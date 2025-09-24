@@ -589,11 +589,17 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
   display:grid; gap: var(--space);
   grid-template-columns: 180px minmax(560px, 720px) 380px; /* balance / list / form */
   grid-template-areas: "balance list form";
-  justify-content:center; align-items:start;
+  justify-content:center; align-items:stretch;
+  grid-auto-rows: 1fr;
 }
 #page-input #acctBalanceCard{ grid-area: balance; display:block; }
 #page-input .tx-panel{ grid-area: list; min-width: 0; }
 #page-input .form-card{ grid-area: form; width:380px; max-width:100%; margin-inline:auto; }
+
+#page-input #acctBalanceCard,
+#page-input .tx-panel,
+#page-input .form-card{ align-self:stretch; height:100%; }
+#page-input .tx-panel{ display:flex; flex-direction:column; min-height:0; }
 
 /* 抽屜開啟讓出右側 */
 @media (min-width:1024px){
@@ -603,13 +609,15 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
 /* 手機：balance/form 上、list 下 */
 @media (max-width:1024px){
   #page-input .input-layout{
-    grid-template-columns: 300px 1fr !important;
+    grid-template-columns: 1fr 1fr !important;
     grid-template-areas:
       "balance form"
       "list    list" !important;
     column-gap: calc(var(--space) + 4px);
-    row-gap: calc(var(--space) + 8px);
+    row-gap: var(--space);
     margin-right:0;
+    align-items:stretch;
+    grid-auto-rows:1fr;
   }
   #page-input .form-card{ width:auto; max-width:100%; }
   #page-input .tx-panel{ width:100%; }
@@ -728,11 +736,19 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
 
 /* 清單 viewport 與表格 */
 #page-input .tx-viewport{
-  position:relative; height:35vh; overflow:auto;
+  position:relative;
+  height:100%;
+  min-height:0;
+  max-height:none;
+  overflow:auto;
   border:1px solid color-mix(in oklab, var(--tint) 12%, transparent);
-  border-radius:12px; background: color-mix(in oklab, var(--surface) 70%, transparent);
+  border-radius:12px;
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  flex:1 1 auto;
 }
-@media (max-width: 1024px){ #page-input .tx-viewport{ height: calc(35vh - 12px); } }
+@media (max-width: 1024px){
+  #page-input .tx-viewport{ height:100%; min-height:0; max-height:none; }
+}
 #page-input #txSpacer{ height:0; }
 #page-input .tx-table{
   width:100%; border-collapse:separate; border-spacing:0; position:absolute; left:0; right:0; top:0;
@@ -1389,5 +1405,11 @@ body.hdr-fab-open #hdrFabMenu{
 
 /* KPI 數字已在 HTML 加了 .chip，沿用全站膠囊風格 */
 
+
+
+@media (max-width:1024px){
+  #page-input #acctBalanceCard,
+  #page-input .form-card{ height:100%; }
+}
 
 </style>
