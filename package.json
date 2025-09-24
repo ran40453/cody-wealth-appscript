@@ -1,0 +1,10 @@
+{
+  "name": "cody-wealth-appscript",
+  "private": true,
+  "scripts": {
+    "pull": "clasp pull",
+    "push": "clasp push",
+    "ver": "clasp version",
+    "zip": "bash ./sync_and_zip.sh"
+  }
+}

@@ -1,0 +1,70 @@
+# Cody Apps Script 工作流小抄 (macOS)
+
+📂 專案資料夾：  
+~/cody-wealth-appscript
+
+---
+
+## 🚀 日常流程
+cd ~/cody-wealth-appscript
+
+# 1. 推送到 Apps Script（更新測試部署）
+npm run push
+
+# 2. 在 Apps Script → Deploy → Test deployments 測試
+
+# 3. 建版本快照（可選）
+npm run ver --msg="修改說明"
+
+# 4. Git 紀錄
+git add .
+git commit -m "feat: 修改說明"
+
+# 5. 壓縮備份（可選）
+npm run zip
+
+---
+
+## 🔄 從雲端拉回最新
+npm run pull
+
+---
+
+## 🗂️ 初始化 Git（只做一次）
+cd ~/cody-wealth-appscript
+git init
+echo "node_modules/" >> .gitignore
+echo "_dist/" >> .gitignore
+git add .
+git commit -m "chore: initial commit with clasp project"
+
+---
+
+## 📦 產生 zip 備份檔（手動單行）
+mkdir -p _dist; STAMP=$(date +"%Y%m%d_%H%M%S"); ZIP="_dist/appsScript_$STAMP.zip"; \\
+zip -rq "$ZIP" . -x "*.git*" -x "*node_modules*" -x "*_dist*"; echo "打包完成：$ZIP"
+
+---
+
+⚡ 重點提醒：
+- 測試部署永遠跑最新 push，不需重複 deploy。
+- 正式部署才會綁定特定版本（除非要分享給他人，不然不用管）。
+- zip 備份與 Git 都是保險，多一層安全。
+
+
+Your identification has been saved in /Users/cody/.ssh/id_ed25519
+Your public key has been saved in /Users/cody/.ssh/id_ed25519.pub
+The key fingerprint is:
+SHA256:KxVyvTzZgRC6QbmpcLNB05YkmcglVl4TrQio5K5jtJU ran40453@gmail.com
+The key's randomart image is:
++--[ED25519 256]--+
+| oo++=*=o.       |
+|.o+o=+=o.o .     |
+|+  o.+++o o .    |
+|... = += o + .   |
+|.  o.=. S = .    |
+| o Eo  . . .     |
+|o o   . .        |
+|oo     .         |
+|..               |
++----[SHA256]-----+
