@@ -278,7 +278,7 @@ function loadTx(account){
         <td class="txt">${esc(r.date||'')}</td>
         <td class="txt"><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account||'').toLowerCase())}">${esc(r.account||'')}</span></td>
         <td class="txt">${esc(r.item||'')}</td>
-        <td class="num">${fmtMoney(r.amount)}</td>
+        <td class="num"><span class="mask-num" data-mask-str="＊＊＊">${fmtMoney(r.amount)}</span></td>
         <td class="txt"><span class="tx-chip tx-chip--status ${isPln?'planned':'posted'}">${esc((r.status||'').toLowerCase())}</span></td>
       </tr>`;
     }).join('');
@@ -365,14 +365,14 @@ function renderBalanceCard(activeAccount){
           const txt = Math.round(Number(balance)||0).toLocaleString('zh-Hant-TW');
           return `<div class="bal-row">
                     <span class="name">${esc(account)}</span>
-                    <span class="bal-chip ${cls}">${txt}</span>
+                    <span class="bal-chip ${cls} mask-num" data-mask-str="＊＊＊">${txt}</span>
                   </div>`;
         }).join('')
       : `<div class="bal-row empty">（無資料）</div>`;
 
     const total = items.reduce((t,x)=>t+(Number(x.balance)||0),0);
     const totalTxt = Math.round(total).toLocaleString('zh-Hant-TW');
-    const totalHTML = `<div class="bal-row total"><span class="name">合計</span><span class="bal-chip total">${totalTxt}</span></div>`;
+    const totalHTML = `<div class="bal-row total"><span class="name">合計</span><span class="bal-chip total mask-num" data-mask-str="＊＊＊">${totalTxt}</span></div>`;
     return titleHTML + rowsHTML + totalHTML;
   };
 
@@ -383,7 +383,7 @@ function renderBalanceCard(activeAccount){
   const sumPlanned = planned.reduce((t,x)=>t+(Number(x.balance)||0),0);
   const grand      = Math.round(sumPosted + sumPlanned).toLocaleString('zh-Hant-TW');
 
-  const grandHTML = `<hr class="bal-divider"><div class="grand-total-wrap"><span class="bal-chip total">${grand}</span></div>`;
+  const grandHTML = `<hr class="bal-divider"><div class="grand-total-wrap"><span class="bal-chip total mask-num" data-mask-str="＊＊＊">${grand}</span></div>`;
 
   cardEl.innerHTML = `<div class="bal-sec">${postedHTML}</div><div class="bal-sec">${plannedHTML}</div>${grandHTML}`;
 }

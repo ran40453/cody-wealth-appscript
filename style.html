@@ -307,23 +307,6 @@ td.num{ text-align:right; }
 }
 
 /* =========================================================
-   #5 Dashboard（核心）
-   ========================================================= */
-.dash-stick-card{ position:sticky; top:var(--hdrH); z-index:700; }
-.dash-top{ display:grid; gap:var(--space); grid-template-columns:2fr 1fr; }
-@media (max-width:1024px){ .dash-top{ grid-template-columns:1fr; } }
-.chartBox{ display:flex; flex-direction:column; gap:10px; }
-.chartWrap{ min-width:0; }
-.chartWrap canvas{ display:block; width:100% !important; height: var(--chart-h-desktop) !important; }
-@media (max-width:1024px){ .chartWrap canvas{ height: var(--chart-h-mobile) !important; } }
-#chartBox.collapsed .chartWrap canvas{ height:84px !important; }
-.kindBtns{ display:flex; gap:8px; margin-top:12px; }
-.kindBtn{ min-height:36px; padding:0 12px; border-radius:10px; cursor:pointer; font-weight:800; border:1px solid color-mix(in oklab, var(--tint) 25%, transparent); background:transparent; color:var(--text); }
-.kindBtn.active{ background: color-mix(in oklab, var(--tint) 36%, transparent); border-color: color-mix(in oklab, var(--tint) 60%, transparent); color:#fff; }
-:root.light .kindBtn{ color:#0b1526; }
-:root.light .kindBtn.active{ color:#fff; }
-
-/* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
    ========================================================= */
 /* 6.1 Chips */
