@@ -37,7 +37,7 @@
   --sum-label-size:      calc(18px / var(--ui-scale));
   --sum-num-size:        calc(18px / var(--ui-scale));
 
-  --tabbar-h:            72px;
+  --tabbar-h:            90px;
   --tab-ico-circle:      48px;
   --tab-ico-font:        22px;
   --tab-text:            12.5px;
@@ -90,6 +90,11 @@
   --input-h:             66px;
   --toggle-w-desktop:    88px;
   --toggle-w-mobile:     132px;
+
+  --app-header-h: var(--hdrH);
+  --app-tabbar-h: calc(var(--tabbar-h) * var(--ui-scale));
+  --tabbar-extra:       20px; /* 額外底部留白（內容與 Tabbar 之間） */
+
 }
 :root.light{
   --bg:#f6f8fb; --surface:#ffffff; --card:#ffffff; --text:#0b1526; --muted:#5a6b7f;
@@ -113,7 +118,7 @@ body{
 }
 .app{
   max-width: var(--container-max); margin:0 auto;
-  padding: env(safe-area-inset-top) 16px calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+  padding: env(safe-area-inset-top) 16px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra));
 }
 /* 鎖捲時避免跳動 */
 .lock-scroll body{ position: fixed; width: 100%; top: calc(-1 * var(--scrollY)); left: 0; right: 0; overflow: hidden; }
@@ -533,7 +538,12 @@ td.num{ text-align:right; }
 /* =========================================================
    #9 Bottom Tabbar（mobile）
    ========================================================= */
-.tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:var(--z-tabbar); display:grid; grid-template-columns:repeat(5,1fr); gap:0; align-items:center; height: calc(var(--tabbar-h) * var(--ui-scale)); background: color-mix(in oklab, var(--bg) 90%, transparent); backdrop-filter: blur(10px) saturate(120%); border-top:1px solid color-mix(in oklab, var(--tint) 18%, transparent); padding:0 max(env(safe-area-inset-left),10px) calc(env(safe-area-inset-bottom)) max(env(safe-area-inset-right),10px); }
+.tabbar{ position:fixed; left:0; right:0; bottom:0; z-index:var(--z-tabbar); 
+  display:grid; grid-template-columns:repeat(5,1fr); 
+  gap:0; align-items:center; height: calc(var(--tabbar-h) * var(--ui-scale)); 
+  background: color-mix(in oklab, var(--bg) 90%, transparent); 
+  backdrop-filter: blur(10px) saturate(120%); border-top:1px solid color-mix(in oklab, var(--tint) 18%, transparent); 
+  padding: 0 60px calc(env(safe-area-inset-bottom) + var(--tabbar-extra)) 60px; }
 .tabbtn{ appearance:none; background:transparent; border:none; color:var(--text); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; width:100%; height:100%; cursor:pointer; -webkit-tap-highlight-color: transparent; }
 .tabbtn .ico.circle{ width: calc(var(--tab-ico-circle) * var(--ui-scale)); height: calc(var(--tab-ico-circle) * var(--ui-scale)); border-radius:999px; display:grid; place-items:center; background: color-mix(in oklab, var(--card) 82%, transparent); border:1px solid color-mix(in oklab, var(--tint) 18%, transparent); transition: transform .08s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease; }
 .tabbtn .ico{ font-size: calc(var(--tab-ico-font) * var(--ui-scale)) !important; line-height:1 !important; }
@@ -609,6 +619,8 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
 /* 手機：balance/form 上、list 下 */
 @media (max-width:1024px){
   #page-input .input-layout{
+    height: calc(100dvh - var(--app-header-h, 56px) - var(--app-tabbar-h, 56px));
+    grid-template-rows: 1fr 1fr; /* 上半 balance+form、下半 list 各佔一半 */
     grid-template-columns: 1fr 1fr !important;
     grid-template-areas:
       "balance form"
@@ -651,7 +663,7 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
   display:inline-grid; place-items:center; cursor:pointer; user-select:none;
   height: var(--input-h); min-width: var(--toggle-w-desktop);
   border-radius:10px; border:1px solid color-mix(in oklab, var(--tint) 35%, transparent);
-  background:transparent; color:var(--text); font-weight:400; font-size: 1.25em;
+  background: var(--tint); color:var(--text); font-weight:400; font-size: 1.25em;
 }
 #page-input .toggleSign:hover{ filter: brightness(1.05); }
 #page-input #btnSubmit.btn{ font-size: 20px; font-weight:400; }
@@ -683,10 +695,18 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
   #page-input .form-card.grid .btn,
   #page-input .form-card.grid .btn-ghost{ width:30%; max-width:30%; display:block; }
 
-  #page-input .toggleSign.btn-ghost{
-    height: var(--input-h); min-height: var(--input-h); line-height: var(--input-h);
-    padding-top:0; padding-bottom:0; box-sizing:border-box; font-size:1em; font-weight:400;
-    background:#ff6a00; border-color:#ff6a00; color:#111;
+   #page-input .toggleSign.btn-ghost{
+    height: var(--input-h);
+    min-height: var(--input-h);
+    line-height: var(--input-h);
+    padding-top: 0;
+    padding-bottom: 0;
+    box-sizing: border-box;
+    font-size: 1em;
+    font-weight: 700;
+    background: var(--tint);
+    border-color: var(--tint);
+    color: #fff;
   }
 }
 
@@ -707,6 +727,53 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
 @media (max-width:1024px){
   #page-input .actions .btn, #page-input .actions .btn-ghost{ width:50vw; max-width:260px; }
 }
+
+/* === Form actions：三顆按鈕同尺寸、平均分布 === */
+#page-input .form-actions{
+  display:flex;
+  gap:10px;
+  justify-content:space-between;   /* 三顆拉開 */
+  align-items:center;
+}
+
+/* 同一份設定也套用到舊的 .actions 容器（若還在用） */
+#page-input .actions,
+#page-input .form-actions{
+  display:flex;
+  gap:10px;
+}
+
+/* 三顆按鈕共用外觀（高度/字級一致，平均分配寬度） */
+#page-input .actions .btn,
+#page-input .actions .btn-ghost,
+#page-input .form-actions .btn,
+#page-input .form-actions .btn-ghost{
+  height: var(--input-h);
+  min-height: var(--input-h);
+  padding: 0 16px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 1 0;           /* ← 平均分配寬度 */
+  width: auto;
+  max-width: none;
+  font-size: calc(var(--form-font) * var(--ui-scale));
+  font-weight: 700;
+}
+
+/* 把原本 Submit 的特例字級/字重拉回來（覆蓋舊規則） */
+#page-input #btnSubmit{
+  font-size: calc(var(--form-font) * var(--ui-scale));
+  font-weight: 700;
+}
+/* 如果你有獨立的 ID 給 Clear / Update，同步一下（保險起見） */
+#page-input #btnClear,
+#page-input #btnUpdateTx{
+  font-size: calc(var(--form-font) * var(--ui-scale));
+  font-weight: 700;
+}
+
 
 /* 13.3 左側清單（Toolbar / Select / 表格） */
 #page-input .tx-toolbar{
@@ -1410,6 +1477,26 @@ body.hdr-fab-open #hdrFabMenu{
 @media (max-width:1024px){
   #page-input #acctBalanceCard,
   #page-input .form-card{ height:100%; }
+}
+
+/* === Mobile：form-actions 仍維持橫向平均排列 === */
+@media (max-width:1024px){
+  #page-input .form-card.grid .form-actions{
+    display:flex;
+    flex-direction: row;            /* ← 不要直向 */
+    gap:10px;
+    justify-content: space-between;
+    align-items:center;
+  }
+  #page-input .form-card.grid .form-actions .btn,
+  #page-input .form-card.grid .form-actions .btn-ghost,
+  #page-input .actions .btn,
+  #page-input .actions .btn-ghost{
+    width: auto !important;
+    max-width: none !important;
+    display: inline-flex;
+    flex: 1 1 0;                    /* ← 平均分配 */
+  }
 }
 
 </style>
