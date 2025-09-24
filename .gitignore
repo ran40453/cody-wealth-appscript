@@ -2,3 +2,4 @@ node_modules/
 _dist/
 node_modules/
 _dist/
+.DS_Store
