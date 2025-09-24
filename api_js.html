@@ -1,0 +1,53 @@
+<script>
+const API = {
+  getMeta:        (cb)           => google.script.run.withSuccessHandler(cb).getMeta(),
+  getSummaryCF:   (cb)           => google.script.run.withSuccessHandler(cb).getSummaryCF(),
+  getTxByKind:    (kind, cb)     => google.script.run.withSuccessHandler(cb).getTxByKind(kind),
+  getTransactions:(q, cb)        => google.script.run.withSuccessHandler(cb).getTransactions(q),
+  getCTBCInvestments:(cb)        => google.script.run.withSuccessHandler(cb).getCTBCInvestments(),
+  getRecordLatest:(cb)           => google.script.run.withSuccessHandler(cb).getRecordLatest(),
+  getDashboardData:(cb)          => google.script.run.withSuccessHandler(cb).getDashboardData(),
+  getDatabaseRows:(q, cb, fb)    =>
+    google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).getDatabaseRows(q),
+  getCashflowUrl: (cb)           => google.script.run.withSuccessHandler(cb).getCashflowUrl(),
+  getCTBCInterestCell:(row, cb, fb) =>
+    google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).getCTBCInterestCell(row),
+  setCTBCInterestUSD:(row, val, cb, fb) =>
+    google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).setCTBCInterestUSD(row, val),
+  submitCashflow: (rec, cb, fb)  =>
+    google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).submitCashflow(rec),
+
+  // 保單相關：注意 key 不重複，屬性之間都有逗號
+  getPolicyGrowth:      (cb, fb) => google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).getPolicyGrowth(),
+  focusPolicyControls:  (cb, fb) => google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).focusPolicyControls(),
+  openPolicyControls:   (cb, fb) => google.script.run.withSuccessHandler(cb).withFailureHandler(fb||console.error).openPolicyControls()
+};
+
+// === 行動版旗標 ===
+function isMobile() {
+  return window.matchMedia('(max-width: 1024px)').matches;
+}
+function applyMobileFlag(){
+  document.documentElement.classList.toggle('is-mobile', isMobile());
+}
+document.addEventListener('DOMContentLoaded', applyMobileFlag);
+window.addEventListener('resize', applyMobileFlag);
+
+// === go() 增強（保留你原本 go）===
+function updateTabbarActive(page){
+  const bar = document.getElementById('tabbar');
+  if (!bar) return;
+  bar.querySelectorAll('.tabbtn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.to === page);
+  });
+}
+(function enhanceGo(){
+  const __go = window.go;
+  window.go = function(page){
+    __go(page);
+    applyMobileFlag();
+    updateTabbarActive(page);
+    if (isMobile() && window.App?.drawerOpen) window.toggleDrawer?.();
+  };
+})();
+</script>

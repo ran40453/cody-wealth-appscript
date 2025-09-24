@@ -1,0 +1,273 @@
+<!-- acc_js.html -->
+<script>
+window.App = window.App || {};
+App.routes = App.routes || {};
+App.modules = App.modules || {};
+App.widgets = App.widgets || {};
+
+/* ========= 總金額膠囊 ========= */
+/* ========= Totals：用本地 list 合計為主；Delta 走後端；提供 setFromList ========= */
+// Totals：以前端 list 合計為主；Delta 仍可從後端抓（保留）
+App.widgets.accTotals = (function(){
+  function fmt1(n){
+    const v = Number(n) || 0;
+    return v.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  }
+  function setUI(total, today){
+    if (total !== undefined) {
+      document.querySelectorAll('.js-accTotalVal').forEach(el=>{
+        el.textContent = fmt1(total);
+        // 讓遮罩不位移
+        el.classList.add('mask-num');
+        el.dataset.maskStr = '＊＊＊';
+      });
+    }
+    if (today !== undefined){
+      document.querySelectorAll('.js-accDeltaVal').forEach(el=>{
+        const v = Number(today) || 0;
+        const sign = v >= 0 ? '+' : '';
+        el.textContent = `${sign}${fmt1(v)} 今日`;
+        el.classList.toggle('pos', v>=0);
+        el.classList.toggle('neg', v<0);
+        el.classList.add('mask-num');
+        el.dataset.maskStr = '＊＊＊ 今日';
+      });
+    }
+  }
+  function refresh(){
+    if (!(google && google.script && google.script.run)) return;
+    google.script.run.withSuccessHandler(d => setUI(d.total, d.today)).getDashNumbers();
+  }
+  function ensureBar(target){
+    if (!target || target.querySelector('.totalbar')) return;
+    const wrap = document.createElement('div');
+    wrap.className = 'totalbar';
+    wrap.innerHTML = `
+      <span class="totalchip">總金額 <b class="js-accTotalVal">—</b></span>
+      <span class="delta js-accDeltaVal">— 今日</span>`;
+    target.appendChild(wrap);
+    target.hidden = false;
+  }
+  function init(){
+    ensureBar(document.querySelector('#page-acc #mount-total-desktop'));
+    ensureBar(document.querySelector('#page-acc #mount-total-mobile'));
+    refresh();
+  }
+  return { init, setUI, refresh };
+})();
+
+
+/* ========= 主頁：掛箭頭、用本地合計推總額、最近異動無限筆 ========= */
+App.modules = App.modules || {};
+App.modules.pageAcc = (function(){
+  let list = [];
+  let currentIndex = -1;
+  let debounceTimer = null;
+
+  const el = {};
+  function $(id){ return document.getElementById(id); }
+
+  function init(){
+    el.grid      = $('accGrid');
+    el.edName    = $('edName');
+    el.edPrev    = $('edPrev');   // 仍保留但隱藏
+    el.edNext    = $('edNext');   // 仍保留但隱藏
+    el.edCur     = $('edCur');
+    el.edInput   = $('edInput');
+    el.edPreview = $('edPreview');
+    el.chipOrig  = $('chipOrig');
+    el.chipSaved = $('chipSaved');
+    el.status    = $('accStatus');
+    el.recent    = $('recentList');
+    el.navPrev   = $('accNavPrev');
+    el.navNext   = $('accNavNext');
+
+    // 麵包屑 current → 帳戶快更
+    const crumbCur = document.querySelector('.crumb .current');
+    if (crumbCur) crumbCur.textContent = '帳戶快更';
+
+    if (el.navPrev) el.navPrev.onclick = ()=> selectPrev();
+    if (el.navNext) el.navNext.onclick = ()=> selectNext();
+
+    el.edInput.addEventListener('input', onType);
+    el.edInput.addEventListener('keydown', onKeyNav);
+    el.submit = document.getElementById('accSubmit');
+      if (el.submit){
+        el.submit.addEventListener('click', ()=> {
+          // 只做儲存，不自動跳下一筆（你若要，改成 flushSave(()=>selectNext())）
+          flushSave();
+        });
+      }
+
+    try { App.widgets.accTotals.init(); } catch(_){}
+    load();
+  }
+
+  function onKeyNav(e){
+    if (e.key === 'Enter' && !e.shiftKey){ flushSave(()=>selectNext()); e.preventDefault(); }
+    else if (e.key === 'Enter' && e.shiftKey){ flushSave(()=>selectPrev()); e.preventDefault(); }
+  }
+  function setStatus(s){ if (el.status) el.status.textContent = '狀態：'+(s||''); }
+
+  function load(){
+    setStatus('讀取中…');
+    google.script.run.withSuccessHandler(res=>{
+      list = res || [];
+      renderGrid();
+      if (list.length) select(0);
+      setStatus('');
+
+      // ★ 總額用本地合計（和 span.amt 同一路）
+      try { App.widgets.accTotals.setFromList(list); } catch(_){}
+      // Delta 獨立刷新一次
+      try { App.widgets.accTotals.refreshDelta(); } catch(_){}
+    }).withFailureHandler(e=> setStatus('讀取失敗：'+e.message))
+      .getAccountsLite();
+  }
+
+  function renderGrid(){
+    el.grid.innerHTML = list.map((x,i) => `
+      <button class="cap" data-idx="${i}" data-cur="${escapeHTML(x.Currency||'')}" title="${escapeHTML(x.AccountName)}">
+        <span class="left">
+          <span class="name">${escapeHTML(x.AccountName)}</span>
+          <span class="cur">${escapeHTML(x.Currency || '')}</span>
+        </span>
+        <span class="amt">${fmt(x.Balance)}</span>
+      </button>
+    `).join('');
+    el.grid.querySelectorAll('.cap').forEach(btn=>{
+      btn.addEventListener('click', ()=> select(Number(btn.dataset.idx)));
+    });
+  }
+
+  function select(idx){
+    if (idx<0 || idx>=list.length) return;
+    currentIndex = idx;
+
+    const cur  = list[idx];
+    const prev = list[idx-1];
+    const next = list[idx+1];
+
+    if (el.edName)    el.edName.textContent    = cur.AccountName || '—';
+    if (el.edCur)     el.edCur.textContent     = cur.Currency || '';
+    if (el.edCur)     el.edCur.setAttribute('data-cur', cur.Currency || '');
+    if (el.chipOrig)  el.chipOrig.textContent  = fmt(cur.Balance);
+    if (el.chipSaved) el.chipSaved.textContent = '—';
+    if (el.edInput)   el.edInput.value         = '';
+    if (el.edPreview) el.edPreview.textContent = '預覽：—';
+
+    // 文字版上一筆/下一筆保留邏輯但不顯示
+    if (el.edPrev){ el.edPrev.onclick = prev ? ()=>select(currentIndex-1) : null; }
+    if (el.edNext){ el.edNext.onclick = next ? ()=>select(currentIndex+1) : null; }
+
+    setTimeout(()=> el.edInput && el.edInput.focus(), 0);
+    // 高亮左側對應膠囊（淺黃）
+    el.grid.querySelectorAll('.cap.is-active').forEach(n=>n.classList.remove('is-active'));
+    const activeBtn = el.grid.querySelector(`.cap[data-idx="${currentIndex}"]`);
+    if (activeBtn) activeBtn.classList.add('is-active');
+
+  }
+
+  function selectNext(){ if (currentIndex < list.length-1) select(currentIndex+1); }
+  function selectPrev(){ if (currentIndex > 0) select(currentIndex-1); }
+
+  function onType(){
+    const raw = (el.edInput.value||'').trim();
+    if (!raw){ if (el.edPreview) el.edPreview.textContent = '預覽：—'; clearTimeout(debounceTimer); return; }
+    clearTimeout(debounceTimer);
+
+    const pv = tryEvalLocal(raw);
+    if (el.edPreview) el.edPreview.textContent = (pv != null) ? ('預覽：'+fmt(pv)) : '預覽：…';
+
+    debounceTimer = setTimeout(()=> previewAndSave(raw), 500);
+  }
+
+  function flushSave(cb){
+    const raw = (el.edInput.value||'').trim();
+    if (!raw) return;
+    previewAndSave(raw, true, cb);
+  }
+
+  function previewAndSave(raw, forceNow=false, cb){
+    const cur = list[currentIndex];
+    if (!cur) return;
+    const oldVal = Number(cur.Balance)||0;
+
+    const doSave = (num)=>{
+      if (num == null || Number.isNaN(num)) { setStatus('無效算式'); return; }
+      setStatus('儲存中…');
+      if (el.edPreview) el.edPreview.textContent = '預覽：'+fmt(num)+'（儲存中…）';
+
+      google.script.run.withSuccessHandler(res=>{
+        if (res && res.ok){
+          cur.Balance = Number(res.saved)||0;
+
+          const capAmt = el.grid.querySelector(`.cap[data-idx="${currentIndex}"] .amt`);
+          if (capAmt) capAmt.textContent = fmt(cur.Balance);
+
+          if (el.chipSaved)  el.chipSaved.textContent = fmt(cur.Balance);
+          if (el.edPreview)  el.edPreview.textContent = '預覽：'+fmt(cur.Balance)+'（已儲存 ✓）';
+          setStatus('已儲存 ✓');
+
+          // 最近異動：無限筆（捲動容器）
+          pushRecent(cur.AccountName, oldVal, cur.Balance);
+
+          // ★ 總額用本地合計；Delta 再向後端拉
+          try { App.widgets.accTotals.setFromList(list); } catch(_){}
+          try { App.widgets.accTotals.refreshDelta(); } catch(_){}
+
+          window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
+          if (el.edInput) el.edInput.value = '';
+          if (typeof cb === 'function') cb();
+        } else {
+          setStatus('儲存失敗');
+        }
+      }).withFailureHandler(e=> setStatus('錯誤：'+e.message))
+        .setBalance({ id: cur.ID, value: Number(num) });
+    };
+
+    if (/^=/.test(raw)){
+      if (!forceNow){ clearTimeout(debounceTimer); debounceTimer = setTimeout(()=> previewAndEvalBySheet(raw, doSave), 800); }
+      else previewAndEvalBySheet(raw, doSave);
+    } else {
+      doSave(tryEvalLocal(raw));
+    }
+  }
+
+  function pushRecent(name, fromVal, toVal){
+    if (!el.recent) return;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    const ss = String(now.getSeconds()).padStart(2,'0');
+    const line = `${hh}:${mm}:${ss}:${name}由${fmt(fromVal)}修改至${fmt(toVal)}`;
+    const li = document.createElement('li');
+    li.textContent = line;
+    el.recent.insertBefore(li, el.recent.firstChild); // 最新在最上
+  }
+
+  function previewAndEvalBySheet(expr, cb){
+    setStatus('計算中…');
+    google.script.run.withSuccessHandler(res=>{
+      if (res && res.ok){ if (el.edPreview) el.edPreview.textContent = '預覽：'+fmt(res.value); cb(res.value); }
+      else setStatus('公式錯誤');
+    }).withFailureHandler(e=> setStatus('公式錯誤：'+e.message))
+      .evalBySheetsEngine(expr);
+  }
+
+  /* 工具 */
+  function tryEvalLocal(s){
+    if (!/^[\d\s+\-*/().]+$/.test(s)) return null;
+    try{ const v = Function('"use strict";return('+s+')')(); return (typeof v==='number' && isFinite(v)) ? v : null; }
+    catch(_){ return null; }
+  }
+  function fmt(n){ const x = Number(n)||0; return x.toLocaleString(undefined,{maximumFractionDigits:0}); }
+  function escapeHTML(s){ return String(s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
+  return { init };
+})();
+
+/* ====== 路由掛載：鍵名 acc（go('acc')） ====== */
+// acc_js.html 末尾改成函式
+App.routes["acc"] = () => App.modules.pageAcc.init();
+</script>

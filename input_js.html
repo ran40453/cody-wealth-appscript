@@ -1,0 +1,497 @@
+<script>
+/* =========================================================
+   page_input 專用 JS（表單、虛擬清單、編輯覆寫、狀態篩選、iOS 防放大）
+   ========================================================= */
+window.App = window.App || {};
+App.modules = App.modules || {};
+
+App.modules.pageInput = (function(){
+  /* ===== 左側虛擬清單狀態 ===== */
+  const vs = {
+    rowH: 44,
+    viewport: null, spacer: null, head: null, body: null,
+    rows: [], view: [], last: [-1, -1],
+    filters: { planned: true, posted: true },
+
+    // 編輯狀態（目前選中的試算表實際列號，以及列資料）
+    selectedRow: null,
+    selectedRec: null,
+    selectedEl:  null
+  };
+
+  /* ===== 入口 ===== */
+  function init(){
+    // 預填今天日期
+    const d = byId('inDate');
+    if (d){ const today = new Date(); d.value = today.toISOString().slice(0,10); }
+
+    bindForm();
+    // 篩選器
+    const cPln = byId('statusFilterPlanned');
+    const cPst = byId('statusFilterPosted');
+    if (cPln) cPln.addEventListener('change', ()=>{ vs.filters.planned = !!cPln.checked; applyStatusFilter(); });
+    if (cPst) cPst.addEventListener('change', ()=>{ vs.filters.posted  = !!cPst.checked; applyStatusFilter(); });
+
+    // 虛擬清單視口
+    setupViewport();
+
+    // 取帳戶/交易資料
+    if (google?.script?.run){
+      google.script.run.withSuccessHandler(meta=>fillAccounts(meta?.accounts||[])).getMeta();
+      loadTx(); // 預設全帳戶
+    }
+  }
+
+  /* ===== 表單 ===== */
+  function bindForm(){
+  // ± 切換
+  const btn = byId('btnToggleSign');
+  const amt = byId('inAmount');
+  if (btn && amt){
+    btn.addEventListener('click', ()=>{
+      const v = String(amt.value || '').trim();
+      if (!v){ amt.value = ''; return; }
+      const n = parseFloat(v);
+      if (!isFinite(n)) return;
+      amt.value = (n === 0) ? '0' : String(-n);
+    });
+  }
+
+  // 送出（新增一筆）
+  byId('btnSubmit')?.addEventListener('click', ()=>{
+    const rec = collect();
+    if (!rec.account || rec.amount === '' || isNaN(rec.amount)){
+      alert('請確認「金額」與「帳戶」。'); return;
+    }
+    google.script.run
+      .withSuccessHandler(()=>{
+        clearFormAndSelection(false);
+        App?.modules?.pageInput?.reloadList?.();  // 直接重抓目前帳戶清單
+        updateBalanceCard();
+        window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
+      })
+      .withFailureHandler(err=>{
+        console.error('submitCashflow failed:', err);
+        alert('送出失敗：' + (err?.message || err));
+      })
+      .submitCashflow(rec);   // ★ 這行一定要有！
+  });
+
+  // 清空（也同時取消選取狀態）
+  byId('btnClear')?.addEventListener('click', clearFormAndSelection);
+
+  // 更新（覆寫所選列，不新增）
+  byId('btnUpdateTx')?.addEventListener('click', ()=>{
+    if (!vs.selectedRow){
+      alert('請先在左側清單點選要編輯的一列'); return;
+    }
+    const rec = collect();
+    if (!rec.account || rec.amount === '' || isNaN(rec.amount)){
+      alert('請確認「金額」與「帳戶」。'); return;
+    }
+    google.script.run
+      .withSuccessHandler(()=>{
+        clearFormAndSelection(false);
+        App?.modules?.pageInput?.reloadList?.();
+        updateBalanceCard();
+        window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
+      })
+      .withFailureHandler(err=>{
+        console.error('updateTransaction failed:', err);
+        alert('更新失敗：' + (err?.message || err));
+      })
+      .updateTransaction(vs.selectedRow, rec);
+  });
+
+  // 左側帳戶篩選（虛擬清單）
+  byId('txAccountPick')?.addEventListener('change', ()=> loadTx(byId('txAccountPick').value || ''));
+
+  updateBalanceCard();
+  }
+
+  function collect(){
+    const date    = byId('inDate')?.value || '';
+    const item    = byId('inItem')?.value || '';
+    const amountV = byId('inAmount')?.value || '';
+    const account = byId('inAccount')?.value || '';
+    const status  = byId('inStatus')?.value || 'auto';
+    const note    = byId('inNote')?.value || '';
+    const amount  = amountV === '' ? '' : Number(amountV);
+    return { date, item, amount, account, status, note };
+  }
+
+  function clearForm(){
+    ['inItem','inAmount','inAccount','inNote'].forEach(id=>{
+      const el = byId(id);
+      if (!el) return;
+      if (el.tagName === 'SELECT') el.value = '';
+      else el.value = '';
+    });
+  }
+
+  function clearFormAndSelection(keepForm=false){
+    // 清表單
+    if (!keepForm) clearForm();
+
+    // 取消列選取
+    if (vs.selectedEl) vs.selectedEl.classList.remove('selected');
+    vs.selectedEl  = null;
+    vs.selectedRow = null;
+    vs.selectedRec = null;
+
+    // 鎖回更新鈕
+    const btnUpd = byId('btnUpdateTx');
+    if (btnUpd) btnUpd.disabled = true;
+  }
+
+  function fillAccounts(list){
+    const selA = byId('inAccount');
+    const selT = byId('txAccountPick');
+    if (selA){
+      const v = selA.value;
+      selA.innerHTML = `<option value="">請選擇帳戶</option>` + list.map(a=>`<option>${esc(a)}</option>`).join('');
+      selA.value = v || '';
+    }
+    if (selT){
+      const v = selT.value;
+      selT.innerHTML = `<option value="">請選擇帳號（顯示全部）</option>` + list.map(a=>`<option>${esc(a)}</option>`).join('');
+      selT.value = v || '';
+    }
+  }
+
+  /* ===== 左側清單：虛擬捲動 ===== */
+  function setupViewport(){
+  // 允許用 id 或 class，避免 HTML 改掉 id 就炸
+  vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
+  vs.spacer   = document.getElementById('txSpacer')   || document.querySelector('#page-input #txSpacer');
+  // tbody 沒 id 時，退而求其次抓 tx-table 的 tbody
+  vs.body     = document.getElementById('txBody')     || document.querySelector('#page-input .tx-table tbody');
+  vs.head     = document.getElementById('txHead')     || document.querySelector('#page-input .tx-table thead');
+
+  // 若沒有 spacer，就動態補一個，避免 virtual 計算高度失效
+  if (vs.viewport && !vs.spacer) {
+    vs.spacer = document.createElement('div');
+    vs.spacer.id = 'txSpacer';
+    vs.viewport.appendChild(vs.spacer);
+  }
+
+  if (!vs.viewport) {
+    // 沒 viewport 也不要報錯，等之後再 render（但資料仍可先抓）
+    return;
+  }
+
+  let raf = null;
+  vs.viewport.addEventListener('scroll', ()=>{
+    if (raf) return;
+    raf = requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
+  });
+  // --- 一次性委派：點 tr 進入編輯模式 ---
+  if (vs.body && !vs._boundRowClick) {
+    vs.body.addEventListener('click', (e)=>{
+      const tr = e.target.closest('tr[data-row]');
+      if (!tr) return;
+
+      const row = Number(tr.dataset.row);
+      // 用 _row 找回原始資料（不要用 index，因為 virtual 有切片）
+      const rec = (vs.rows || []).find(r => Number(r._row) === row);
+      if (!rec) return;
+
+      // 先移除舊選取
+      if (vs.selectedEl && vs.selectedEl !== tr) vs.selectedEl.classList.remove('selected');
+
+      // 標記新選取
+      vs.selectedEl  = tr;
+      vs.selectedRow = row;
+      vs.selectedRec = rec;
+      tr.classList.add('selected');
+
+      // 帶入表單並開啟「更新」按鈕
+      fillFormByRec(rec);
+      const btnUpd = document.getElementById('btnUpdateTx');
+      if (btnUpd) btnUpd.disabled = false;
+    });
+    vs._boundRowClick = true;
+  }
+  }
+
+function loadTx(account){
+  if (!google?.script?.run) return;  // 只檢查 GAS 是否可用；不要因為沒有 viewport 就不抓
+  const filter = account ? {account} : {};
+  google.script.run
+    .withSuccessHandler(rows=>{
+      // rows: [{date,item,amount,account,status,note,_row?}]
+      vs.rows = Array.isArray(rows) ? rows : [];
+      applyStatusFilter();            // 依狀態過濾 + 嘗試重畫（如果 DOM 已就緒）
+      updateBalanceCard();            // 左側餘額卡不依賴 viewport，直接更新
+    })
+    .getTransactions(filter);
+}
+
+  function fillFormByRec(rec){
+    if (!rec) return;
+    // 你的表單欄位 id 對應
+    const map = {
+      date:    'inDate',
+      item:    'inItem',
+      amount:  'inAmount',
+      account: 'inAccount',
+      status:  'inStatus',
+      note:    'inNote'
+    };
+    Object.entries(map).forEach(([k, id])=>{
+      const el = byId(id);
+      if (!el) return;
+      el.value = rec[k] ?? '';
+    });
+  }
+
+  function applyStatusFilter(){
+    const f = vs.filters;
+    vs.view = (vs.rows||[]).filter(r=>{
+      const s = String(r.status||'').toLowerCase();
+      return (s==='planned' && f.planned) || (s==='posted' && f.posted);
+    });
+    if (vs.spacer) vs.spacer.style.height = (vs.view.length * vs.rowH) + 'px';
+    vs.last = [-1,-1];
+    renderVirtual();
+  }
+
+  function renderVirtual(){
+    if (!vs.viewport) vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
+    if (!vs.body)     vs.body     = document.getElementById('txBody')     || document.querySelector('#page-input .tx-table tbody');
+    if (!vs.viewport || !vs.body) return;
+    const top = vs.viewport.scrollTop;
+    const h   = vs.viewport.clientHeight;
+    const start = Math.max(0, Math.floor(top / vs.rowH) - 10);
+    const need  = Math.ceil(h / vs.rowH) + 20;
+    const end   = Math.min(vs.view.length, start + need);
+    if (vs.last[0]===start && vs.last[1]===end) return;
+    vs.last = [start, end];
+
+    const slice = vs.view.slice(start, end);
+    vs.body.style.transform = `translateY(${start * vs.rowH}px)`;
+    vs.body.innerHTML = slice.map(r=>{
+      const isPln = ((r.status||'').toLowerCase()==='planned');
+      const sel   = (Number(r._row||0) === Number(vs.selectedRow)) ? ' selected' : '';
+      return `
+      <tr class="${isPln ? 'row-planned' : 'row-posted'}${sel}" data-row="${esc(r._row)}">
+        <td class="txt">${esc(r.date||'')}</td>
+        <td class="txt"><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account||'').toLowerCase())}">${esc(r.account||'')}</span></td>
+        <td class="txt">${esc(r.item||'')}</td>
+        <td class="num">${fmtMoney(r.amount)}</td>
+        <td class="txt"><span class="tx-chip tx-chip--status ${isPln?'planned':'posted'}">${esc((r.status||'').toLowerCase())}</span></td>
+      </tr>`;
+    }).join('');
+
+    if (!slice.length){
+      vs.body.style.transform = 'translateY(0px)';
+      vs.body.innerHTML = `<tr><td class="empty" colspan="5">沒有資料</td></tr>`;
+    }
+  }
+
+  /* ===== utils ===== */
+  function byId(id){ return document.getElementById(id); }
+  function esc(s){ const map={ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":"&#39;" }; return String(s??'').replace(/[&<>"']/g, m=>map[m]); }
+  function fmtMoney(v){
+    const n = Number(v); if (!isFinite(n)) return '—';
+    return n.toLocaleString('zh-Hant-TW',{ minimumFractionDigits:0, maximumFractionDigits:0 });
+  }
+
+  return {
+    init,
+    __getRows: () => vs.rows,
+    reloadList: () => loadTx(document.getElementById('txAccountPick')?.value || '')
+  };
+})();
+
+/* ===== 帳戶餘額：計算工具（沿用你原本的） ===== */
+function computePostedBalancesByAccount(rows){
+  const posted = (rows||[]).filter(r => String(r.status||'').toLowerCase()==='posted');
+  const byAcct = new Map();
+  posted.forEach(r=>{
+    const acct = String(r.account||'').trim();
+    if(!acct) return;
+    (byAcct.get(acct) || byAcct.set(acct, []).get(acct)).push(r);
+  });
+  const out = [];
+  for(const [acct, list] of byAcct.entries()){
+    const currentRows = list.filter(r=>/\bcurrent\b/i.test(String(r.item||'')));
+    if(!currentRows.length) continue;
+    const latest = currentRows
+      .map(r=>({...r,_ts:Date.parse(r.date||'')||0}))
+      .sort((a,b)=>b._ts-a._ts)[0];
+    const base = Number(latest.amount)||0;
+    const others = list.filter(r=>!/\bcurrent\b/i.test(String(r.item||'')));
+    const sumOthers = others.reduce((t,r)=>t+(Number(r.amount)||0),0);
+    out.push({account:acct, balance: base - sumOthers});
+  }
+  return out.sort((a,b)=> a.account.localeCompare(b.account, 'zh-Hant'));
+}
+
+function computePlannedTotalsByAccount(rows){
+  const planned = (rows||[]).filter(r => String(r.status||'').toLowerCase()==='planned');
+  const byAcct = new Map();
+  planned.forEach(r=>{
+    if (/\bcurrent\b/i.test(String(r.item||''))) return;
+    const acct = String(r.account||'').trim();
+    if(!acct) return;
+    const v = -(Number(r.amount)||0);
+    byAcct.set(acct, (byAcct.get(acct)||0) + v);
+  });
+  return Array.from(byAcct.entries())
+    .map(([account, balance])=>({account, balance}))
+    .sort((a,b)=>a.account.localeCompare(b.account,'zh-Hant'));
+}
+
+function renderBalanceCard(activeAccount){
+  const cardEl = document.getElementById('acctBalanceCard');
+  if (!cardEl) return;
+  const rows = App.modules.pageInput?.__getRows?.() || [];
+
+  let posted = computePostedBalancesByAccount(rows);
+  let planned = computePlannedTotalsByAccount(rows);
+
+  if (activeAccount){
+    const acct = String(activeAccount).trim();
+    posted  = posted.filter(x => x.account === acct);
+    planned = planned.filter(x => x.account === acct);
+  }
+
+  const sectionHTML = (title, items) => {
+    const titleHTML = `<div class="section-title"><span class="tx-chip">${title}</span></div>`;
+    const rowsHTML = items.length
+      ? items.map(({account, balance}) => {
+          const cls = balance < 0 ? 'neg' : 'pos';
+          const txt = Math.round(Number(balance)||0).toLocaleString('zh-Hant-TW');
+          return `<div class="bal-row">
+                    <span class="name">${esc(account)}</span>
+                    <span class="bal-chip ${cls}">${txt}</span>
+                  </div>`;
+        }).join('')
+      : `<div class="bal-row empty">（無資料）</div>`;
+
+    const total = items.reduce((t,x)=>t+(Number(x.balance)||0),0);
+    const totalTxt = Math.round(total).toLocaleString('zh-Hant-TW');
+    const totalHTML = `<div class="bal-row total"><span class="name">合計</span><span class="bal-chip total">${totalTxt}</span></div>`;
+    return titleHTML + rowsHTML + totalHTML;
+  };
+
+  const postedHTML  = sectionHTML('Posted', posted);
+  const plannedHTML = sectionHTML('Planned', planned);
+
+  const sumPosted  = posted.reduce((t,x)=>t+(Number(x.balance)||0),0);
+  const sumPlanned = planned.reduce((t,x)=>t+(Number(x.balance)||0),0);
+  const grand      = Math.round(sumPosted + sumPlanned).toLocaleString('zh-Hant-TW');
+
+  const grandHTML = `<hr class="bal-divider"><div class="grand-total-wrap"><span class="bal-chip total">${grand}</span></div>`;
+
+  cardEl.innerHTML = `<div class="bal-sec">${postedHTML}</div><div class="bal-sec">${plannedHTML}</div>${grandHTML}`;
+}
+
+function pickActiveAccount(){
+  return document.getElementById('txAccountPick')?.value
+      || document.getElementById('inAccount')?.value
+      || '';
+}
+
+function updateBalanceCard(){
+  try{
+    const acct = pickActiveAccount();
+    renderBalanceCard(acct);
+  }catch(e){}
+}
+
+/* =========================================================
+   iOS 防自動放大（略：保留你原本版本）
+   ========================================================= */
+(function(){
+  const isIOS = /iP(ad|hone|od)/.test(navigator.platform) ||
+                (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+  if (!isIOS) return;
+  let meta = document.querySelector('#app-viewport') ||
+             document.querySelector('meta[name="viewport"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.id = 'app-viewport';
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+    document.head.appendChild(meta);
+  }
+  const original = meta.getAttribute('content') || 'width=device-width, initial-scale=1, viewport-fit=cover';
+  const lockZoom = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+  const unlockZoom = original
+    .replace(/\s*,?\s*maximum-scale=\d+(\.\d+)?/i, '')
+    .replace(/\s*,?\s*user-scalable=no/i, '')
+    .trim() || 'width=device-width, initial-scale=1, viewport-fit=cover';
+
+  const matchField = (el) => !!el && el.matches &&
+    el.matches('input.fx-field, textarea.fx-field, select.fx-select, input[type="date"].fx-field, input[type="number"].fx-field');
+
+  function prelock(){ meta.setAttribute('content', lockZoom); requestAnimationFrame(()=> meta.setAttribute('content', lockZoom)); }
+  document.addEventListener('touchstart', (e)=>{
+    if (matchField(e.target)) prelock();
+  }, { capture:true, passive:true });
+
+  document.addEventListener('focusin', (e)=>{
+    if (!matchField(e.target)) return;
+    prelock();
+    const cs = getComputedStyle(e.target);
+    const px = parseFloat(cs.fontSize) || 16;
+    if (px < 16){
+      e.target.dataset._origFontSize = e.target.style.fontSize || '';
+      e.target.style.fontSize = '16px';
+    }
+  }, { capture:true });
+
+  document.addEventListener('focusout', (e)=>{
+    if (!matchField(e.target)) return;
+    setTimeout(()=>{
+      const ae = document.activeElement;
+      const anyFocused = !!(ae && ae.matches && ae.matches('input, textarea, select'));
+      if (!anyFocused){
+        meta.setAttribute('content', unlockZoom);
+        requestAnimationFrame(()=> meta.setAttribute('content', unlockZoom));
+      }
+    }, 250);
+    if ('_origFontSize' in e.target.dataset){
+      e.target.style.fontSize = e.target.dataset._origFontSize;
+      delete e.target.dataset._origFontSize;
+    }
+  }, { capture:true });
+})();
+
+/* =========================================================
+   自動初始化 + 版面高度再平衡
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', ()=>{
+  function rebalanceInputLayout(){
+    try{
+      const form = document.getElementById('inputFormCard');
+      const panel = document.querySelector('#page-input .tx-panel');
+      const toolbar = panel?.querySelector('.tx-toolbar');
+      const viewport = document.getElementById('txViewport');
+      if (!form || !panel || !toolbar || !viewport) return;
+
+      const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+      const rect = form.getBoundingClientRect();
+      const cs = getComputedStyle(document.documentElement);
+      const hdrH = parseFloat(cs.getPropertyValue('--hdrH-mobile')) || 56;
+      const tabbarH = parseFloat(cs.getPropertyValue('--tabbarH')) || 56;
+
+      if (!isMobile){
+        const pv = Math.max(200, Math.floor(rect.height - toolbar.offsetHeight - 12));
+        viewport.style.height = pv + 'px';
+      }else{
+        const vh = window.innerHeight;
+        const pv = Math.max(120, Math.floor(vh - hdrH - rect.height - toolbar.offsetHeight - tabbarH - 36));
+        viewport.style.height = pv + 'px';
+        panel.style.marginBottom = '0px';
+      }
+    }catch(e){}
+  }
+  window.addEventListener('resize', rebalanceInputLayout, { passive:true });
+
+  App.modules.pageInput?.init?.();
+  rebalanceInputLayout();
+});
+</script>

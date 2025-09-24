@@ -1,0 +1,553 @@
+<!-- ctbc_js.html -->
+<script>
+window.App = window.App || {};
+window.API = window.API || {};
+API.getCTBCInterestCell = API.getCTBCInterestCell || function(row, ok, fail){
+  if (!(window.google && google.script && google.script.run)) {
+    try { ok && ok(null); } catch(_) {}
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(ok)
+    .withFailureHandler(fail || function(e){ console.error('getCTBCInterestCell failed:', e); ok && ok(null); })
+    .getCTBCInterestCell(row);
+};
+
+App.modules = App.modules || {};
+
+  App.modules.ctbc = App.modules.ctbc || (function () {
+    // ===== state =====
+    // 欄位：H=類型、K=Name、L=金額USD、N=現值USD、T=含息損益USD、U=含息報酬率、V=計價幣別、AF=已領利息(原幣)
+    let allRows = [];
+    let viewRows = [];
+
+    const CHIP_ORDER = ['股票','基金','債券','定存','支出','活存利息','到期現金','換匯','其他'];
+    const DEFAULT_ON = new Set(['基金','股票']);
+
+    let collapsed = false;
+
+    const vs = { rowHeight:44, viewport:null, spacer:null, thead:null, tbody:null, lastRange:[-1,-1] };
+
+    // ===== init =====
+    function init(){
+      renderChips([]);
+      bindKPI();
+      setupViewport();
+      renderHead();
+      setBodyLoading(true);
+      fetchData();
+    }
+
+    // ===== chips（用 H 欄類型）=====
+    function renderChips(kinds){
+      const box = byId('ctbcChips'); if (!box) return;
+      const cleanKinds = kinds.map(k => String(k||'').trim()).filter(Boolean);
+      const union = new Set([ ...CHIP_ORDER, ...cleanKinds ]);
+      const arr = Array.from(union);
+      const rank = new Map(CHIP_ORDER.map((k,i)=>[k,i]));
+      arr.sort((a,b)=>{
+        const ia = rank.has(a) ? rank.get(a) : 999 + String(a).localeCompare('');
+        const ib = rank.has(b) ? rank.get(b) : 999 + String(b).localeCompare('');
+        return ia - ib;
+      });
+      box.innerHTML = `
+        <div class="ctbc-chips">
+          ${arr.map(k => `
+            <button class="ctbc-chip ${DEFAULT_ON.has(k)?'active':''}" data-type="${esc(k)}">${esc(k)}</button>
+          `).join('')}
+        </div>
+      `;
+      box.querySelectorAll('.ctbc-chip').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          el.classList.toggle('active');
+          applyAll();
+        });
+      });
+    }
+
+    // ===== KPI 收合 =====
+    function bindKPI(){
+      const btn  = byId('kpiToggle');
+      const wrap = byId('ctbcKPI');
+      if (btn && wrap){
+        btn.onclick = ()=>{
+          collapsed = !collapsed;
+          wrap.dataset.collapsed = collapsed ? '1':'0';
+          btn.textContent = collapsed ? '展開統計' : '收合統計';
+        };
+      }
+    }
+
+    // ===== viewport / virtual =====
+    function setupViewport(){
+    vs.viewport = byId('ctbcViewport');
+    vs.spacer   = byId('ctbcSpacer');
+    vs.thead    = byId('ctbcHead');
+    vs.tbody    = byId('ctbcBody');
+    if (!vs.viewport) return;
+
+    // ✅ 事件委派（首次嘗試）
+    ensureAFBinding();
+
+    // ✅ 內容變動就再保險綁一次（虛擬渲染會常常重寫 tbody）
+    if (vs.tbody && !vs._mo) {
+      vs._mo = new MutationObserver(()=> ensureAFBinding());
+      vs._mo.observe(vs.tbody, { childList:true, subtree:false });
+    }
+
+    let raf=null;
+    vs.viewport.addEventListener('scroll', ()=>{
+      if (raf) return;
+      raf=requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
+    });
+  }
+
+  // ===== data =====
+  function fetchData(){
+  if (!(window.google && window.google.script && window.google.script.run)){
+    // 等 250ms 再試，最多試 40 次（10 秒）
+    if (!fetchData._try) fetchData._try = 0;
+    if (fetchData._try++ < 40) { setTimeout(fetchData, 250); return; }
+    failUI('載入失敗：Apps Script 物件未就緒'); 
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(rows=>{
+      allRows = Array.isArray(rows) ? rows : [];
+      allRows.forEach(r=>{ r.TYPE = String(r.H ?? '').trim() || guessType(r.K || ''); });
+      const kinds = Array.from(new Set(allRows.map(r=>r.TYPE).filter(Boolean)));
+      renderChips(kinds);
+      applyAll();
+      vs.lastRange = [-1,-1];     // 保證首渲染
+      renderVirtual();
+    })
+    .withFailureHandler(err=>{
+      console.error('[CTBC] load error:', err);
+      failUI((err && err.message) || '讀取失敗');
+    })
+    .getCTBCInvestments();
+  }
+
+
+  // ===== apply: chips -> filter(H) -> KPI -> table =====
+  function applyAll(){
+    const onTypes = getActiveTypes();
+    viewRows = allRows.filter(r=> onTypes.has(r.TYPE || '其他'));
+    renderKPI(viewRows);
+    renderTable(viewRows);
+  }
+
+  function getActiveTypes(){
+    const set = new Set();
+    qsa('#ctbcChips .ctbc-chip.active').forEach(el=> set.add(el.dataset.type));
+    return set.size ? set : new Set(DEFAULT_ON);
+  }
+
+  // ===== 數值工具 =====
+  function toNum(v){
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
+    const s = String(v).replace(/[%\uFFE5\u00A5$￥]/g, '').replace(/[\s,]/g,'');
+    const x = parseFloat(s);
+    return isFinite(x) ? x : 0;
+  }
+  function normalizeU(u){
+    const x = toNum(u);
+    return (Math.abs(x) <= 1) ? (x * 100) : x;
+  }
+
+  // ===== KPI（含 ROI 膠囊；KPI All 第一格仍用 L 欄合計）=====
+function renderKPI(rows){
+  const grp = groupBy(rows, r => (r.V || '').toUpperCase());
+  const twd = grp['TWD'] || [];
+  const usd = grp['USD'] || [];
+  const all = rows;
+
+  setKpiBlock('All', agg(all), /*isAll*/true);
+  setKpiBlock('TWD', agg(twd));
+  setKpiBlock('USD', agg(usd));
+
+  function agg(arr){
+    const N    = arr.reduce((s,x)=> s + toNum(x.N), 0);
+    const T    = arr.reduce((s,x)=> s + toNum(x.T), 0);
+    const AF   = arr.reduce((s,x)=> s + toNum(x.AF), 0);
+    const Lsum = arr.reduce((s,x)=> s + toNum(x.L), 0);
+    const w    = arr.reduce((s,x)=> s + toNum(x.N), 0);
+    const wavgU= w>0 ? (arr.reduce((s,x)=> s + normalizeU(x.U)*toNum(x.N), 0) / w) : null;
+    return { N, T, AF, Lsum, roiU: wavgU };
+  }
+  function pct(v){ return (v==null) ? '—' : Number(v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) + '%'; }
+  function roiBadgeHtml(u){
+    if (u==null) return `<span class="roi-badge">—</span>`;
+    const n = Number(u);
+    const cls = (n >= 0) ? 'pos' : 'neg';
+    const sign = n>0 ? '+' : (n<0 ? '' : ''); // 百分比本身有負號，正值加 + 號
+    const txt = sign + Number(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) + '%';
+    return `<span class="roi-badge ${cls}">${txt}</span>`;
+  }
+
+  function setKpiBlock(prefix, a, isAll=false){
+    // 幣別卡：這裡只給數值，不包 ROI（避免跟 KPI All 混淆）
+    setText(`kpi${prefix}_N`, fmtMoney(a.N));
+    setText(`kpi${prefix}_T`, fmtMoney(a.T));
+    // ROI 改成膠囊（保留原 id；用 innerHTML）
+    const elR = document.getElementById(`kpi${prefix}_ROI`);
+    if (elR) elR.innerHTML = roiBadgeHtml(a.roiU);
+
+    setText(`kpi${prefix}_AF`, fmtMoney(a.AF));
+
+    if (isAll){
+      setText('kpiAllN',     fmtMoney(a.Lsum)); // 金額USD（L 合計）
+      setText('kpiAllT',     fmtMoney(a.T));    // 含息損益
+      // KPI All 的 ROI 也顯示膠囊
+      const el = document.getElementById('kpiAllROI');
+      if (el) el.innerHTML = roiBadgeHtml(a.roiU);
+      setText('kpiAllNoInt', fmtMoney(a.N));    // 現值（ΣN）
+      setText('kpiAllAF',    fmtMoney(a.AF));   // 已領利息
+    }
+  }
+
+  // --- 標記 KPI 金額為可遮罩 ---
+  (function(){
+    const ids = [
+      // All
+      'kpiAllN','kpiAllT','kpiAllNoInt','kpiAllAF',
+      // TWD
+      'kpiTWD_N','kpiTWD_T','kpiTWD_AF',
+      // USD
+      'kpiUSD_N','kpiUSD_T','kpiUSD_AF',
+      // ROI
+      'kpiAllROI','kpiTWD_ROI','kpiUSD_ROI'
+
+    ];
+    ids.forEach(id=>{
+      const el = document.getElementById(id);
+      if (el){ el.classList.add('mask-num'); el.dataset.maskStr = '＊＊＊'; }
+    });
+  })();
+
+}
+
+// ===== 表頭（K / N / (T+U) / AF / AH / H / V） =====
+function renderHead(){
+  const thead = vs.thead; if (!thead) return;
+  thead.innerHTML = `<tr>
+    <th class="txt">項目</th>                          <!-- K -->
+    <th class="num col-fix-1">現值 (USD)</th>          <!-- N -->
+    <th class="txt col-fix-2">含息損益 / 報酬率</th>    <!-- T + U 合欄 -->
+    <th class="num col-fix-3">已領利息 (USD)</th>      <!-- AF -->
+    <th class="txt col-fix-4">更新日</th>               <!-- AH：新增 -->
+    <th class="txt">類型</th>                          <!-- H -->
+    <th class="txt">計價幣別</th>                      <!-- V -->
+  </tr>`;
+}
+
+// ===== 表身 =====
+function renderTable(rows){
+  viewRows = Array.isArray(rows) ? rows : [];
+  if (vs.spacer) vs.spacer.style.height = (viewRows.length * vs.rowHeight) + 'px';
+  if (vs.tbody) {
+    vs.tbody.style.transform = 'translateY(0px)';
+    vs.tbody.innerHTML = '';
+  }
+  vs.lastRange = [-1, -1];  // ★ 重設，強制 renderVirtual 重繪
+  renderVirtual();
+  ensureAFBinding(); 
+}
+
+
+// ===== 點擊「已領利息(USD)」：輸入金額或算式並寫回 =====
+function onClickAFCell(e){
+  const td = e.currentTarget || (e && e.currentTarget);
+  const rowNo = Number(td && td.dataset ? td.dataset.row : (td && td.getAttribute && td.getAttribute('data-row')) || 0);
+  if (!rowNo) return;
+
+  // 若前端 API 不可用，直接走 fallback，不要丟例外
+  if (!window.API || typeof API.getCTBCInterestCell !== 'function') {
+    const curTxt = (td.textContent || '').replace(/[\s,，\u00A0]/g,'').trim();
+    openAFEditor(rowNo, curTxt || '');
+    return;
+  }
+
+  API.getCTBCInterestCell(rowNo, (cell)=>{
+    const def = (cell && cell.formula) ? cell.formula : (cell && cell.value ? cell.value : '');
+    openAFEditor(rowNo, def || '');
+  }, (err)=>{
+    console.error(err);
+    const curTxt = (td.textContent || '').replace(/[\s,，\u00A0]/g,'').trim();
+    openAFEditor(rowNo, curTxt || '');
+  });
+}
+
+
+  // ===== 表格（虛擬渲染；T+U 合欄；U 顯示 ROI 膠囊） =====
+function renderVirtual(){
+  if (!vs.viewport || !vs.tbody) return;
+  const rows = viewRows;
+  const top = vs.viewport.scrollTop;
+  const h   = vs.viewport.clientHeight;
+  const start = Math.max(0, Math.floor(top / vs.rowHeight) - 10);
+  const need  = Math.ceil(h / vs.rowHeight) + 20;
+  const end   = Math.min(rows.length, start + need);
+  if (vs.lastRange[0]===start && vs.lastRange[1]===end) return;
+  vs.lastRange = [start, end];
+
+  const slice = rows.slice(start, end);
+  vs.tbody.style.transform = `translateY(${start * vs.rowHeight}px)`;
+  vs.tbody.innerHTML = slice.map(r=>{
+    const tVal = fmtMoney(r.T);
+    const uNum = isFinite(+toNum(r.U)) ? normalizeU(r.U) : null;
+    const uCls = (uNum==null) ? '' : (uNum>=0 ? 'pos' : 'neg');
+    const uTxt = (uNum==null) ? '—' :
+      ((uNum>0?'+':'') + Number(uNum).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) + '%');
+
+    const pnlCell = `
+      <div class="pnl-cell">
+        <span class="num">${esc(tVal)}</span>
+        <span class="roi-badge ${uCls}">${esc(uTxt)}</span>
+      </div>`;
+
+    const typeHtml = r.H ? `<span class="type-chip">${esc(r.H)}</span>` : '-';
+    const rowNo = Number(r.ROW || 0);
+    const afHtml = `<span class="pill af-pill">${esc(fmtMoney(r.AF))}</span>`;
+
+    return `<tr data-row="${rowNo}">
+      <td class="txt">${esc(r.K||'-')}</td>                         <!-- 項目 K -->
+      <td class="num col-fix-1">${esc(fmtMoney(r.N))}</td>           <!-- 現值 N -->
+      <td class="txt col-fix-2">${pnlCell}</td>                      <!-- 含息損益/ROI -->
+      <td class="num col-fix-3 cell-af" data-row="${rowNo}">${afHtml}</td> <!-- 已領利息 AF(可點) -->
+      <td class="txt col-fix-4">${esc(r.AH || '')}</td>              <!-- 更新日 AH -->
+      <td class="txt">${typeHtml}</td>                               <!-- 類型 H -->
+      <td class="txt">${esc((r.V||'').toUpperCase())}</td>           <!-- 幣別 V -->
+    </tr>`;
+  }).join('');
+
+  if (!slice.length){
+    vs.tbody.style.transform = 'translateY(0px)';
+    vs.tbody.innerHTML = `<tr><td class="empty" colspan="7">目前沒有資料</td></tr>`;
+  }
+}
+
+  // ===== helpers =====
+  function guessType(name){
+    if (/基金|fund|etf/i.test(name)) return '基金';
+    if (/stock|股票|shrs|股份/i.test(name)) return '股票';
+    if (/定存|time\s*deposit|cd\b/i.test(name)) return '定存';
+    if (/活存|saving/i.test(name)) return '活存利息';
+    if (/到期|結清|退保|年金|annuity|pension/i.test(name)) return '到期現金';
+    if (/bond|債/i.test(name)) return '債券';
+    if (/換匯|fx|外匯|usd\/twd|twd\/usd/i.test(name)) return '換匯';
+    if (/支出|費用|手續費|tax|稅/i.test(name)) return '支出';
+    return '其他';
+  }
+
+  // 放在檔案裡任何函式外層（與 helpers 並排）
+  function ensureAFBinding(){
+    if (!vs) return;
+    if (!vs.tbody) vs.tbody = byId('ctbcBody');
+    if (vs.tbody && !vs._afBound) {
+      vs.tbody.addEventListener('click', (e)=>{
+        const td = e.target.closest('.cell-af');
+        if (td && vs.tbody.contains(td)) onClickAFCell({ currentTarget: td });
+      });
+      vs._afBound = true;
+    }
+  }
+
+
+  function groupBy(arr, f){ const m={}; for(const x of arr){ const k=f(x)||''; (m[k]||(m[k]=[])).push(x);} return m; }
+  function byId(id){ return document.getElementById(id); }
+  function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
+  function setText(id, v){ const el=byId(id); if (el) el.textContent = v; }
+  function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m])); }
+  function fmtMoney(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '—'; }
+  function setHTML(id, html){ const el = byId(id); if (el) el.innerHTML = html; }
+
+  /** 將數值轉為紅/綠/灰 chip（保留原字級、不變大） */
+  function roiChipHTML(v){
+    if (v == null || !isFinite(+v)) return '—';
+    const n = Number(v);
+    const cls  = n>0 ? 'roi-pos' : (n<0 ? 'roi-neg' : 'roi-zero');
+    const sign = n>0 ? '+' : (n<0 ? '−' : '');
+    const s = Math.abs(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1});
+    return `<span class="roi-chip ${cls}">${sign}${s}%</span>`;
+  }
+
+  
+
+  function isMobileScreen(){ return window.matchMedia && window.matchMedia('(max-width: 1024px)').matches; }
+
+/** 將使用者輸入/原字串標準化用於「是否異動」判斷 */
+function _normExpr_(s){
+  if (s == null) return '';
+  s = String(s).trim();
+  // 讓 "= 1 + 2" 與 "=1+2" 視為相同；數值的 "1,234" 與 "1234" 相同
+  const isFormula = /^=/.test(s);
+  if (isFormula) return '=' + s.slice(1).replace(/\s+/g,'');
+  // 值：拿掉千分位/空白
+  return s.replace(/[\s,，\u00A0]/g,'');
+}
+
+/** 共用：實際寫回（若內容有異動才寫） */
+function _commitAF_(rowNo, orig, newVal){
+  closeAF();
+  closeAFDesk();
+  // 顯示處理中的狀態
+  setText('ctbcStatus', '更新中…');
+  API.setCTBCInterestUSD(rowNo, newVal, () => {
+    // 更新成功後，重新整理資料
+    loadData();
+    // 顯示成功訊息
+    setText('ctbcStatus', '已更新!');
+    // 成功後可以考慮讓訊息消失
+    setTimeout(() => { setText('ctbcStatus', ''); }, 3000);
+  }, (err) => {
+    // 處理錯誤並顯示錯誤訊息
+    setText('ctbcStatus', `錯誤: ${err.message}`);
+    console.error('[ctbc] failed to update interest:', err);
+  });
+}
+
+// 顯示狀態卡片
+document.getElementById('ctbcStatus').classList.add('show');
+
+// 隱藏狀態卡片
+document.getElementById('ctbcStatus').classList.remove('show');
+
+/** 開啟編輯器：桌機→簡單輸入窗；手機→數字鍵盤 */
+function openAFEditor(rowNo, defaultExpr){
+  if (isMobileScreen()) {
+  let modal = document.getElementById('afModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'afModal';
+    modal.innerHTML = `
+      <div class="af-backdrop"></div>
+      <div class="af-dialog">
+        <div class="af-title">輸入已領利息（可輸入算式）</div>
+        <input id="afInput" class="af-input" inputmode="decimal" autocomplete="off" />
+        <div class="af-pad">
+          ${[
+            '=','7','8','9','+','(',
+            '4','5','6','-',
+            '1','2','3','*',')',
+            '0','.','/','清除','←','確定'
+          ].map(k=>`<button class="af-key" data-k="${k.trim()}">${k}</button>`).join('')}
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    // 只綁一次
+    if (!modal._bound) {
+      modal.addEventListener('click', (e)=>{
+        if (e.target.classList.contains('af-backdrop')) { closeAFAll(); return; }
+        const btn = e.target.closest('.af-key'); 
+        if (!btn) return;
+
+        const k = btn.dataset.k;
+        const inp = document.getElementById('afInput');
+
+        if (k === '清除') {
+          inp.value = '';
+          return;
+        }
+        if (k === '←') {
+          inp.value = inp.value.slice(0,-1);
+          return;
+        }
+        if (k === '確定') {
+          const raw = inp.value.trim();
+          if (!raw) { closeAFAll(); return; }
+          if (!/^[=]?[0-9\s+\-*/().,，\u00A0]+$/.test(raw)) { 
+            alert('只允許數字與 + - * / ( )'); 
+            return; 
+          }
+          // ★ 關鍵：從 dataset 讀取當前 row / 原字串
+          const r = Number(modal.dataset.rowNo || 0);
+          const orig = modal.dataset.orig || '';
+          _commitAF_(r, orig, raw);
+          return;
+        }
+        // 其他鍵：輸入
+        inp.value += k;
+      });
+      modal._bound = true;
+    }
+  }
+  // ★ 每次開啟都更新 dataset 與預設值
+  modal.dataset.rowNo = String(rowNo);
+  modal.dataset.orig  = String(defaultExpr||'').trim();
+  document.getElementById('afInput').value = String(defaultExpr||'').replace(/[\u00A0]/g,'').trim();
+  modal.classList.add('open');
+}
+
+  else {
+  let modal = document.getElementById('afModalDesk');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'afModalDesk';
+    modal.innerHTML = `
+      <div class="af-backdrop"></div>
+      <div class="af-dialog">
+        <div class="af-title">輸入已領利息（可輸入 =公式 或 數字）</div>
+        <div class="af-help">提示：以「=」開頭可保留公式，例如 <code>=583+584+584+583</code></div>
+        <input id="afInputDesk" class="af-input" autocomplete="off" />
+        <div class="af-actions">
+          <button class="af-btn af-cancel">取消</button>
+          <button class="af-btn af-ok">確定</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    // 只綁一次
+    if (!modal._bound) {
+      modal.addEventListener('click', (e)=>{
+        const el = e.target;
+        if (el.classList.contains('af-backdrop') || el.classList.contains('af-cancel')) { 
+          closeAFDesk(); 
+          return; 
+        }
+        if (el.classList.contains('af-ok')) {
+          const val = document.getElementById('afInputDesk').value.trim();
+          if (val && !/^[=]?[0-9\s+\-*/().,，\u00A0]+$/.test(val)) { 
+            alert('只允許數字與 + - * / ( )'); 
+            return; 
+          }
+          // ★ 關鍵：從 dataset 讀取現在要寫入的列與原字串
+          const r = Number(modal.dataset.rowNo || 0);
+          const orig = modal.dataset.orig || '';
+          _commitAF_(r, orig, val);   // 關窗與重抓由 _commitAF_ 處理
+        }
+      });
+      modal._bound = true;
+    }
+  }
+  // ★ 每次開啟都更新 dataset 與預設值
+  modal.dataset.rowNo = String(rowNo);
+  modal.dataset.orig  = String(defaultExpr||'').trim();
+
+  const inp = document.getElementById('afInputDesk');
+  inp.value = modal.dataset.orig;
+  setTimeout(()=>{ inp.focus(); const l=inp.value.length; inp.setSelectionRange(l,l); }, 0);
+  modal.classList.add('open');
+}
+}
+
+function closeAF(){ const m=document.getElementById('afModal'); if (m) m.classList.remove('open'); }
+function closeAFDesk(){ const m=document.getElementById('afModalDesk'); if (m) m.classList.remove('open'); }
+// ★ NEW：一鍵關兩種視窗（桌機/手機）
+function closeAFAll(){ closeAF(); closeAFDesk(); }
+
+
+function setBodyLoading(on){
+    const tb = byId('ctbcBody'); if (!tb) return;
+    if (on) tb.innerHTML = `<tr><td class="empty" colspan="7">載入中…</td></tr>`;
+  }
+  function failUI(msg){
+    const tb  = byId('ctbcBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="7">發生錯誤：${esc(msg||'')}</td></tr>`;
+}
+
+return { init };
+})();
+
+</script>

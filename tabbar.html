@@ -1,0 +1,208 @@
+<!-- tabbar.html -->
+<nav id="tabbar" class="tabbar" aria-label="app bottom bar">
+  <!-- Dashboard -->
+  <button class="tabbtn" data-to="dashmain" aria-label="Dashboard">
+    <span class="ico circle"><span class="material-symbols-outlined">home</span></span>
+    <span class="tabtxt">Dashboard</span>
+  </button>
+
+<!-- 明細 -->
+  <button class="tabbtn" data-to="record" aria-label="總表">
+    <span class="ico circle"><span class="material-symbols-outlined">list_alt</span></span>
+    <span class="tabtxt">明細</span>
+  </button>
+
+  <!-- 輸入 -->
+  <button class="tabbtn" data-to="input" aria-label="輸入">
+    <span class="ico circle"><span class="material-symbols-outlined">edit</span></span>
+    <span class="tabtxt">輸入</span>
+  </button>
+
+  <!-- 圖表 -->
+  <button class="tabbtn" data-to="charts" aria-label="圖表">
+    <span class="ico circle"><span class="material-symbols-outlined">bar_chart</span></span>
+    <span class="tabtxt">圖表</span>
+  </button>
+
+  <!-- Menu / Drawer -->
+  <button class="tabbtn" data-act="menu" aria-label="Menu">
+    <span class="ico circle"><span class="material-symbols-outlined">menu</span></span>
+    <span class="tabtxt">Menu</span>
+  </button>
+</nav>
+
+<script>
+(function(){
+  const bar = document.getElementById('tabbar');
+  const drawer = document.getElementById('drawer');
+  const PM_ROOT = document.getElementById('popmenus-root');
+  let suppressNextClick = false;
+
+  // 動態偵測是否為行動裝置（不要在載入時就固定）
+  function isMobile(){
+    return (
+      /iPhone|Android|iPad|iPod/i.test(navigator.userAgent) ||
+      (window.matchMedia && matchMedia('(pointer: coarse)').matches) ||
+      document.documentElement.classList.contains('mobile')
+    );
+  }
+
+  function setActive(to){
+    bar.querySelectorAll('.tabbtn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.to === to);
+    });
+  }
+
+  // 統一定義 popmenu
+  const POPMENUS = {
+    input: [
+      { key:'input',  icon:'edit',            text:'現金記帳', action: ()=>go && go('input') },
+      { key:'input',  icon:'edit',            text:'帳戶快更', action: ()=>go && go('acc') },
+
+    ],
+    dashmain: [
+      { key:'dashmain', icon:'dashboard',   text:'Dashboard', action: ()=>go && go('dashmain') },
+      { key:'dash',     icon:'table_chart', text:'總表',      action: ()=>go && go('dash') },
+      { key:'charts',   icon:'bar_chart',   text:'Charts',    action: ()=>go && go('charts') },
+      { key:'ctbc',   icon:'account_balance', text:'CTBC 匯入', action: ()=>go && go('ctbc') }
+    ],
+    list: [
+      { key:'record', icon:'database', text:'Database', action: ()=>go && go('record') }
+    ],
+    _menu: [
+      { key:'links',   icon:'link',     text:'其他連結', action: ()=>go && go('links') },
+      { key:'record',  icon:'database', text:'Database', action: ()=>go && go('record') },
+      { key:'policy',  icon:'policy',   text:'定存保單', action: ()=>go && go('policy') },
+      { key:'settings',icon:'tune',     text:'偏好設定', action: ()=>{ try{ openSettings&&openSettings(); }catch(_){} } }
+    ]
+  };
+
+  function closePopmenu(){ if (PM_ROOT) PM_ROOT.innerHTML = ''; }
+
+  function isMobile(){
+    return (
+      /iPhone|Android|iPad|iPod/i.test(navigator.userAgent) ||
+      (window.matchMedia && matchMedia('(pointer: coarse)').matches) ||
+      document.documentElement.classList.contains('mobile')
+    );
+  }
+
+    function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+    function openPopmenu(anchorBtn, items){
+    if (!PM_ROOT) return;
+    closePopmenu();
+
+    const bar = document.getElementById('tabbar');
+    const bRect = bar.getBoundingClientRect();
+
+    // 1) 建立「只蓋到 tabbar 上緣」的遮罩
+    const overlay = document.createElement('div');
+    overlay.className = 'popmenu-overlay popmenu-overlay--top';
+    // 動態把高度設成 tabbar 頂端的位置（px）
+    overlay.style.height = Math.max(0, bRect.top) + 'px';
+    overlay.addEventListener('click', closePopmenu);
+
+    // 2) 建立選單
+    const menu = document.createElement('div');
+    menu.className = 'popmenu';
+
+    // === 垂直定位：緊貼 tabbar 正上方（用 bottom）===
+    const GAP = 6;
+    const bottomFromViewport = (window.innerHeight - bRect.top) + GAP;
+    menu.style.bottom = bottomFromViewport + 'px';
+
+    // 先插入 DOM，等會量寬做左右夾取
+    PM_ROOT.appendChild(overlay);
+    PM_ROOT.appendChild(menu);
+
+    // 填入項目
+    (items || []).forEach(it=>{
+      const row = document.createElement('div');
+      row.className = 'item';
+      row.innerHTML = `
+        <span class="ico"><span class="material-symbols-outlined">${it.icon}</span></span>
+        <span class="txt">${it.text}</span>`;
+      row.addEventListener('click', ()=>{
+        closePopmenu();
+        try{ it.action && it.action(); }catch(e){ console.warn(e); }
+      });
+      menu.appendChild(row);
+    });
+
+    // === 水平定位：以按鈕中心為基準，量寬後做左右夾取，避免超出螢幕 ===
+    const btnRect = anchorBtn.getBoundingClientRect();
+    const cx = btnRect.left + btnRect.width/2;
+
+    const prevTransform = menu.style.transform;
+    menu.style.visibility = 'hidden';
+    menu.style.transform = 'translate(-50%,0) scale(1)';
+    const rawW = menu.getBoundingClientRect().width;
+    const margin = 8;
+    const center = clamp(cx, rawW/2 + margin, window.innerWidth - (rawW/2 + margin));
+    menu.style.left = center + 'px';
+
+    // 還原動畫並顯示
+    menu.style.transform = prevTransform || '';
+    requestAnimationFrame(()=>{
+      menu.style.visibility = '';
+      menu.classList.add('show');
+    });
+  }
+
+
+  // 禁止選取與原生長按（避免 iPhone 出現文字選取氣泡）
+  bar.style.webkitUserSelect = 'none';
+  bar.style.userSelect = 'none';
+  bar.addEventListener('contextmenu', (e)=> e.preventDefault());
+
+  // 點擊：行動版 → 有定義就彈出選單；桌機 → 正常切頁
+      bar.addEventListener('click', (e)=>{
+        if (suppressNextClick){ suppressNextClick = false; return; }
+        const btn = e.target.closest('.tabbtn');
+        if (!btn) return;
+
+        // 右側 Menu
+        if (btn.dataset.act === 'menu'){
+          if (isMobile()){
+            openPopmenu(btn, POPMENUS._menu);
+          }else{
+            // 桌機維持 Drawer
+            drawer?.classList.toggle('show');
+            document.body.classList.toggle('drawer-open', drawer?.classList.contains('show'));
+          }
+          return;
+        }
+
+    // 其他 Tab
+    const to = btn.dataset.to;
+    if (!to) return;
+
+  if (isMobile() && POPMENUS[to]) {
+    e.preventDefault();
+    e.stopPropagation();          // ← 同理：小選單已處理，別再冒泡
+    openPopmenu(btn, POPMENUS[to]);
+    return;
+  }
+    go(to);
+
+    // 桌機或沒有 popmenu 定義 → 正常導頁
+    if (typeof window.go === 'function') {
+      window.go(to);
+    } else {
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('show','is-active'));
+      const pg = document.getElementById('page-' + to);
+      if (pg) pg.classList.add('show','is-active');
+    }
+    setActive(to);
+  });
+
+  // 啟動時保持 tabbar 高亮與目前頁一致
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const shown = document.querySelector('.page.show, .page.is-active');
+    if (!shown) return;
+    const id = shown.id.replace(/^page[_-]/,'');
+    setActive(id);
+  });
+})();
+</script>

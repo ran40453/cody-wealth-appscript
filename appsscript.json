@@ -1,0 +1,91 @@
+{
+  "timeZone": "America/New_York",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "sheets": {
+    "macros": [
+      {
+        "menuName": "new_props",
+        "functionName": "newprops2"
+      },
+      {
+        "menuName": "move+paste",
+        "functionName": "myFunction"
+      },
+      {
+        "menuName": "New_Row",
+        "functionName": "NewRowV2"
+      },
+      {
+        "menuName": "to_LastRow",
+        "functionName": "to_LastRow",
+        "defaultShortcut": "Ctrl+Alt+Shift+1"
+      },
+      {
+        "menuName": "Clean_Up",
+        "functionName": "CleanUp1"
+      },
+      {
+        "menuName": "Row_Up",
+        "functionName": "Row_Up1"
+      },
+      {
+        "menuName": "Row_Up 1",
+        "functionName": "Row_Up"
+      },
+      {
+        "menuName": "fomat",
+        "functionName": "fomat"
+      },
+      {
+        "menuName": "select",
+        "functionName": "select"
+      },
+      {
+        "menuName": "copu",
+        "functionName": "copu"
+      },
+      {
+        "menuName": "qq",
+        "functionName": "qq"
+      },
+      {
+        "menuName": "addRow",
+        "functionName": "addRow"
+      },
+      {
+        "menuName": "onOpen",
+        "functionName": "onOpen"
+      },
+      {
+        "menuName": "New_Row_MRP",
+        "functionName": "New_Row_MRP"
+      },
+      {
+        "menuName": "onEdit",
+        "functionName": "onEdit"
+      },
+      {
+        "menuName": "To_LastRow",
+        "functionName": "To_LastRow"
+      },
+      {
+        "menuName": "UpdateChart",
+        "functionName": "UpdateChart"
+      },
+      {
+        "menuName": "UpdateChart",
+        "functionName": "UpdateChart"
+      },
+      {
+        "menuName": "changeChartColor",
+        "functionName": "changeChartColor"
+      }
+    ]
+  },
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "MYSELF"
+  }
+}

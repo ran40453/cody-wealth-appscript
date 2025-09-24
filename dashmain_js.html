@@ -1,0 +1,175 @@
+<!-- dashmain_js.html -->
+<script>
+(function(){
+  // —— 小工具 ——
+  function fmt(n, frac=0){
+    const num = Number(n);
+    return isFinite(num)
+      ? num.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac})
+      : '—';
+  }
+  function setText(id, v, frac=0, suffix=''){
+    const el = document.getElementById(id);
+    if (!el) return;
+    const num = Number(v);
+    el.textContent = isFinite(num) ? fmt(num, frac) + (suffix||'') : '—';
+    // 讓遮罩機制一致（和其它 KPI 同樣 class / data-attr）
+    el.classList.add('mask-num');
+    el.dataset.maskStr = '＊＊＊';
+  }
+
+  function setPnlPill(el, num, suffix=''){
+  if (!el) return;
+  const n = Number(num||0);
+  const sign = n>0?'+':'';
+  el.textContent = sign + fmt(n,1) + (suffix||'');
+  el.classList.remove('pos','neg','zero');
+  if (n>0) el.classList.add('pos');
+  else if (n<0) el.classList.add('neg');
+  else el.classList.add('zero');
+
+  // 讓遮罩機制一致
+  el.classList.add('mask-num');
+  el.dataset.maskStr = '＊＊＊';
+  }
+
+  function fmtMD(dstr){
+    if (!dstr) return '';
+    const d = new Date(dstr);
+    if (isNaN(d)) return String(dstr);
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const dd= String(d.getDate()).padStart(2,'0');
+    return `${m}/${dd}`;
+  }
+
+  // —— 近期 planned 清單渲染 ——
+  function renderPlannedList(rows){
+  const wrap = document.getElementById('plannedList');
+  if (!wrap) return;
+  const html = (rows||[]).map(r=>{
+    const acc = (r.account||'').trim();
+    const date = fmtMD(r.date||'');
+    const name = (r.item||'').trim();
+    const amt = Number(r.amount||0).toLocaleString('zh-Hant-TW');
+    return `
+      <div class="item">
+        <div class="row row-acc">
+          <span class="cap account" data-acc="${acc}">${acc || '-'}</span>
+        </div>
+        <div class="row row-meta">
+          <span class="date">${date}</span>
+          <span class="name" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
+          <span class="cap amt mask-num" data-mask-str="＊＊＊">${amt}</span>
+        </div>
+      </div>`;
+  }).join('');
+  wrap.innerHTML = html || '<div class="empty">無 upcoming</div>';
+
+  // ★ 計算 planned 總額並更新 pill（rows.amount 已是數字、且你 server 端已把 planned 轉為負數）
+  const total = (rows||[]).reduce((s,r)=> s + Number(r.amount||0), 0);
+  setPnlPill(document.getElementById('planPnlPill'), total);
+}
+
+
+  // —— 帳戶餘額清單 ——
+  function renderAccList(rows){
+  const wrap = document.getElementById('accList');
+  if (!wrap) return;
+  if (!rows || !rows.length){
+    wrap.innerHTML = '<div class="empty">尚無帳戶資料</div>';
+    // ★ 沒資料時 pill 顯示 0
+    setPnlPill(document.getElementById('accSumPill'), 0);
+    return;
+  }
+  wrap.innerHTML = rows.map(r=>{
+    const acc = r.account || '';
+    const now = Number(r.now||0).toLocaleString('zh-Hant-TW');
+    return `
+      <div class="item" style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--hairline);background:var(--card);border-radius:14px;padding:10px 12px;">
+        <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${acc}</span>
+        <span class="v mask-num" style="min-width:120px;justify-content:flex-end;" data-mask-str="＊＊＊">${now}</span>
+      </div>`;
+  }).join('');
+
+  // ★ 計算帳戶「現有餘額」總和並更新 pill
+  const sum = rows.reduce((s,r)=> s + Number(r.now||0), 0);
+  setPnlPill(document.getElementById('accSumPill'), sum);
+}
+
+
+  function loadAccList(){
+    if (!window.google?.script?.run?.withSuccessHandler) return;
+    google.script.run
+      .withSuccessHandler(res=>{ renderAccList(Array.isArray(res)?res:[]); })
+      .withFailureHandler(err=>{
+        console.error('[accList] load error:', err);
+        const wrap = document.getElementById('accList');
+        if (wrap) wrap.innerHTML = '<div class="empty">載入失敗</div>';
+      })
+      .getSummaryNow();
+  }
+
+  // —— 主渲染 ——
+  function renderDashboard(data){
+    if (!data){ console.warn('[dashmain] 空資料'); return; }
+
+    const kp     = data.kpis || {};
+    const latest = (data.database && data.database.latest) || {};
+
+    // A. KPI（TWD；USD 有後備 latest.CV）
+    setText('kpiTotal', kp.total);
+    setText('kpiNet',   kp.net);
+    setText('kpiCash',  kp.cash);
+    setText('kpiAvail', kp.avail);
+    setText('kpiDebt', kp.debt);
+    const d = document.getElementById('kpiDate');
+    if (d) d.textContent = kp.date || '—';
+
+    // B. 當日損益膠囊（源自 latest.F）
+    setPnlPill(document.getElementById('dashPnlPill'), Number(latest.F||0));
+
+    // C. Planned Top5
+    const cf = data.cashflow || { plannedTop:[] };
+    renderPlannedList(cf.plannedTop);
+
+    // D. CTBC KPI
+    const ct = (data.ctbc && data.ctbc.allUSD) || {value:0,pnl:0,ret:0,interest:0};
+    setText('ctVal', ct.value, 1);
+    setText('ctPnl', ct.pnl,   1);
+    setPnlPill(document.getElementById('ctRetPill'), Number(ct.ret||0), '%'); // ← 新 pill 在 title 右側
+    setText('ctInt', ct.interest, 1);
+  }
+
+  // —— 載入 ——
+  function loadDashboard(){
+    google.script.run
+      .withSuccessHandler(res=>{
+        console.log('[dashmain] getDashboardData ok', res);
+        renderDashboard(res);
+        loadAccList();
+      })
+      .withFailureHandler(err=>{
+        console.error('[dashmain] getDashboardData ERR', err && err.message || err);
+        const row = document.getElementById('kpiRow');
+        if (row) row.innerHTML = `<div class="empty">載入失敗：${(err && err.message)||err}</div>`;
+      })
+      .getDashboardData();
+  }
+
+  // —— Page hooks / Route —— 
+  window.App = window.App || {};
+  App.pages  = App.pages || {};
+
+  App.pages.dashmain = {
+    init(){ loadDashboard(); },
+    refresh(){ loadDashboard(); }
+  };
+  App.routes = App.routes || {};
+  App.routes.dashmain = function(){
+    if (!App.__dashInited){
+      App.__dashInited = true;
+      App.pages.dashmain?.init?.();
+    }
+  };
+})();
+</script>

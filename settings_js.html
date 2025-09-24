@@ -1,0 +1,125 @@
+<script>
+(function(){
+  const ROOT = document.documentElement;
+  const STORAGE_KEY = 'ui_prefs_v2'; // 升版以避免舊格式衝突
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+
+  // 取得目前顯示中的 page 容器（.page.show）
+  function getActivePageEl(){
+    return document.querySelector('.page.show') || null;
+  }
+  function getActivePageId(){
+    const el = getActivePageEl();
+    return el ? (el.id || el.dataset.page || 'unknown') : 'unknown';
+  }
+
+  // 存取：{ global:{var:val...}, pages:{[pageId]:{var:val...}} }
+  function loadPrefs(){
+    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'') || {global:{}, pages:{}}; }
+    catch(e){ return {global:{}, pages:{}}; }
+  }
+  function savePrefs(obj){ localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); }
+
+  // 套用到 DOM：global → :root；page → 當前 page 容器
+  function applyGlobal(vars){
+    Object.entries(vars||{}).forEach(([k,v])=> ROOT.style.setProperty(k, v));
+  }
+  function applyPage(pageId, vars){
+    const el = getActivePageEl(); if (!el) return;
+    // 先清掉舊 inline，再寫新的（避免殘留）
+    Object.keys(vars||{}).forEach(k=> el.style.setProperty(k, vars[k]));
+  }
+
+  // 將控制項顯示同步到目前數值
+  function syncControls(){
+    const prefs = loadPrefs();
+    const pageId = getActivePageId();
+    const pageVars = prefs.pages?.[pageId] || {};
+    const readVar = (scope, name) => {
+      if (scope==='page' && pageVars[name] != null) return pageVars[name];
+      if (scope==='global' && prefs.global?.[name] != null) return prefs.global[name];
+      // fallback：抓目前計算後值
+      const target = (scope==='page' ? getActivePageEl() : ROOT);
+      return getComputedStyle(target).getPropertyValue(name).trim() || '';
+    };
+
+    $$('#settingsPanel [data-var]').forEach(el=>{
+      const { scope, var: v, suffix='' } = el.dataset;
+      const val = readVar(scope, v);
+      const num = suffix ? parseFloat(String(val).replace(suffix,'')) : parseFloat(val);
+      if (!Number.isNaN(num)) el.value = num;
+    });
+  }
+
+  // 輸入即時生效（無需重整）
+  function bindInputs(){
+    $$('#settingsPanel [data-var]').forEach(el=>{
+      el.addEventListener('input', ()=>{
+        const { scope, var: v, suffix='' } = el.dataset;
+        const str = (el.type==='range' || el.type==='number') ? (el.value + suffix) : el.value;
+
+        if (scope === 'global') {
+          ROOT.style.setProperty(v, str);             // 立即更新
+          const prefs = loadPrefs();
+          prefs.global = prefs.global || {};
+          prefs.global[v] = str;                      // 先暫存（不立刻存檔也可）
+          savePrefs(prefs);
+        } else { // page
+          const pg = getActivePageEl();
+          if (pg) pg.style.setProperty(v, str);       // 立即更新（只影響這頁）
+          const prefs = loadPrefs();
+          prefs.pages = prefs.pages || {};
+          const id = getActivePageId();
+          prefs.pages[id] = prefs.pages[id] || {};
+          prefs.pages[id][v] = str;
+          savePrefs(prefs);
+        }
+      });
+    });
+  }
+
+  // 頁面切換時自動載入該頁設定
+  function applyForCurrentPage(){
+    const prefs = loadPrefs();
+    applyGlobal(prefs.global||{});
+    const id = getActivePageId();
+    applyPage(id, (prefs.pages&&prefs.pages[id]) || {});
+    syncControls();
+  }
+
+  // 監看 .page.show 切換（若你有自己的路由事件，直接在那邊呼叫 applyForCurrentPage 即可）
+  const mo = new MutationObserver(()=> applyForCurrentPage());
+  mo.observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
+
+  // 開關浮層
+  $('#openSettings')?.addEventListener('click', ()=>{
+    $('#settingsOverlay')?.removeAttribute('hidden');
+    syncControls();
+  });
+  $('#closeSettings')?.addEventListener('click', ()=> $('#settingsOverlay')?.setAttribute('hidden',''));
+  $('#settingsOverlay')?.addEventListener('click', (e)=>{
+    if (e.target.classList.contains('settings-backdrop')) $('#settingsOverlay')?.setAttribute('hidden','');
+  });
+  document.addEventListener('keydown', e=>{
+    if (e.key==='Escape') $('#settingsOverlay')?.setAttribute('hidden','');
+  });
+
+  // Reset & Save（Save 已在 input 即時存了，這裡只是提供按鈕）
+  $('#btnSave')?.addEventListener('click', ()=> alert('已儲存（變更會自動即時生效，無需重整）'));
+  $('#btnResetAll')?.addEventListener('click', ()=>{
+    const prefs = loadPrefs(); prefs.global = {}; savePrefs(prefs);
+    ROOT.removeAttribute('style'); applyForCurrentPage();
+  });
+  $('#btnResetPage')?.addEventListener('click', ()=>{
+    const id = getActivePageId();
+    const prefs = loadPrefs(); if (prefs.pages) delete prefs.pages[id]; savePrefs(prefs);
+    const el = getActivePageEl(); if (el) el.removeAttribute('style');
+    applyForCurrentPage();
+  });
+
+  // 首次載入
+  applyForCurrentPage();
+  bindInputs();
+})();
+</script>

@@ -1,0 +1,47 @@
+<script>
+window.App   = window.App || {};
+App.routes   = App.routes || {};
+App.pages    = App.pages  || {};
+
+// ===== 只負責註冊 routes，不再定義 createVirtualTable / initDatabaseView =====
+if (!App.routes.ctbc) {
+  App.routes['ctbc'] = () => App.modules.ctbc.init();
+}
+App.routes['settings'] = function(){};
+
+// record：一律呼叫「全域版本」的 initDatabaseView（它在 record_js 內定義）
+App.routes['record'] = function(){
+  try{
+    if (typeof window.initDatabaseView === 'function') {
+      window.initDatabaseView();   // ← 這個才會綁好 #btnRecordAddRow、狀態卡等
+    } else {
+      console.error('[record] initDatabaseView not found. 確認 record_js 已載入且在 route_js 之前');
+    }
+  }catch(e){
+    console.error('[record] init error:', e);
+  }
+};
+
+// policy：同樣只代理到真正模組
+App.routes['policy'] = function(){
+  try{
+    if (App.pages?.policy?.init)       App.pages.policy.init();
+    else if (App.modules?.policy?.init)App.modules.policy.init();
+    else console.warn('[policy] no init found');
+  }catch(e){
+    console.error('[policy] init error:', e);
+  }
+};
+
+// dash 頁面初始化（保留）
+(function(){
+  let initedDash = false;
+  App.routes['dashmain'] = function(){
+    if (!initedDash) {
+      initedDash = true;
+      if (App.pages['dashmain']?.init) App.pages['dashmain'].init();
+      else if (typeof loadDashboard === 'function') loadDashboard();
+    }
+  };
+})();
+</script>

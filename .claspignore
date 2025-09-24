@@ -1,0 +1,7 @@
+# 忽略這些檔案/資料夾在 push 到雲端時被帶上去
+.git/
+node_modules/
+_dist/
+.DS_Store
+README.md
+*.zip

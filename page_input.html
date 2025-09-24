@@ -1,0 +1,88 @@
+<!-- page_input：表單 + 虛擬清單（桌面左/右；手機上/下） -->
+<section id="page-input" class="page show">
+  <div class="input-layout">
+
+    <!-- 左：帳戶餘額（Posted / Planned） -->
+    <div id="acctBalanceCard" class="card acct-balance-card">
+      <div class="bal-sec" id="balPosted">
+        <div class="section-title">Posted</div>
+        <div class="bal-list" id="acctBalanceListPosted"></div>
+      </div>
+      <div class="bal-sec" id="balPlanned">
+        <div class="section-title">Planned</div>
+        <div class="bal-list" id="acctBalanceListPlanned"></div>
+      </div>
+      <div id="acctBalanceTotal" class="bal-row total">
+        <span class="label">合計</span>
+        <span class="value" id="acctBalanceGrand">—</span>
+      </div>
+    </div>
+
+    <!-- 中：虛擬清單（手機時會放到下方；高度固定，不影響整頁滾動） -->
+    <aside class="tx-panel">
+      <div class="tx-toolbar">
+        <div class="fx-select-wrap">
+          <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
+            <label class="tx-chip tx-chip--status planned" style="cursor:pointer;">
+              <input type="checkbox" id="statusFilterPlanned" checked style="margin-right:6px;"> planned
+            </label>
+            <label class="tx-chip tx-chip--status posted" style="cursor:pointer;">
+              <input type="checkbox" id="statusFilterPosted" checked style="margin-right:6px;"> posted
+            </label>
+          </div>
+          <select id="txAccountPick" class="fx-select">
+            <option value="">請選擇帳戶</option>
+          </select>
+        </div>
+      </div>
+      <div class="tx-viewport" id="txViewport">
+        <table class="tx-table">
+          <thead id="txHead"></thead>
+          <tbody id="txBody"></tbody>
+        </table>
+        <div id="txSpacer"></div>
+      </div>
+    </aside>
+
+    <!-- 右：表單（手機置於上方） -->
+    <div class="card form-card grid" id="inputFormCard">
+      <label for="inDate" class="sr-only">日期</label>
+      <input type="date" id="inDate" class="fx-field" />
+
+      <input type="text" id="inItem" class="fx-field" placeholder="輸入項目" />
+
+      <div class="row amount-row">
+        <button class="btn-ghost toggleSign" id="btnToggleSign" type="button" title="切換正/負">±</button>
+        <input type="number" inputmode="decimal" id="inAmount" class="fx-field" placeholder="請輸入金額" />
+      </div>
+
+      <div class="fx-select-wrap">
+          <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
+            <label class="tx-chip tx-chip--status planned">
+              <input type="checkbox" id="statusFilterPlanned" checked> planned
+            </label>
+            <label class="tx-chip tx-chip--status posted">
+              <input type="checkbox" id="statusFilterPosted" checked> posted
+            </label>
+      </div>
+        <select id="inAccount" class="fx-select">
+          <option value="">請選擇帳戶</option>
+        </select>
+      </div>
+
+      <textarea id="inNote" class="fx-field" placeholder="輸入備注"></textarea>
+
+      <div class="hint-bubble">
+        支出輸入正數；「±」可切換正/負；今天以前 → posted；未來 → planned
+      </div>
+
+      <div class="form-actions">
+      <button id="btnSubmit"   class="btn btn--lg btn--primary">送出</button>
+      <button id="btnClear"    class="btn btn--lg btn--dark">清空</button>
+      <button id="btnUpdateTx" class="btn btn--lg btn--danger" disabled>更新</button>
+      </div>
+        
+    </div>
+
+  </div>
+</section>

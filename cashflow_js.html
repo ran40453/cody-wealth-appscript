@@ -1,0 +1,266 @@
+<script>
+/* ===== Cashflow (input / dash / list) ===== */
+let chartRef = null;
+let chartCollapsed = false;
+let currentKind = 'planned';
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  // 初始化帳戶/日期、刷新 NOW、圖表與清單
+  loadMeta().then(()=>{
+    initInputDates();
+    refreshNow();
+    loadDashboardChart();
+    loadKindList();
+  });
+});
+
+function initInputDates(){
+  const el = document.getElementById('date');
+  if (el && !el.value) el.value = new Date().toISOString().slice(0,10);
+  const from = document.getElementById('fFrom');
+  const to   = document.getElementById('fTo');
+  if (from) from.value = '';
+  if (to)   to.value = '';
+}
+
+/* ---- meta & form ---- */
+async function loadMeta(){
+  return new Promise((resolve)=>{
+    google.script.run.withSuccessHandler(meta=>{
+      const acctSel = document.getElementById('accountSel');
+      const acctNew = document.getElementById('accountNew');
+      if (acctSel){
+        acctSel.innerHTML = `<option value="" disabled selected>請選擇帳戶</option>` +
+          (meta.accounts||[]).map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('') +
+          `<option value="__NEW__">＋ 輸入新帳戶…</option>`;
+        acctSel.onchange = ()=>{
+          const isNew = acctSel.value === '__NEW__';
+          if (acctNew) acctNew.style.display = isNew ? '' : 'none';
+          if (isNew) acctNew && acctNew.focus();
+        };
+      }
+      const fAcc = document.getElementById('fAccount');
+      if (fAcc) fAcc.innerHTML = `<option value="">全部</option>` + (meta.accounts||[]).map(v=>`<option>${esc(v)}</option>`).join('');
+      resolve();
+    }).getMeta();
+  });
+}
+
+function submitForm(){
+  const acctSel  = document.getElementById('accountSel');
+  const acctNew  = document.getElementById('accountNew');
+  const statusSel= document.getElementById('statusSel');
+  const rec = {
+    date:  document.getElementById('date').value,
+    item:  document.getElementById('item').value,
+    amount: normalizeNumber(document.getElementById('amount').value),
+    account: (acctSel && acctSel.value==='__NEW__'? (acctNew?acctNew.value:'') : (acctSel?acctSel.value:'' )).trim(),
+    status: statusSel ? statusSel.value : 'auto',
+    note: document.getElementById('note').value
+  };
+  if (!rec.account) return alert('請選帳戶或輸入新帳戶');
+  if (!rec.date)    return alert('請選日期');
+  if (!rec.item.trim()) return alert('請填明細');
+  if (rec.amount==='' || isNaN(Number(rec.amount))) return alert('金額格式不對');
+
+  google.script.run.withSuccessHandler(res=>{
+    alert(`已加入第 ${res.row} 列\n該帳戶 NOW：${Number(res.balanceNow||0).toLocaleString('zh-Hant-TW')}`);
+    resetForm(true);
+    refreshNow();
+    reloadList();
+    loadDashboardChart();
+    loadKindList();
+  }).withFailureHandler(err=>{
+    alert('送出失敗：' + (err && err.message ? err.message : err));
+  }).submitCashflow(rec);
+}
+function resetForm(keepDate=false){
+  if (!keepDate) document.getElementById('date').value='';
+  document.getElementById('item').value='';
+  document.getElementById('amount').value='';
+  document.getElementById('note').value='';
+}
+
+/* ---- NOW chips ---- */
+function refreshNow(){
+  google.script.run.withSuccessHandler(rows=>{
+    const wrap = document.getElementById('nowwrap');
+    if (!wrap) return;
+    if (!rows || rows.length===0){
+      wrap.innerHTML = `<div class="chip">尚無資料</div>`;
+    } else {
+      wrap.innerHTML = rows.map(r =>
+        `<div class="chip">${esc(r.account)}：${Number(r.now||0).toLocaleString('zh-Hant-TW')}</div>`
+      ).join('');
+    }
+  }).getSummaryNow();
+}
+
+/* ---- Dashboard bar ---- */
+function loadDashboardChart(){
+  google.script.run.withSuccessHandler(rows=>{
+    const dataRows = (rows||[]).filter(r => (r.account||'').toUpperCase()!=='TOTAL');
+    const totalRow = (rows||[]).find(r => (r.account||'').toUpperCase()==='TOTAL') || {now:0, planned:0, final:0};
+    setText('tNow', Number(totalRow.now||0).toLocaleString('zh-Hant-TW'));
+    setText('tPln', Number(totalRow.planned||0).toLocaleString('zh-Hant-TW'));
+    setText('tFin', Number(totalRow.final||0).toLocaleString('zh-Hant-TW'));
+
+    if (!chartCollapsed){
+      const labels = ['NOW','Planned','Final'];
+      const datasets = dataRows.map(r => ({
+        label: r.account,
+        data: [Number(r.now||0), Number(r.planned||0), Number(r.final||0)]
+      }));
+      drawCFBar(labels, datasets);
+    } else {
+      drawCollapsedBar(Number(totalRow.final||0));
+    }
+  }).getSummaryCF();
+}
+function drawCFBar(labels, datasets){
+  const el = document.getElementById('pie');
+  if (!el) return;
+  const ctx = el.getContext('2d');
+  if (window.ChartDataLabels) Chart.register(ChartDataLabels);
+  if (chartRef) chartRef.destroy();
+  chartRef = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{ y:{ beginAtZero:true } },
+      plugins:{
+        legend:{ position:'bottom', labels:{ boxWidth:14 } },
+        datalabels:{
+          anchor:'end', align:'end', clip:true,
+          formatter:v=>Number(v||0).toLocaleString('zh-Hant-TW'),
+          font:{ weight:'600' }
+        },
+        tooltip:{ callbacks:{ label:(c)=>`${c.dataset.label}: ${Number(c.parsed.y||0).toLocaleString('zh-Hant-TW')}` } }
+      }
+    }
+  });
+}
+function drawCollapsedBar(finalTotal){
+  const el = document.getElementById('pie');
+  if (!el) return;
+  const ctx = el.getContext('2d');
+  if (chartRef) chartRef.destroy();
+  chartRef = new Chart(ctx, {
+    type: 'bar',
+    data: { labels:['Final'], datasets:[{ label:'TOTAL', data:[Number(finalTotal||0)] }] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }, tooltip:{ enabled:false } },
+      scales:{ y:{ beginAtZero:true, ticks:{ display:false } }, x:{ ticks:{ display:false } } }
+    }
+  });
+}
+function toggleChart(){
+  chartCollapsed = !chartCollapsed;
+  const box = document.getElementById('chartBox');
+  const btn = document.getElementById('chartToggleBtn');
+  if (box) box.classList.toggle('collapsed', chartCollapsed);
+  if (btn) btn.textContent = chartCollapsed ? '展開圖表' : '收合圖表';
+  loadDashboardChart();
+}
+
+/* ---- 下方清單（now / planned / final） ---- */
+function switchKind(kind){
+  currentKind = kind;
+  setText('listTitle', (kind==='now'?'NOW': kind==='final'?'Final' : 'Planned'));
+  ['now','planned','final'].forEach(k=>{
+    const el = document.getElementById('btn-kind-'+k);
+    if (el) el.classList.toggle('active', k===kind);
+  });
+  loadKindList();
+}
+function loadKindList(){
+  const tb = document.getElementById('plannedBody');
+  if (tb) tb.innerHTML = `<tr><td class="empty" colspan="4">載入中…</td></tr>`;
+  google.script.run.withSuccessHandler(list=>{
+    if (!tb) return;
+    if (!list || list.length===0){ tb.innerHTML = `<tr><td class="empty" colspan="4">沒有資料</td></tr>`; return; }
+    tb.innerHTML = list.map(r=>`
+      <tr>
+        <td>${esc(r.date||'')}</td>
+        <td><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account||'').toLowerCase())}">${esc(r.account||'')}</span></td>
+        <td class="num">${Number(r.amount||0).toLocaleString('zh-Hant-TW')}</td>
+        <td>${esc(r.item||'')}</td>
+      </tr>`).join('');
+  }).getTxByKind(currentKind);
+}
+
+/* ---- List 頁 ---- */
+function reloadList(){
+  const q = {
+    account: document.getElementById('fAccount')?.value || '',
+    dateFrom: document.getElementById('fFrom')?.value || '',
+    dateTo: document.getElementById('fTo')?.value || ''
+  };
+  google.script.run.withSuccessHandler(rows=>{
+    const tb = document.getElementById('txBody');
+    if (!tb) return;
+    if (!rows || rows.length===0){ tb.innerHTML = `<tr><td class="empty" colspan="5">沒有符合的資料</td></tr>`; return; }
+    tb.innerHTML = rows.map(r=>`
+      <tr>
+        <td>${esc(r.date||'')}</td>
+        <td><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account||'').toLowerCase())}">${esc(r.account||'')}</span></td>
+        <td class="num">${Number(r.amount||0).toLocaleString('zh-Hant-TW')}</td>
+        <td>${esc(r.status||'')}</td>
+        <td>${esc(r.item||'')}</td>
+      </tr>`).join('');
+  }).getTransactions(q);
+}
+function resetFilter(){
+  const from = document.getElementById('fFrom');
+  const to   = document.getElementById('fTo');
+  const fAcc = document.getElementById('fAccount');
+  if (from) from.value=''; if (to) to.value=''; if (fAcc) fAcc.value='';
+  reloadList();
+}
+
+/**
+ * 鍵盤守衛：iOS/Android 開鍵盤時，不讓畫面被頂上去，
+ * 同時把鍵盤高度換算成 --kb-safe，增加底部 padding。
+ */
+(function(){
+  const isTouch = matchMedia('(pointer: coarse)').matches || /iPhone|Android|iPad|iPod/i.test(navigator.userAgent);
+  const vv = window.visualViewport;
+
+  if (!isTouch || !vv) return;
+
+  // 根據鍵盤出現/隱藏，動態更新 --kb-safe
+  const onResize = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty('--kb-safe', kb + 'px');
+  };
+  vv.addEventListener('resize', onResize);
+  onResize();
+
+  // 在「記帳頁」輸入時鎖住滾動，離開輸入解除
+  const cashflowPage = document.getElementById('page_input') || document.querySelector('[data-page=cashflow]');
+  if (!cashflowPage) return;
+
+  let lastScrollY = 0;
+
+  cashflowPage.addEventListener('focusin', (e) => {
+    if (!(e.target instanceof HTMLElement)) return;
+    if (e.target.matches('input, textarea, select, [contenteditable="true"]')) {
+      lastScrollY = window.scrollY || document.documentElement.scrollTop;
+      document.documentElement.style.setProperty('--scrollY', lastScrollY + 'px');
+      document.documentElement.classList.add('lock-scroll');
+    }
+  });
+
+  cashflowPage.addEventListener('focusout', (e) => {
+    if (!(e.target instanceof HTMLElement)) return;
+    if (e.target.matches('input, textarea, select, [contenteditable="true"]')) {
+      document.documentElement.classList.remove('lock-scroll');
+      // 回到原本位置
+      setTimeout(()=> window.scrollTo(0, lastScrollY), 0);
+    }
+  });
+})();
+
+</script>

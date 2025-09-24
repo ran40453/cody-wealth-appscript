@@ -1,0 +1,60 @@
+<!-- dashmain_html.html -->
+<section id="page-dashmain" class="page">
+  <div class="dashmain">
+    <!-- A：總覽 KPI -->
+    <section class="card kpi">
+      <header class="card-hd">
+        <div class="title">總覽</div>
+        <span id="dashPnlPill" class="pnl-pill">–</span>
+        <button class="btn-ghost" data-go="record" title="明細"><span class="material-symbols-outlined">receipt_long</span></button>
+      </header>
+      <div class="kpi-list">
+        <div class="kpi-item"><div class="k">總資產</div><div id="kpiTotal" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">淨資產</div><div id="kpiNet" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">現金</div><div id="kpiCash" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">可動用</div><div id="kpiAvail" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">債務</div><div id="kpiDebt" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">更新日</div><div id="kpiDate" class="v capsule">—</div></div>
+      </div>
+    </section>
+
+    <!-- B：投資總覽（CTBC） -->
+    <section class="card ctbc">
+      <header class="card-hd">
+        <div class="title">投資總覽</div>
+        <span id="ctRetPill" class="pnl-pill" data-mask-str="＊＊＊">—</span>
+        <button class="btn-ghost" data-go="ctbc" title="去記帳頁"><span class="material-symbols-outlined">savings</span></button>
+      </header>
+      <div class="ctbc-list">
+        <div class="kpi-item"><div class="k">現值 (USD)</div><div id="ctVal" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">含息損益</div><div id="ctPnl" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">已領利息</div><div id="ctInt" class="v money capsule">—</div></div>
+        <div class="kpi-item"><div class="k">報酬率</div><div id="ctRet" class="v"><span class="capsule">—</span></div></div>
+      </div>
+    </section>
+
+    <!-- C：Plan（把標題改 Plan，右邊放 pill） -->
+      <section class="card planned">
+        <header class="card-hd">
+          <div class="title">Plan</div>
+          <span id="planPnlPill" class="pnl-pill">–</span>
+          <button class="btn-ghost" data-go="input" title="歷史數據">
+            <span class="material-symbols-outlined">edit</span>
+          </button>
+        </header>
+        <div id="plannedList" class="list slim"></div>
+      </section>
+
+      <!-- D：帳戶餘額（右邊放總和 pill） -->
+      <section class="card accounts">
+        <header class="card-hd">
+          <div class="title">帳戶</div>
+          <span id="accSumPill" class="pnl-pill">–</span>
+          <button class="btn-ghost" data-go="acc" title="管理帳戶">
+            <span class="material-symbols-outlined">toll</span>
+          </button>
+        </header>
+        <div id="accList" class="list slim"></div>
+      </section>
+  </div>
+</section>

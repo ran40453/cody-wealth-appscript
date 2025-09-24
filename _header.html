@@ -1,0 +1,66 @@
+<!-- _header.html 
+  <div class="title-wrap">
+    <img class="app-logo" src="https://static.wixstatic.com/media/f31164_8fb3a217689346059f1c7a5e599fa050~mv2.png/v1/fill/w_282,h_50,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/logoFONT.png" alt="logo">   
+    <div class="title">Cody Wealth</div>
+  </div>
+
+<!-- 右側：主題切換 + 抽屜
+<div class="header-actions">
+  <div class="themeBtn" onclick="toggleTheme()" aria-label="theme">☀︎/☾</div>
+  <button id="openSettings" class="themeBtn" title="顯示設定">tune</button>
+  <div class="menuBtn"  onclick="toggleDrawer()" aria-label="menu">☰</div>
+</div>
+
+<!-- 下排：麵包屑容器
+<div id="breadcrumb" class="breadcrumb"></div>
+ 
+-->
+
+<!-- _header.html -->
+<div class="title-wrap">
+  <img class="app-logo"
+       src="https://static.wixstatic.com/media/f31164_8fb3a217689346059f1c7a5e599fa050~mv2.png/v1/fill/w_282,h_50,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/logoFONT.png"
+       alt="logo"
+       style="cursor:pointer"
+       onclick="go('dashmain')" />
+  <div class="title">Cody Wealth</div>
+</div>
+
+<!-- 主收合鈕（手機用） -->
+<div id="hdrFabWrap" aria-hidden="true">
+  <button id="hdrFab" class="icon-btn material-symbols-outlined" aria-expanded="false" aria-controls="hdrFabMenu">more_vert</button>
+  <div id="hdrFabMenu" role="menu">
+    <button class="icon-btn material-symbols-outlined" data-act="refresh"  role="menuitem" title="重新整理">refresh</button>
+    <button class="icon-btn material-symbols-outlined" data-act="mask"     role="menuitem" title="隱藏金額">visibility_off</button>
+    <button class="icon-btn material-symbols-outlined" data-act="theme"    role="menuitem" title="主題切換">dark_mode</button>
+    <button class="icon-btn material-symbols-outlined" data-act="settings" role="menuitem" title="設定">settings</button>
+  </div>
+</div>
+
+
+<!-- 右側：按鍵（順序：重新整理 / 隱藏金額 / 主題 / 設定 / 選單） -->
+<div class="header-actions">
+    <button id="btnRefresh" class="themeBtn" title="Refresh">
+      <span class="material-symbols-outlined">refresh</span>
+    </button>
+
+    <button id="btnMask" class="maskBtn" aria-pressed="false" title="Mask">
+      <span class="material-symbols-outlined">visibility_off</span>
+    </button>
+
+    <button id="btnTheme" class="themeBtn only-desktop" title="Theme">
+      <span class="material-symbols-outlined">dark_mode</span>
+    </button>
+
+    <button id="openSettings" class="themeBtn only-desktop" title="Settings">
+      <span class="material-symbols-outlined">tune</span>
+    </button>
+
+    <!-- 這顆按鈕留在 header-actions 裡，不要再被 <aside id="drawer"> 包住 -->
+    <button id="btnMenu" class="menuBtn only-desktop" title="Menu">
+      <span class="material-symbols-outlined">menu</span>
+    </button>
+  </div>
+
+<!-- 下排：麵包屑容器 -->
+<div id="breadcrumb" class="breadcrumb"></div>

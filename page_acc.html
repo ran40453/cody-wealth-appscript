@@ -1,0 +1,63 @@
+<!-- page_acc.html -->
+<section id="page-acc" class="page hidden">
+  <!-- ※ 移除 subhead；麵包屑 current 由 JS 另行更新為「帳戶快更」 -->
+
+  <!-- 主要版面：左右水平排列 -->
+  <div class="acc-layout">
+    <!-- 左欄：膠囊牆（卡片外框 + 獨立卷軸） -->
+    <aside class="pane pane--left card">
+      <div id="accGrid" class="acc-grid"></div>
+    </aside>
+
+    <!-- 右欄：上=總額卡、中=編輯卡、下=最近異動（可捲動） -->
+<section class="pane pane--right">
+
+  <!-- 總額卡片（移到最上） -->
+  <div class="card card--total">
+    <div id="mount-total-desktop" class="mount-total mount-total--desktop" ></div>
+  </div>
+
+  <!-- 編輯卡：加入左右箭頭（icon），取代文字 edPrev/edNext -->
+  <div class="card card--editor">
+    <button id="accNavPrev" class="navArrow navArrow--left" aria-label="上一筆">
+      <span class="material-symbols-outlined">chevron_left</span>
+    </button>
+    <button id="accNavNext" class="navArrow navArrow--right" aria-label="下一筆">
+      <span class="material-symbols-outlined">chevron_right</span>
+    </button>
+
+    <div id="editorBar" class="editor">
+      <div class="info">
+        <div id="edPrev" class="prev hint" style="display:none"></div>
+        <div id="edName" class="name">—</div>
+        <div id="edNext" class="next hint" style="display:none"></div>
+        <div id="edCur" class="curbadge">—</div>
+      </div>
+
+      <div class="inputbox">
+        <input id="edInput" type="text" inputmode="decimal"
+               placeholder="輸入金額或算式：(1200+300)*2 或 =SUM(100,200)" />
+        <div class="chips">
+          <span class="chip muted">原本：<b id="chipOrig">—</b></span>
+          <span class="chip ok">已存：<b id="chipSaved">—</b></span>
+        </div>
+        <div class="preview" id="edPreview">預覽：—</div>
+      </div>
+
+      <div class="statusline">
+        <span id="accStatus" class="chip status">狀態：—</span>
+      </div>
+
+      <!-- 手機限定：Submit -->
+      <button id="accSubmit" class="btn btn-primary mobile-only" aria-label="儲存">儲存</button>
+    </div>
+  </div>
+
+  <!-- 最近異動（不限筆數，虛擬卷軸） -->
+  <div class="card card--recent">
+    <div class="recent-head">最近異動</div>
+    <ol id="recentList" class="recent-list"></ol>
+  </div>
+</section>
+  </div>
+</section>

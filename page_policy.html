@@ -1,0 +1,91 @@
+<section id="page-policy" class="page">
+  <!-- 上方：圖 + KPI（KPI 用 chip 膠囊） -->
+  <div class="card" id="pol-top">
+    <div class="card-hd">
+      <div class="title">保單成長概況</div>
+      <div class="actions">
+        <button id="polBtnRefresh" class="btn-ghost">重載</button>
+      </div>
+    </div>
+
+    <div class="grid kpi-row" style="grid-template-columns:repeat(5,1fr);gap:10px;">
+      <div class="kpi-item">
+        <div class="k">我的年齡</div>
+        <div class="v chip" id="polKpiAge">--</div>
+      </div>
+      <div class="kpi-item">
+        <div class="k">紅利模型</div>
+        <div class="v chip" id="polKpiBonus">--</div>
+      </div>
+      <div class="kpi-item">
+        <div class="k">累計提領</div>
+        <div class="v chip" id="polKpiDraw">--</div>
+      </div>
+      <div class="kpi-item">
+        <div class="k">Total P/L</div>
+        <div class="v chip" id="polKpiPL">--</div>
+      </div>
+      <div class="kpi-item">
+        <div class="k">累計投入</div>
+        <div class="v chip" id="polKpiInvest">--</div>
+      </div>
+    </div>
+
+    <div class="chartWrap" style="margin-top:8px;">
+      <canvas id="polChart"></canvas>
+    </div>
+    <div id="polReadout" style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;"></div>
+  </div>
+
+  <!-- 中間：兩卡並排（左：A1:B10 控制項；右：年份 slider） -->
+  <div class="grid-2col" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+    <!-- 左邊：控制卡（A1:B10） -->
+    <div class="card" id="pol-ctrl">
+      <div class="card-hd">
+        <div class="title">控制項（A1 : B10）</div>
+      </div>
+      <div class="list slim" id="polCtrlBody" style="max-height:28vh;overflow:auto;">
+        <div class="empty">載入中…</div>
+      </div>
+    </div>
+
+    <!-- 右邊：年份控制 -->
+    <div class="card" id="pol-mid">
+      <div class="card-hd">
+        <div class="title">年份控制</div>
+        <div class="actions">
+          <button id="polPrev" class="btn-ghost">◀︎</button>
+          <button id="polNext" class="btn-ghost">▶︎</button>
+        </div>
+      </div>
+      <div class="grid" style="gap:8px;">
+        <input id="polRange" type="range" min="0" max="0" step="1" value="0" style="width:100%;">
+        <div style="display:flex;justify-content:space-between;font-size:12px;opacity:.75;">
+          <span id="polMinYear">--</span><span id="polCurYear">--</span><span id="polMaxYear">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下方：明細表（新增「累計投入」欄；thead 置頂） -->
+  <div class="card" id="pol-btm">
+    <div class="card-hd">
+      <div class="title">明細</div>
+    </div>
+    <div class="list slim pol-table-wrap">
+      <table class="pol-table">
+        <thead>
+          <tr>
+            <th>年/月</th>
+            <th>年齡</th>
+            <th>紅利模型</th>
+            <th class="num">累計提領</th>
+            <th class="num">Total P/L</th>
+            <th class="num">累計投入</th>
+          </tr>
+        </thead>
+        <tbody id="polTbody"><tr><td colspan="6" class="empty">載入中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</section>
