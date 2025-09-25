@@ -311,7 +311,7 @@ function renderVirtual(){
     const typeHtml = r.H ? `<span class="type-chip">${esc(r.H)}</span>` : '-';
     const rowNo = Number(r.ROW || 0);
     const afHtml = `<span class="pill af-pill mask-num" data-mask-str="＊＊＊">${esc(fmtMoney(r.AF))}</span>`;
-    const quoteHtml = `<span class="pill quote-pill mask-num" data-mask-str="＊＊＊">${esc(fmtMoney(r.QUOTE))}</span>`;
+    const quoteHtml = `<span class="pill af-pill mask-num" data-mask-str="＊＊＊">${esc(fmtMoney(r.QUOTE))}</span>`;
 
     return `<tr data-row="${rowNo}">
       <td class="txt">${esc(r.K||'-')}</td>                         <!-- 項目 K -->
@@ -347,8 +347,8 @@ function renderVirtual(){
   kind = (kind||'AF').toUpperCase();
   const m1 = document.getElementById('afModal');
   const m2 = document.getElementById('afModalDesk');
-  if (m1){ m1.dataset.kind = kind; const t=m1.querySelector('.af-title'); if (t) t.textContent = (kind==='QUOTE'?'輸入目前報價（可輸入算式）':'輸入已領利息（可輸入算式）'); }
-  if (m2){ m2.dataset.kind = kind; const t=m2.querySelector('.af-title'); if (t) t.textContent = (kind==='QUOTE'?'輸入目前報價（可輸入 =公式 或 數字）':'輸入已領利息（可輸入 =公式 或 數字）'); }
+  if (m1){ m1.dataset.kind = kind; const t=m1.querySelector('.af-subtitle'); if (t) t.textContent = (kind==='QUOTE'?'輸入目前報價（可輸入算式）':'輸入已領利息（可輸入算式）'); }
+  if (m2){ m2.dataset.kind = kind; const t=m2.querySelector('.af-subtitle'); if (t) t.textContent = (kind==='QUOTE'?'輸入目前報價（可輸入 =公式 或 數字）':'輸入已領利息（可輸入 =公式 或 數字）'); }
   }
 
   // 放在檔案裡任何函式外層（與 helpers 並排）
@@ -473,19 +473,20 @@ function openAFEditor(rowNo, defaultExpr){
       modal = document.createElement('div');
       modal.id = 'afModal';
       modal.innerHTML = `
-        <div class="af-backdrop"></div>
-        <div class="af-dialog">
-          <div class="af-title">輸入已領利息（可輸入算式）</div>
-          <input id="afInput" class="af-input" inputmode="decimal" autocomplete="off" />
-          <div class="af-pad">
-            ${[
-              '=','7','8','9','+','(',
-              '4','5','6','-',
-              '1','2','3','*',')',
-              '0','.','/','清除','←','確定'
-            ].map(k=>`<button class="af-key" data-k="${k.trim()}">${k}</button>`).join('')}
-          </div>
-        </div>`;
+      <div class="af-backdrop"></div>
+      <div class="af-dialog">
+        <div class="af-title"><b id="afItemName"></b></div>
+        <div class="af-subtitle">輸入已領利息（可輸入算式）</div>
+        <input id="afInput" class="af-input" inputmode="decimal" autocomplete="off" />
+        <div class="af-pad">
+          ${[
+            '=','7','8','9','+','(',
+            '4','5','6','-',
+            '1','2','3','*',')',
+            '0','.','/','清除','←','確定','取消'
+          ].map(k=>`<button class="af-key" data-k="${k.trim()}">${k}</button>`).join('')}
+        </div>
+      </div>`;
       document.body.appendChild(modal);
       // enforce overlay styles (mobile)
       modal.style.position = 'fixed';
@@ -496,6 +497,15 @@ function openAFEditor(rowNo, defaultExpr){
       const dg = modal.querySelector('.af-dialog');
       if (bd){ bd.style.position='fixed'; bd.style.inset='0'; bd.style.background='rgba(0,0,0,.45)'; bd.style.zIndex='2200'; }
       if (dg){ dg.style.position='fixed'; dg.style.left='50%'; dg.style.top='16%'; dg.style.transform='translateX(-50%)'; dg.style.background='#fff'; dg.style.borderRadius='12px'; dg.style.padding='16px'; dg.style.minWidth='320px'; dg.style.maxWidth='min(92vw,560px)'; dg.style.zIndex='2210'; dg.style.boxShadow='0 14px 40px rgba(0,0,0,.28)'; }
+      // ↓ 內容縮小兩級（只縮副標、輸入框、鍵盤；標題保持原大小）
+      (function(){
+        const sub = modal.querySelector('.af-subtitle');
+        const inp = modal.querySelector('#afInput');
+        const keys = modal.querySelectorAll('.af-key');
+        if (sub) sub.style.fontSize = '14px';
+        if (inp) inp.style.fontSize = '14px';
+        keys.forEach(k=> k.style.fontSize = '14px');
+      })();
 
       // 只綁一次
       if (!modal._bound) {
@@ -511,6 +521,7 @@ function openAFEditor(rowNo, defaultExpr){
             inp.value = '';
             return;
           }
+          if (k === '取消') { closeAFAll(); return; }
           if (k === '←') {
             inp.value = inp.value.slice(0,-1);
             return;
@@ -526,6 +537,7 @@ function openAFEditor(rowNo, defaultExpr){
             const r = Number(modal.dataset.rowNo || 0);
             const orig = modal.dataset.orig || '';
             _commitAF_(r, orig, raw);
+            closeAFAll();
             return;
           }
           // 其他鍵：輸入
@@ -536,6 +548,15 @@ function openAFEditor(rowNo, defaultExpr){
     }
     // ★ 每次開啟都更新 dataset 與預設值
     modal.dataset.rowNo = String(rowNo);
+    (function(){
+      var name = '';
+      try {
+        var row = (Array.isArray(allRows) ? allRows : []).find(x => Number(x && x.ROW || 0) === Number(rowNo));
+        name = row && row.K ? String(row.K) : '';
+      } catch(_){}
+      var elName = modal.querySelector('#afItemName') || modal.querySelector('#afItemNameDesk');
+      if (elName) elName.textContent = name || '';
+    })();
     modal.dataset.orig  = String(defaultExpr||'').trim();
     document.getElementById('afInput').value = String(defaultExpr||'').replace(/[\u00A0]/g,'').trim();
     // show as overlay
@@ -548,16 +569,16 @@ function openAFEditor(rowNo, defaultExpr){
       modal = document.createElement('div');
       modal.id = 'afModalDesk';
       modal.innerHTML = `
-        <div class="af-backdrop"></div>
-        <div class="af-dialog">
-          <div class="af-title">輸入已領利息（可輸入 =公式 或 數字）</div>
-          <div class="af-help">提示：以「=」開頭可保留公式，例如 <code>=583+584+584+583</code></div>
-          <input id="afInputDesk" class="af-input" autocomplete="off" />
-          <div class="af-actions">
-            <button class="af-btn af-cancel">取消</button>
-            <button class="af-btn af-ok">確定</button>
-          </div>
-        </div>`;
+      <div class="af-backdrop"></div>
+      <div class="af-dialog">
+        <div class="af-title"><b id="afItemNameDesk"></b></div>
+        <div class="af-subtitle af-help">輸入已領利息（可輸入 =公式 或 數字）</div>
+        <input id="afInputDesk" class="af-input" autocomplete="off" />
+        <div class="af-actions">
+          <button class="af-btn af-cancel">取消</button>
+          <button class="af-btn af-ok">確定</button>
+        </div>
+      </div>`;
       document.body.appendChild(modal);
       // enforce overlay styles (desktop)
       modal.style.position = 'fixed';
@@ -568,6 +589,13 @@ function openAFEditor(rowNo, defaultExpr){
       const dg2 = modal.querySelector('.af-dialog');
       if (bd2){ bd2.style.position='fixed'; bd2.style.inset='0'; bd2.style.background='rgba(0,0,0,.45)'; bd2.style.zIndex='2200'; }
       if (dg2){ dg2.style.position='fixed'; dg2.style.left='50%'; dg2.style.top='16%'; dg2.style.transform='translateX(-50%)'; dg2.style.background='#fff'; dg2.style.borderRadius='12px'; dg2.style.padding='16px'; dg2.style.minWidth='320px'; dg2.style.maxWidth='min(92vw,560px)'; dg2.style.zIndex='2210'; dg2.style.boxShadow='0 14px 40px rgba(0,0,0,.28)'; }
+      // ↓ 內容縮小兩級（桌機：縮副標與輸入框）
+      (function(){
+        const sub2 = modal.querySelector('.af-subtitle');
+        const inp2 = modal.querySelector('#afInputDesk');
+        if (sub2) sub2.style.fontSize = '14px';
+        if (inp2) inp2.style.fontSize = '14px';
+      })();
 
       // 只綁一次
       if (!modal._bound) {
@@ -578,22 +606,31 @@ function openAFEditor(rowNo, defaultExpr){
             return; 
           }
           if (el.classList.contains('af-ok')) {
-            const val = document.getElementById('afInputDesk').value.trim();
-            if (val && !/^[=]?[0-9\s+*().,，\u00A0\/-]+$/.test(val)) { 
-              alert('只允許數字與 + - * / ( )'); 
-              return; 
-            }
-            // ★ 關鍵：從 dataset 讀取現在要寫入的列與原字串
-            const r = Number(modal.dataset.rowNo || 0);
-            const orig = modal.dataset.orig || '';
-            _commitAF_(r, orig, val);   // 關窗與重抓由 _commitAF_ 處理
+          const val = document.getElementById('afInputDesk').value.trim();
+          if (val && !/^[=]?[0-9\\s+*().,，\\u00A0\\/-]+$/.test(val)) { 
+            alert('只允許數字與 + - * / ( )'); 
+            return; 
           }
+          const r = Number(modal.dataset.rowNo || 0);
+          const orig = modal.dataset.orig || '';
+          _commitAF_(r, orig, val);
+          closeAFDesk();  // ← 確認後立刻關窗
+        }
         });
         modal._bound = true;
       }
     }
     // ★ 每次開啟都更新 dataset 與預設值
     modal.dataset.rowNo = String(rowNo);
+    (function(){
+      var name = '';
+      try {
+        var row = (Array.isArray(allRows) ? allRows : []).find(x => Number(x && x.ROW || 0) === Number(rowNo));
+        name = row && row.K ? String(row.K) : '';
+      } catch(_){}
+      var elName = modal.querySelector('#afItemName') || modal.querySelector('#afItemNameDesk');
+      if (elName) elName.textContent = name || '';
+    })();
     modal.dataset.orig  = String(defaultExpr||'').trim();
 
     const inp = document.getElementById('afInputDesk');
@@ -605,8 +642,8 @@ function openAFEditor(rowNo, defaultExpr){
   }
 }
 
-function closeAF(){ const m=document.getElementById('afModal'); if (m) m.classList.remove('open'); }
-function closeAFDesk(){ const m=document.getElementById('afModalDesk'); if (m) m.classList.remove('open'); }
+function closeAF(){ const m=document.getElementById('afModal'); if (m){ m.classList.remove('open'); m.style.display='none'; } }
+function closeAFDesk(){ const m=document.getElementById('afModalDesk'); if (m){ m.classList.remove('open'); m.style.display='none'; } }
 // ★ NEW：一鍵關兩種視窗（桌機/手機）
 function closeAFAll(){ closeAF(); closeAFDesk(); }
 
