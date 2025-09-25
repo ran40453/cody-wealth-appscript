@@ -346,7 +346,7 @@ function fixMissingValidationAll_(){
 function getCTBCInvestments(){
   const SHEET = '✅';
   // A=1, ..., AF=32, AG=33, AH=34
-  const INDEX = {H:8, K:11, L:12, N:14, T:20, U:21, V:22, AF:32, AH:34}; 
+  const INDEX = {H:8, K:11, L:12, N:14, R:18, T:20, U:21, V:22, AF:32, AH:34};
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) return [];
 
@@ -373,6 +373,8 @@ function getCTBCInvestments(){
     K:  toStr(r[INDEX.K  - 1]),
     L:  Number(r[INDEX.L  - 1]) || 0,
     N:  Number(r[INDEX.N  - 1]) || 0,
+    R:   toStr(r[INDEX.R - 1]),
+    UOTE: Number(r[INDEX.R - 1]) || 0, 
     T:  Number(r[INDEX.T  - 1]) || 0,
     U:  Number(r[INDEX.U  - 1]) || 0,
     V:  toStr(r[INDEX.V  - 1]),
@@ -424,6 +426,40 @@ function setCTBCInterestUSD(rowNumber, input){
   SpreadsheetApp.flush();
   return { row: rowNumber };
 }
+
+/** 讀取某列 QUOTE(R) 的公式/值 */
+function getCTBCQuoteCell(rowNumber){
+  const SHEET = '✅';
+  const COL_R = 18; // 目前報價
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('找不到工作表：' + SHEET);
+  if (rowNumber < 2) throw new Error('列號不合法');
+  const rng = sh.getRange(rowNumber, COL_R);
+  return { formula: rng.getFormula() || '', value: rng.getDisplayValue() || '' };
+}
+
+/** 寫回「目前報價 (USD)」（R=18），並更新 AH(34) */
+function setCTBCQuoteUSD(rowNumber, input){
+  const SHEET = '✅';
+  const COL_R = 18; // 目前報價
+  const COL_AH = 34; // 更新日
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('找不到工作表：' + SHEET);
+  if (rowNumber < 2) throw new Error('列號不合法');
+
+  const rngR = sh.getRange(rowNumber, COL_R);
+  const s = (typeof input === 'string') ? input.trim() : '';
+  if (s && s[0] === '=') rngR.setFormula(s); else rngR.setValue(Number(input)||0);
+
+  const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  sh.getRange(rowNumber, COL_AH).setValue(today);
+
+  SpreadsheetApp.flush();
+  return { row: rowNumber };
+}
+
+/* ===== Cashflow 彙總表（給前端 Dashboard 用） ===== */
 
 /** 表內可用：=CF_SUMMARY()  → 含表頭與最後一列 TOTAL */
 function CF_SUMMARY() {
