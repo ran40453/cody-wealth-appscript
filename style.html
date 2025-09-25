@@ -922,29 +922,44 @@ html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip{ background:#f
    ========================================================= */
 .maskBtn .material-symbols-outlined{ font-size:22px; line-height:1; }
 
-/* 遮罩核心：body.mask-on 啟用 */
+/* ── 核心遮罩（僅在 body.mask-on 啟用）──────────────────────── */
 body.mask-on .mask-num,
 body.mask-on [data-maskable]{
-  color: transparent !important;
-  position: relative;            /* ← 不要 absolute，留在原位 */
-  display: inline-block;  
+  position: relative !important;
+  display: inline-block;
   font-variant-numeric: tabular-nums;
 }
+/* 把自己與所有子孫的字色全部隱藏，避免徽章/次元素漏字 */
+body.mask-on .mask-num,
+body.mask-on .mask-num *,
+body.mask-on [data-maskable],
+body.mask-on [data-maskable] *{
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important; /* Safari/iOS */
+  text-shadow: none !important;
+}
+/* 疊上替代字（預設從 data-mask-str 讀取） */
 body.mask-on .mask-num::after,
 body.mask-on [data-maskable]::after{
-  content: attr(data-mask-str, '＊＊＊');
+  content: attr(data-mask-str);
   position: absolute; inset: 0;
-  font: inherit; line-height: inherit; text-align: inherit;
-  letter-spacing: inherit; white-space: nowrap; color: var(--text);
-  pointer-events: none;          /* ← 避免擋到點擊/選取 */
+  display: flex; align-items: center; justify-content: flex-end; /* 數字預設靠右 */
+  text-align: inherit; font: inherit; line-height: inherit; letter-spacing: inherit;
+  pointer-events: none;
+  color: var(--text) !important;
+  -webkit-text-fill-color: var(--text) !important;
 }
+/* 行內徽章在被遮罩時保持膠囊尺寸（只隱藏文字） */
+body.mask-on .roi-badge.mask-num{ display:inline-block; }
 
 /* 輸入欄位/互動元件預設不遮 */
-body.mask-on input, body.mask-on textarea, body.mask-on select,
-body.mask-on [contenteditable]{ color: inherit !important; }
-.no-mask{ color: inherit !important; }
+body.mask-on input,
+body.mask-on textarea,
+body.mask-on select,
+body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-color: inherit !important; }
+.no-mask{ color: inherit !important; -webkit-text-fill-color: inherit !important; }
 
-/* 指定總額兜底 */
+/* 指定總額兜底（維持你的原規則） */
 .mask-on #js-accTotalVal{ color:transparent !important; position:relative; }
 .mask-on #js-accTotalVal::after{ content:'＊＊＊'; position:absolute; inset:0 auto 0 0; width:100%; font:inherit; }
 
