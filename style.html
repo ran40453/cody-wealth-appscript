@@ -961,6 +961,55 @@ body.mask-on #ctbcViewport .ctbc-table .roi-badge::after{
 }
 .maskBtn .material-symbols-outlined{ font-size:22px; line-height:1; }
 
+/* === [Fix] 讓 pill/徽章不消失，星號置中；且不要整塊覆蓋 pnl-cell === */
+
+/* 1) 停用整塊覆蓋 pnl-cell，避免把整格蓋住造成星號位移 */
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell::after{
+  content: none !important;
+}
+
+/* 2) 針對 pnl-cell 內的兩個子元素分別遮罩：數字靠右、徽章置中 */
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .num,
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .num *{
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .num{
+  position: relative !important;
+}
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .num::after{
+  content: '＊＊＊';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: flex-end; /* 右對齊數字 */
+  pointer-events: none;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important;
+}
+
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .roi-badge,
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .roi-badge *{
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .roi-badge{
+  position: relative !important; display: inline-block;
+}
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell .roi-badge::after{
+  content: '＊＊＊';
+  position: absolute; inset: 0;
+  display: inline-flex; align-items: center; justify-content: center; /* 徽章置中 */
+  pointer-events: none;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important;
+}
+
+/* 3) AF/QUOTE 等膠囊（.pill / .af-pill）被遮罩時，星號置中顯示，保留膠囊外觀 */
+body.mask-on .pill.mask-num::after,
+body.mask-on .af-pill.mask-num::after,
+body.mask-on .roi-badge.mask-num::after{
+  justify-content: center !important;
+}
+
 /* ── 核心遮罩（僅在 body.mask-on 啟用）──────────────────────── */
 body.mask-on .mask-num,
 body.mask-on [data-maskable]{
