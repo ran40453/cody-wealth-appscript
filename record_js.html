@@ -1,4 +1,3 @@
-<!-- record_js.html -->
 <script>
 (function(){
   window.App = window.App || {};
@@ -8,11 +7,12 @@
   function fmtNumTW(n, opt={minimumFractionDigits:1, maximumFractionDigits:1}){
     return Number(n||0).toLocaleString('zh-Hant-TW', opt);
   }
+  function maskHTML(v){ return `<span class="mask-num" data-mask-str="＊＊＊">${v}</span>`; }
   function pnlBadgeHTML(v){
     const n = Number(v||0);
     const cls = n>0 ? 'pnl-pill pos' : n<0 ? 'pnl-pill neg' : 'pnl-pill zero';
     const sign = n>0 ? '+' : '';
-    return `<span class="${cls}">${sign}${fmtNumTW(n)}</span>`;
+    return `<span class="${cls}">${maskHTML(sign + fmtNumTW(n))}</span>`;
   }
 
   // —— 虛擬表 ——
@@ -31,6 +31,13 @@
       lastRange: [-1,-1],
       fetching: new Set()
     };
+    function isNumericLike(x){
+      if (typeof x === 'number') return true;
+      if (typeof x !== 'string') return false;
+      if (x.indexOf('<') !== -1) return false; // 已含 HTML，不再包
+      return /[0-9]/.test(x);
+    }
+    function wrapCell(x){ return isNumericLike(x) ? maskHTML(String(x)) : String(x); }
     function onResize(){ state.viewportH = state.viewport.clientHeight; render(); }
     let tick = null;
     function onScroll(){ if (tick) return; tick = requestAnimationFrame(()=>{ render(); tick=null; }); }
@@ -62,7 +69,7 @@
         const isLatest = (start + idx === 0); // 第一筆 = 最新
         const trCls = isLatest ? 'is-latest' : '';
         if (!r) return `<tr class="${trCls}" style="height:${state.rowHeight}px"><td colspan="${state.headers.length||1}">載入中…</td></tr>`;
-        return `<tr class="${trCls}" style="height:${state.rowHeight}px">${r.map(c=>`<td>${String(c)}</td>`).join('')}</tr>`;
+        return `<tr class="${trCls}" style="height:${state.rowHeight}px">${r.map(c=>`<td>${wrapCell(c)}</td>`).join('')}</tr>`;
       }).join('');
     }
 
@@ -116,14 +123,14 @@
       .withSuccessHandler(res=>{
         if (!res){ box.innerHTML = `<div class="empty">沒有資料</div>`; return; }
         const rows = [
-          ['日期', res.date || '-'],
-          ['總資產', fmtNumTW(res.C)],
-          ['加上爸爸', fmtNumTW(res.D)],
-          ['可動用', fmtNumTW(res.E)],
+          ['日期', (res && res.date) || '-'],
+          ['總資產', maskHTML(fmtNumTW(res.C))],
+          ['加上爸爸', maskHTML(fmtNumTW(res.D))],
+          ['可動用', maskHTML(fmtNumTW(res.E))],
           ['當日損益', pnlBadgeHTML(res.F)],
-          ['現金', fmtNumTW(res.G)],
-          ['債務', fmtNumTW(res.BB)],
-          ['持有 USD', fmtNumTW(res.CV)]
+          ['現金', maskHTML(fmtNumTW(res.G))],
+          ['債務', maskHTML(fmtNumTW(res.BB))],
+          ['持有 USD', maskHTML(fmtNumTW(res.CV))]
         ];
         box.innerHTML = rows.map(([k,v])=>`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
         syncKpiFromLatest(res); // 若 dash KPI 容器存在就同步
