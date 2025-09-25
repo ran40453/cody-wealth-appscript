@@ -374,7 +374,7 @@ function getCTBCInvestments(){
     L:  Number(r[INDEX.L  - 1]) || 0,
     N:  Number(r[INDEX.N  - 1]) || 0,
     R:   toStr(r[INDEX.R - 1]),
-    UOTE: Number(r[INDEX.R - 1]) || 0, 
+    QUOTE: Number(r[INDEX.R - 1]) || 0, 
     T:  Number(r[INDEX.T  - 1]) || 0,
     U:  Number(r[INDEX.U  - 1]) || 0,
     V:  toStr(r[INDEX.V  - 1]),
