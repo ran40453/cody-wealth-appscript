@@ -1,4 +1,3 @@
-<!-- dashmain_js.html -->
 <script>
 (function(){
   // —— 小工具 ——
@@ -136,7 +135,20 @@
     const ct = (data.ctbc && data.ctbc.allUSD) || {value:0,pnl:0,ret:0,interest:0};
     setText('ctVal', ct.value, 1);
     setText('ctPnl', ct.pnl,   1);
-    setPnlPill(document.getElementById('ctRetPill'), Number(ct.ret||0), '%'); // ← 新 pill 在 title 右側
+    // 優先取用 page_ctbc 當前 chips 篩選的 ROI（若該模組已載入）；否則以 allUSD 的 (ΣT/ΣN)*100
+    let roiForDash = NaN;
+    if (typeof window.CTBC_getCurrentSummary === 'function'){
+      const s = window.CTBC_getCurrentSummary();
+      if (s && isFinite(s.sumN) && s.sumN !== 0 && isFinite(s.sumT)) {
+        roiForDash = (s.sumT / s.sumN) * 100;
+      } else if (isFinite(s.roi)) {
+        roiForDash = s.roi; // 已是百分比
+      }
+    }
+    if (!isFinite(roiForDash)){
+      roiForDash = (Number(ct.value) ? (Number(ct.pnl) / Number(ct.value)) * 100 : NaN);
+    }
+    setPnlPill(document.getElementById('ctRetPill'), roiForDash, '%');
     setText('ctInt', ct.interest, 1);
   }
 
