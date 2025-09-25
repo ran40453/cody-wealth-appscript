@@ -920,6 +920,45 @@ html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip{ background:#f
 /* =========================================================
    #15 隱藏數字（mask）
    ========================================================= */
+
+/* ── [CTBC 專用] 遮罩 ctbcViewport 內的「現值 / 含息損益 / 報酬率」──────────────── */
+body.mask-on #ctbcViewport .ctbc-table td.num,
+body.mask-on #ctbcViewport .ctbc-table td.num *,
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell,
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell *,
+body.mask-on #ctbcViewport .ctbc-table .roi-badge,
+body.mask-on #ctbcViewport .ctbc-table .roi-badge *{
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  text-shadow: none !important;
+}
+/* N 欄（數字右對齊）：覆蓋替代字，維持右側對齊 */
+body.mask-on #ctbcViewport .ctbc-table td.num{ position: relative !important; }
+body.mask-on #ctbcViewport .ctbc-table td.num::after{
+  content: '＊＊＊';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: flex-end;
+  pointer-events: none;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important;
+}
+/* 含息損益 + 報酬率（同一格 .pnl-cell）：整塊覆蓋 */
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell{ position: relative !important; }
+body.mask-on #ctbcViewport .ctbc-table .pnl-cell::after{
+  content: '＊＊＊';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: flex-end;
+  pointer-events: none;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important;
+}
+/* 萬一某些情形只有 roi-badge 單獨出現（外層沒 .pnl-cell），也一併覆蓋 */
+body.mask-on #ctbcViewport .ctbc-table .roi-badge{ position: relative !important; display:inline-block; }
+body.mask-on #ctbcViewport .ctbc-table .roi-badge::after{
+  content: '＊＊＊';
+  position: absolute; inset: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important;
+}
 .maskBtn .material-symbols-outlined{ font-size:22px; line-height:1; }
 
 /* ── 核心遮罩（僅在 body.mask-on 啟用）──────────────────────── */
