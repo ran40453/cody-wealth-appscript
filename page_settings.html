@@ -5,6 +5,7 @@
     <div class="sheet-head">
       <strong>顯示設定</strong>
       <button id="closeSettings" class="btn-ghost">關閉</button>
+      <button class="btn-ghost btnResetPalette" type="button">還原預設色票</button>
     </div>
 
     <div class="grid" id="settingsPanel">
@@ -36,51 +37,94 @@
     </div>
   </div>
 
-  <!-- 底/邊（rgba + alpha）— 你原本的 rgba 區塊可保留，建議放在這張卡片下方 -->
-  <!-- 範例：正向底/邊 -->
-  <div class="kv-grid">
-    <div class="k">正向底</div>
-    <div class="v" data-rgba-var="--tone-pos-bg">
-      <input type="color" data-role="color" value="#10b981"> α
-      <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
-    </div>
-    <div class="k">正向邊</div>
-    <div class="v" data-rgba-var="--tone-pos-bd">
-      <input type="color" data-role="color" value="#10b981"> α
-      <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-    </div>
+  <!-- 放在 Palette（全域）那張卡片內，字色膠囊下面 -->
+<div class="palette-grid">
+  <!-- 正向底 -->
+  <div class="swatch swatch--alpha" data-rgba-var="--tone-pos-bg">
+    <button type="button" class="swatch-btn">正向底</button>
+    <input type="color" class="swatch-input" value="#10b981" aria-label="正向底">
+    <input type="range" class="swatch-alpha" min="0" max="1" step="0.01" value="0.12" aria-label="正向底透明度">
   </div>
+
+  <!-- 正向邊 -->
+  <div class="swatch swatch--alpha" data-rgba-var="--tone-pos-bd">
+    <button type="button" class="swatch-btn">正向邊</button>
+    <input type="color" class="swatch-input" value="#10b981" aria-label="正向邊">
+    <input type="range" class="swatch-alpha" min="0" max="1" step="0.01" value="0.35" aria-label="正向邊透明度">
+  </div>
+</div>
+
   <!-- 其餘 neg/info/warn 的 rgba 區塊依此複製 -->
 </div>
 
-<!-- ② 全域 Global -->
+<!-- ② 全域 Global（卡片 + 三欄） -->
 <div class="card card--ghost">
   <h4>全域 Global</h4>
-  <!-- 把你既有的「global」inputs 移到這裡 -->
-  <!-- 例如： -->
-  <label>頁面最大寬度 (--container-max)
-    <input type="range" min="800" max="1600" step="10"
-           data-scope="global" data-var="--container-max" data-suffix="px">
-  </label>
-  <!-- ... 其他 global 控件 -->
+  <div class="settings-grid-3">
+    <label>頁面最大寬度 (--container-max)
+      <input type="range" min="800" max="1600" step="10"
+             data-scope="global" data-var="--container-max" data-suffix="px">
+    </label>
+    <label>整體縮放 (--ui-scale)
+      <input type="range" min="0.8" max="1.4" step="0.01"
+             data-scope="global" data-var="--ui-scale">
+    </label>
+    <label>基礎字級 (--font-body)
+      <input type="range" min="14" max="22" step="1"
+             data-scope="global" data-var="--font-body" data-suffix="px">
+    </label>
+    <label>標籤字級 (--label-size)
+      <input type="range" min="11" max="16" step="1"
+             data-scope="global" data-var="--label-size" data-suffix="px">
+    </label>
+    <label>表格內距 (--table-pad)
+      <input type="range" min="6" max="18" step="1"
+             data-scope="global" data-var="--table-pad" data-suffix="px">
+    </label>
+    <label>點擊最低高度 (--tap-min)
+      <input type="range" min="36" max="64" step="1"
+             data-scope="global" data-var="--tap-min" data-suffix="px">
+    </label>
+    <label>圓角半徑 (--radius)
+      <input type="range" min="6" max="20" step="1"
+             data-scope="global" data-var="--radius" data-suffix="px">
+    </label>
+    <label>主色（tint）
+      <input type="color" class="swatch-input" value="#2f6efc"
+             data-scope="global" data-var="--tint">
+    </label>
+    <label>輔色（accent）
+      <input type="color" class="swatch-input" value="#10b981"
+             data-scope="global" data-var="--accent">
+    </label>
+  </div>
   <div class="actions">
     <button class="btn-ghost btnResetAll">恢復全域預設</button>
     <button class="btn btnSave">儲存</button>
   </div>
 </div>
 
-<!-- ③ 僅此頁 Page Only -->
+<!-- ③ 僅此頁 Page Only（卡片 + 三欄） -->
 <div class="card card--ghost">
   <h4>僅此頁 Page Only</h4>
-  <!-- 把你既有的「page only」inputs 移到這裡 -->
-  <!-- 例如： -->
-  <label>表格字級 (--table-font)
-    <input type="range" min="12" max="20" step="1"
-           data-scope="page" data-var="--table-font" data-suffix="px">
-  </label>
+  <div class="settings-grid-3">
+    <label>表單字級 (--form-font)
+      <input type="range" min="14" max="22" step="1"
+             data-scope="page" data-var="--form-font" data-suffix="px">
+    </label>
+    <label>表格字級 (--table-font)
+      <input type="range" min="12" max="20" step="1"
+             data-scope="page" data-var="--table-font" data-suffix="px">
+    </label>
+    <label>輸入高度 (--input-h)
+      <input type="range" min="44" max="84" step="2"
+             data-scope="page" data-var="--input-h" data-suffix="px">
+    </label>
+  </div>
   <div class="actions">
     <button class="btn-ghost btnResetPage">恢復此頁預設</button>
   </div>
+  
 </div>
 
 <!-- 整頁設定區（不影響浮層 overlay） -->
@@ -118,12 +162,12 @@
           <div class="v"><input type="color" data-scope="global" data-var="--tone-secondary-fg"></div>
         </div>
 
-        <div class="kv-grid">
-          <div class="k">正向底/邊 (--tone-pos-bg/bd)</div>
-          <div class="v" data-rgba-var="--tone-pos-bg">
-            <input type="color" data-role="color" value="#10b981"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
+          <div class="swatch swatch--alpha" data-rgba-var="--tone-pos-bg">
+            <button type="button" class="swatch-btn">正向底</button>
+            <input type="color" class="swatch-input" value="#10b981" aria-label="正向底">
+            <input type="range" class="swatch-alpha" min="0" max="1" step="0.01" value="0.12" aria-label="正向底透明度">
           </div>
+
           <div class="k"></div>
           <div class="v" data-rgba-var="--tone-pos-bd">
             <input type="color" data-role="color" value="#10b981"> α

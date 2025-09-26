@@ -1604,5 +1604,69 @@ body.hdr-fab-open #hdrFabMenu{
     #page-settings   [data-rgba-var]{ display:flex; align-items:center; gap:8px; }
     #settingsOverlay [data-rgba-var] input[type="range"],
     #page-settings   [data-rgba-var] input[type="range"]{ width:120px; }
+
+    /* 置中小視窗：把背景改成半透明 */
+    #settingsOverlay .settings-sheet{
+      background: color-mix(in oklab, var(--card) 50%, transparent); /* 50% 透明 */
+    }
+
+    #settingsOverlay .settings-backdrop{
+      background: rgba(0,0,0,.24); backdrop-filter: blur(4px);
+    }
+
+      #settingsOverlay {
+    /* backdrop */  position: fixed; inset: 0; z-index: 1000;
+  }
+
+  #settingsOverlay .settings-sheet{
+    position:fixed; inset:0; margin:auto; width:min(720px, 96vw); max-height:min(80vh, 720px); overflow:auto; border-radius:16px; box-shadow:0 20px 60px color-mix(in oklab, var(--text) 16%, transparent); padding:16px;
+  }
+
+    /* 膠囊色票格線：每列 4–6 欄（自適應） */
+    #settingsOverlay .palette-grid,
+    #page-settings .palette-grid{
+      display:grid;
+      grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) );
+      gap:10px;
+    }
+
+    /* 膠囊外觀與隱藏原生 color input */
+    #settingsOverlay .swatch, #page-settings .swatch{ position:relative; }
+    #settingsOverlay .swatch-input, #page-settings .swatch-input{
+      position:absolute; inset:0; width:0; height:0; opacity:0; pointer-events:none;
+    }
+    #settingsOverlay .swatch-btn, #page-settings .swatch-btn{
+      display:block; width:100%; text-align:center; font-weight:700;
+      border:1px solid var(--hairline); border-radius:999px; padding:8px 12px;
+    }
+
+    /* 有 α 的膠囊：range 放右側，保持緊湊 */
+    #settingsOverlay .swatch--alpha, #page-settings .swatch--alpha{ display:flex; align-items:center; gap:8px; }
+    #settingsOverlay .swatch--alpha .swatch-btn, #page-settings .swatch--alpha .swatch-btn{ flex:1 1 auto; }
+    #settingsOverlay .swatch--alpha .swatch-alpha, #page-settings .swatch--alpha .swatch-alpha{
+      width:110px; min-width:90px;
+    }
+
+    /* 三欄表單區 */
+    #settingsOverlay .settings-grid-3,
+    #page-settings .settings-grid-3{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:12px;
+    }
+    @media (max-width: 800px){
+      #settingsOverlay .settings-grid-3, #page-settings .settings-grid-3{
+        grid-template-columns: 1fr 1fr; /* 手機兩欄 */
+      }
+    }
+
+    /* 50% 透明卡片，便於觀察底層變化 */
+    #settingsOverlay .card--ghost,
+    #page-settings .card--ghost{
+      background: color-mix(in oklab, var(--card) 50%, transparent);
+      backdrop-filter: blur(2px);
+    }
+
+
   }
   </style>
