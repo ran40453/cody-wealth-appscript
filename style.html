@@ -389,6 +389,11 @@ td.num{ text-align:right; }
 :where(.txt){ text-align:left; }
 :where(.num){ text-align:right; font-variant-numeric: tabular-nums; }
 
+/* ---------------------------------------------------------
+   4.5 Shared Capsules（badge/chip/pill） — TODO
+   說明：後續僅抽「外觀基礎」（display/圓角/line-height），顏色維持各頁；
+   為避免視覺變動，這一步僅標記，不修改任何樣式。
+*/
 
 /* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
@@ -1196,8 +1201,7 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 #page-dashmain .list.slim .row{ padding:6px 0; border-bottom:1px dashed var(--border, rgba(0,0,0,.08)); }
 
 /* 清單成為可伸展的區域，才會吃到剩餘高度並可滾動 */
-#page-dashmain .card > .list,
-#page-dashmain .card .list.slim{
+#page-dashmain :where(.card > .list, .card .list.slim){
   flex: 1 1 auto;
   min-height: 0;      /* 關鍵：避免內容把父容器撐爆 */
   overflow: auto;     /* 在卡片內滾，不要把整頁撐出捲軸 */
@@ -1209,7 +1213,7 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 }
 
 /* 讓 KPI 區改成單欄直向 */
-#page-dashmain .kpi-grid{ 
+#page-dashmain :where(.kpi-grid){ 
   display:grid; grid-template-columns:1fr; gap:8px;
 }
 
@@ -1331,10 +1335,7 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   #page-dashmain .card-bd{ flex: 1 1 auto; min-height: 0; overflow:auto; }
 
   /* 若你的卡片沒有 .card-bd，我們讓常見容器當滾動區 */
-  #page-dashmain .card > .list,
-  #page-dashmain .card .list.slim,
-  #page-dashmain .card .kpi-grid,
-  #page-dashmain .card .rows{
+  #page-dashmain :where(.card > .list, .card .list.slim, .card .kpi-grid, .card .rows){
     flex: 1 1 auto;
     min-height: 0;
     overflow: auto;
