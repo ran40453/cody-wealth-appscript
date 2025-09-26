@@ -401,7 +401,6 @@ textarea{ min-height:72px; resize:vertical; }
 table{ width:100%; border-collapse:collapse; }
 th,td{ padding: calc(var(--table-pad) * var(--ui-scale)); border-bottom:1px solid color-mix(in oklab, var(--tint) 12%, transparent); font-size: calc(var(--table-font) * var(--ui-scale)); }
 th{ text-align:left; color:var(--muted); font-weight:700; }
-td.num{ text-align:right; }
 
 .empty{ color:var(--muted); text-align:center; padding:16px; }
 
@@ -410,9 +409,6 @@ td.num{ text-align:right; }
    說明：統一數字字律與小標樣式；僅做「字型/數字」基線，不動版面
    --------------------------------------------------------- */
 :where(.kpi-item .v){ font-variant-numeric: tabular-nums; font-weight: 700; }
-:where(.kpi-item .k){ opacity: .75; }
-:where(.num){ font-variant-numeric: tabular-nums; }
-:where(td.num){ text-align: right; }
 
 /* 卡片 header 右上小鈕統一 */
 .card .card-hd .btn-ghost{
@@ -432,7 +428,7 @@ td.num{ text-align:right; }
    --------------------------------------------------------- */
 .kpi-item{ display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; padding:6px 8px; border-radius:10px; background:var(--kpi-bg, rgba(0,0,0,.03)); font-weight:200; font-size:23px; }
 .kpi-item .k{ opacity:.7; }
-.kpi-item .v{ text-align:right; font-variant-numeric:tabular-nums; }
+.kpi-item .v{ text-align:right; }
 .kpi-item.span2{ grid-column:1 / span 2; }
 
 
@@ -465,11 +461,24 @@ td.num{ text-align:right; }
 .roi-badge.neg{ color:var(--roi-neg-fg); background:var(--roi-neg-bg); border-color:var(--roi-neg-bd); }
 .roi-badge.zero{ color:var(--roi-zero-fg); background:var(--roi-zero-bg); border-color:var(--roi-zero-bd); }
 
+
 /* ---------------------------------------------------------
    4.8 Shared Numeric Helpers（KPI/資訊列數字對齊與字律）
    說明：集中常見容器中的數字字律；用 :where 降權，不影響頁內覆寫。
    --------------------------------------------------------- */
 :where(.ctbc-kpiBar .v, .kpi-card .v){ font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------
+   4.9 Shared Rows Grid（列表行骨架）
+   說明：統一 .rows 內每一列 .r 的版型；不干涉欄寬與內距，僅定義骨架。
+   --------------------------------------------------------- */
+:where(.rows .r){ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
+
+/* ---------------------------------------------------------
+   4.10 Utility: Scroll Area（可重用滾動容器）
+   說明：僅提供工具類，不自動套用；未來需要滾動區時加 .scroll-area 即可。
+   --------------------------------------------------------- */
+:where(.scroll-area){ min-height:0; overflow:auto; }
 
 
 /* =========================================================
@@ -494,7 +503,6 @@ td.num{ text-align:right; }
 .kpi-grid{ display:grid; grid-template-columns: repeat(2, minmax(260px,1fr)); gap:12px; margin-top:10px; }
 .kpi-card{ border:1px dashed var(--ctbc-border); border-radius:10px; padding:10px 12px; background: var(--kpi-pane-bg); }
 .kpi-card .title{ font-weight:600; margin-bottom:6px; font-size:13px; }
-.kpi-card .rows .r{ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
 .kpi-card .k{ color:#64748b; font-size:13px; }
 /* .kpi-card .v{ font-variant-numeric: tabular-nums; } -- moved to shared */
 /* 收合只影響幣別卡 */
