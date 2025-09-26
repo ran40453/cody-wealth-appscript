@@ -1043,33 +1043,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 .mask-on #js-accTotalVal::after{ content:'＊＊＊'; position:absolute; inset:0 auto 0 0; width:100%; font:inherit; }
 
 /* =========================================================
-   #16 Settings（浮層）
-   ========================================================= */
-#settingsOverlay{ position:fixed; inset:0; z-index: var(--z-settings) !important; display:grid; place-items:end; padding:10px; }
-#settingsOverlay[hidden]{ display:none; }
-#settingsOverlay .settings-backdrop{
-  position:absolute; inset:0; background:rgba(0,0,0,.35); backdrop-filter: blur(2px); z-index: calc(var(--z-settings) + 0) !important;
-}
-#settingsOverlay .settings-sheet{
-  position:relative; width:min(680px, 96vw);
-  background: color-mix(in oklab, var(--surface) 92%, transparent);
-  border:1px solid color-mix(in oklab, var(--tint) 16%, transparent);
-  border-radius:16px; box-shadow: 0 16px 48px var(--shadow);
-  padding:14px; margin: 0 4px 4px auto; backdrop-filter: blur(14px) saturate(120%);
-  animation: sheetRise .22s ease both; z-index: calc(var(--z-settings) + 1) !important;
-}
-#settingsOverlay .sheet-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-#settingsPanel label{ display:block; }
-#openSettings{ font-family: 'Material Symbols Outlined'; }
-/* 關閉鈕固定在最上層 */
-.settings-close, .modal .btn-close{
-  position: fixed !important;
-  top: calc(env(safe-area-inset-top, 0px) + 12px) !important;
-  right: calc(env(safe-area-inset-right, 0px) + 12px) !important;
-  z-index: calc(var(--z-settings) + 2) !important;
-}
-
-/* =========================================================
    #17 Dashmain（版面與 KPI）
    /* 佈局依賴：桌機 12 欄、手機 2×2 固定格；卡片內需自成滾動區（min-height:0 + overflow:auto）。
    注意：此區有重覆的 .pnl-pill → [T1] Phase 1 只保留通用版本。 
@@ -1550,4 +1523,36 @@ body.hdr-fab-open #hdrFabMenu{
   }
 }
 
-</style>
+  /* =========================================================
+     #21 Page Settings（頁面專屬；不影響他頁）
+     說明：此區只作用於 #page-settings；使用共用骨架（kv-grid/kv-duo）與 tone 色票。
+     ========================================================= */
+  @layer pages{
+    /* 版面骨架：桌機雙欄，手機單欄 */
+    #page-settings .settings-layout{
+      display:grid; gap: var(--space);
+      grid-template-columns: 1fr 2fr; /* 左窄右寬 */
+      align-items:start;
+    }
+    @media (max-width:1024px){
+      #page-settings .settings-layout{ grid-template-columns:1fr; }
+    }
+
+    /* 卡片外觀：沿用 .card，可在此做本頁微調 */
+    #page-settings .card{ padding:14px; }
+
+    /* 鍵值列：直接吃共用骨架 */
+    #page-settings .kv-grid{ /* 只需掛 class，骨架由 shared 提供 */ }
+    #page-settings .kv-duo{  /* 同上 */ }
+
+    /* 小徽章（資訊/警示） */
+    #page-settings .badge.info{ background: var(--tone-info-bg); color: var(--tone-info-fg); border:1px solid var(--tone-info-bd); }
+    #page-settings .badge.warn{ background: var(--tone-warn-bg); color: var(--tone-warn-fg); border:1px solid var(--tone-warn-bd); }
+
+    /* 區域變數（只影響本頁）示例 */
+    #page-settings{ --kpi-pane-bg: color-mix(in oklab, var(--surface) 92%, transparent); }
+
+    /* 置底操作列 */
+    #page-settings .toolbar{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+  }
+  </style>

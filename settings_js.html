@@ -2,124 +2,158 @@
 (function(){
   const ROOT = document.documentElement;
   const STORAGE_KEY = 'ui_prefs_v2'; // 升版以避免舊格式衝突
-  const $ = s => document.querySelector(s);
-  const $$ = s => Array.from(document.querySelectorAll(s));
+  const $ = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 
   // 取得目前顯示中的 page 容器（.page.show）
-  function getActivePageEl(){
-    return document.querySelector('.page.show') || null;
-  }
-  function getActivePageId(){
-    const el = getActivePageEl();
-    return el ? (el.id || el.dataset.page || 'unknown') : 'unknown';
-  }
+  function getActivePageEl(){ return document.querySelector('.page.show') || null; }
+  function getActivePageId(){ const el = getActivePageEl(); return el ? (el.id || el.dataset.page || 'unknown') : 'unknown'; }
 
-  // 存取：{ global:{var:val...}, pages:{[pageId]:{var:val...}} }
-  function loadPrefs(){
-    try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'') || {global:{}, pages:{}}; }
-    catch(e){ return {global:{}, pages:{}}; }
-  }
+  // 偏好存取：{ global:{var:val...}, pages:{[pageId]:{var:val...}} }
+  function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'') || {global:{}, pages:{}}; } catch(e){ return {global:{}, pages:{}}; } }
   function savePrefs(obj){ localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); }
 
-  // 套用到 DOM：global → :root；page → 當前 page 容器
-  function applyGlobal(vars){
-    Object.entries(vars||{}).forEach(([k,v])=> ROOT.style.setProperty(k, v));
-  }
-  function applyPage(pageId, vars){
-    const el = getActivePageEl(); if (!el) return;
-    // 先清掉舊 inline，再寫新的（避免殘留）
-    Object.keys(vars||{}).forEach(k=> el.style.setProperty(k, vars[k]));
+  // 將偏好套用到 DOM：global → :root；page → 目前 .page.show
+  function applyGlobal(vars){ Object.entries(vars||{}).forEach(([k,v])=> ROOT.style.setProperty(k, v)); }
+  function applyPage(pageId, vars){ const el = getActivePageEl(); if (!el) return; Object.entries(vars||{}).forEach(([k,v])=> el.style.setProperty(k, v)); }
+
+  // 讀取目前值（優先偏好 → 否則取 computed style）
+  function readVar(scope, name, pageVars, prefs){
+    if (scope==='page' && pageVars && pageVars[name] != null) return pageVars[name];
+    if (scope==='global' && prefs.global && prefs.global[name] != null) return prefs.global[name];
+    const target = (scope==='page' ? getActivePageEl() : ROOT) || ROOT;
+    return getComputedStyle(target).getPropertyValue(name).trim() || '';
   }
 
-  // 將控制項顯示同步到目前數值
-  function syncControls(){
+  // 將控制項顯示同步到目前數值（接受容器）
+  function syncControls(container){
+    const root = container || document;
     const prefs = loadPrefs();
     const pageId = getActivePageId();
     const pageVars = prefs.pages?.[pageId] || {};
-    const readVar = (scope, name) => {
-      if (scope==='page' && pageVars[name] != null) return pageVars[name];
-      if (scope==='global' && prefs.global?.[name] != null) return prefs.global[name];
-      // fallback：抓目前計算後值
-      const target = (scope==='page' ? getActivePageEl() : ROOT);
-      return getComputedStyle(target).getPropertyValue(name).trim() || '';
-    };
-
-    $$('#settingsPanel [data-var]').forEach(el=>{
+    $$('[data-var]', root).forEach(el=>{
       const { scope, var: v, suffix='' } = el.dataset;
-      const val = readVar(scope, v);
+      const val = readVar(scope, v, pageVars, prefs);
       const num = suffix ? parseFloat(String(val).replace(suffix,'')) : parseFloat(val);
       if (!Number.isNaN(num)) el.value = num;
     });
   }
 
-  // 輸入即時生效（無需重整）
-  function bindInputs(){
-    $$('#settingsPanel [data-var]').forEach(el=>{
-      el.addEventListener('input', ()=>{
-        const { scope, var: v, suffix='' } = el.dataset;
-        const str = (el.type==='range' || el.type==='number') ? (el.value + suffix) : el.value;
+  // 綁定設定控制（容器化）
+  function bindSettings(root){
+    if(!root) return;
+    const inputs = $$('[data-var]', root);
+    const applyVar = (el) => {
+      const v = el.dataset.var; if(!v) return;
+      const scope = el.dataset.scope || 'global';
+      const sx = el.dataset.suffix || '';
+      const val = (el.type==='range' || el.type==='number') ? (el.value + sx) : el.value;
+      if (scope === 'global') {
+        ROOT.style.setProperty(v, val);
+        const prefs = loadPrefs(); prefs.global = prefs.global || {}; prefs.global[v] = val; savePrefs(prefs);
+      } else {
+        const pg = getActivePageEl(); if (pg) pg.style.setProperty(v, val);
+        const prefs = loadPrefs(); prefs.pages = prefs.pages || {}; const id = getActivePageId();
+        prefs.pages[id] = prefs.pages[id] || {}; prefs.pages[id][v] = val; savePrefs(prefs);
+      }
+    };
+    inputs.forEach(el => {
+      el.addEventListener('input', () => applyVar(el));
+      if(el.value) applyVar(el); // 初始化一次（如果有預設值）
+    });
 
-        if (scope === 'global') {
-          ROOT.style.setProperty(v, str);             // 立即更新
-          const prefs = loadPrefs();
-          prefs.global = prefs.global || {};
-          prefs.global[v] = str;                      // 先暫存（不立刻存檔也可）
-          savePrefs(prefs);
-        } else { // page
-          const pg = getActivePageEl();
-          if (pg) pg.style.setProperty(v, str);       // 立即更新（只影響這頁）
-          const prefs = loadPrefs();
-          prefs.pages = prefs.pages || {};
-          const id = getActivePageId();
-          prefs.pages[id] = prefs.pages[id] || {};
-          prefs.pages[id][v] = str;
-          savePrefs(prefs);
-        }
-      });
+    // 容器區域內的按鈕（避免與 overlay/整頁互撞）
+    const wrap = root.closest('section, .settings-sheet, body') || document;
+    const btnSave = $('.btnSave', wrap);
+    const btnResetPage = $('.btnResetPage', wrap);
+    const btnResetAll = $('.btnResetAll', wrap);
+
+    btnSave && btnSave.addEventListener('click', (e)=>{ e.preventDefault(); /* 如需後端儲存可在此串接 */ alert('已儲存（變更會即時生效）'); });
+    btnResetPage && btnResetPage.addEventListener('click', (e)=>{ e.preventDefault(); const el = getActivePageEl(); if (el) el.removeAttribute('style'); const prefs = loadPrefs(); const id = getActivePageId(); if (prefs.pages) delete prefs.pages[id]; savePrefs(prefs); syncControls(root); });
+    btnResetAll && btnResetAll.addEventListener('click', (e)=>{ e.preventDefault(); const prefs = loadPrefs(); prefs.global = {}; savePrefs(prefs); ROOT.removeAttribute('style'); syncControls(root); });
+  }
+
+  // 讓浮層內保存/關閉確實關閉視窗
+  (function(){
+    const wrap = document.getElementById('settingsOverlay');
+    if(!wrap) return;
+    const btnSave = wrap.querySelector('#btnSave, .btnSave');
+    const btnClose = wrap.querySelector('#closeSettings, .settings-close');
+    const btnResetPage = wrap.querySelector('#btnResetPage, .btnResetPage');
+    const btnResetAll = wrap.querySelector('#btnResetAll, .btnResetAll');
+    btnSave && btnSave.addEventListener('click', ()=> closeOverlay());
+    btnClose && btnClose.addEventListener('click', ()=> closeOverlay());
+    btnResetPage && btnResetPage.addEventListener('click', ()=> {});
+    btnResetAll && btnResetAll.addEventListener('click', ()=> {});
+  })();
+
+  // 支援 data-rgba-var 容器：color + alpha → rgba()
+  function bindRgbaPickers(){
+    document.querySelectorAll('[data-rgba-var]').forEach(box=>{
+      const vname = box.getAttribute('data-rgba-var');
+      const color = box.querySelector('input[type="color"][data-role="color"]');
+      const alpha = box.querySelector('input[type="range"][data-role="alpha"]');
+      const apply = ()=>{
+        if(!color || !alpha) return;
+        const hex = color.value.trim();
+        const a = parseFloat(alpha.value || '1');
+        const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+        if(!m) return;
+        const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16);
+        const rgba = `rgba(${r},${g},${b},${a})`;
+        document.documentElement.style.setProperty(vname, rgba);
+        const prefs = loadPrefs(); prefs.global = prefs.global || {}; prefs.global[vname]=rgba; savePrefs(prefs);
+      };
+      color && color.addEventListener('input', apply);
+      alpha && alpha.addEventListener('input', apply);
+      apply();
     });
   }
 
-  // 頁面切換時自動載入該頁設定
-  function applyForCurrentPage(){
-    const prefs = loadPrefs();
-    applyGlobal(prefs.global||{});
-    const id = getActivePageId();
-    applyPage(id, (prefs.pages&&prefs.pages[id]) || {});
-    syncControls();
-  }
-
-  // 監看 .page.show 切換（若你有自己的路由事件，直接在那邊呼叫 applyForCurrentPage 即可）
+  // 監看 .page.show 切換（若你有自己的路由事件，也可自行呼叫 applyForCurrentPage）
+  function applyForCurrentPage(){ const prefs = loadPrefs(); applyGlobal(prefs.global||{}); const id = getActivePageId(); applyPage(id, (prefs.pages&&prefs.pages[id]) || {}); syncControls($('#settingsPanel')); syncControls($('#settingsForm')); }
   const mo = new MutationObserver(()=> applyForCurrentPage());
   mo.observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
 
-  // 開關浮層
-  $('#openSettings')?.addEventListener('click', ()=>{
-    $('#settingsOverlay')?.removeAttribute('hidden');
-    syncControls();
+  // === Overlay 開關 ===
+  const overlay = $('#settingsOverlay');
+  const openOverlay = () => { if (!overlay) return; overlay.hidden = false; document.documentElement.classList.add('lock-scroll'); syncControls($('#settingsPanel')); };
+  const closeOverlay = () => { if (!overlay) return; overlay.hidden = true; document.documentElement.classList.remove('lock-scroll'); };
+
+  // Header 按鈕 → 一律只開浮層（捕獲階段擋住任何路由）
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('#openSettings, [data-open="settings-overlay"], a[href*="settings" i]');
+    if (t){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      openOverlay();
+    }
+  }, true);
+
+  // 浮層內關閉鈕 / 點背景 / ESC 關閉
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#closeSettings, .settings-close, [data-close="settings-overlay"], .modal .btn-close, [data-action="close-settings"]')){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeOverlay();
+    }
+    if (e.target.classList && e.target.classList.contains('settings-backdrop')){ closeOverlay(); }
   });
-  $('#closeSettings')?.addEventListener('click', ()=> $('#settingsOverlay')?.setAttribute('hidden',''));
-  $('#settingsOverlay')?.addEventListener('click', (e)=>{
-    if (e.target.classList.contains('settings-backdrop')) $('#settingsOverlay')?.setAttribute('hidden','');
-  });
-  document.addEventListener('keydown', e=>{
-    if (e.key==='Escape') $('#settingsOverlay')?.setAttribute('hidden','');
+  document.addEventListener('keydown', e=>{ if (e.key==='Escape') closeOverlay(); });
+
+  // === 右側抽屜 → 進入整頁 Settings ===
+  const showPage = (id) => { $$('.page').forEach(p => p.classList.toggle('show', p.id === id)); closeOverlay(); };
+  document.addEventListener('click', (e) => {
+    const goPageBtn = e.target.closest('#openSettingsPage, [data-route="settings-page"], .drawer [data-target="settings-page"]');
+    if (goPageBtn){ e.preventDefault(); showPage('page-settings'); }
   });
 
-  // Reset & Save（Save 已在 input 即時存了，這裡只是提供按鈕）
-  $('#btnSave')?.addEventListener('click', ()=> alert('已儲存（變更會自動即時生效，無需重整）'));
-  $('#btnResetAll')?.addEventListener('click', ()=>{
-    const prefs = loadPrefs(); prefs.global = {}; savePrefs(prefs);
-    ROOT.removeAttribute('style'); applyForCurrentPage();
-  });
-  $('#btnResetPage')?.addEventListener('click', ()=>{
-    const id = getActivePageId();
-    const prefs = loadPrefs(); if (prefs.pages) delete prefs.pages[id]; savePrefs(prefs);
-    const el = getActivePageEl(); if (el) el.removeAttribute('style');
-    applyForCurrentPage();
-  });
+  // 啟用兩組容器
+  bindSettings($('#settingsPanel')); // 浮層 controls（若存在）
+  bindSettings($('#settingsForm'));  // 整頁 controls（若存在）
+  bindRgbaPickers();
 
   // 首次載入
   applyForCurrentPage();
-  bindInputs();
 })();
 </script>
