@@ -474,7 +474,7 @@ td.num{ text-align:right; }
 #ctbcFilterBar{ position:sticky; top:var(--header-h); z-index:var(--z-ui); background:var(--bg); padding:6px 0 8px; border-bottom:1px solid color-mix(in oklab, var(--tint) 14%, transparent); }
 .ctbc-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .ctbc-chip{ padding:6px 10px; border:1px solid var(--ctbc-border); border-radius:999px; background:#fff; font-size:13px; cursor:pointer; user-select:none; display:inline-flex; align-items:center; justify-content:center; font-weight:800; color:#0b1526; }
-.ctbc-chip.active{ background:#0ea5e9; border-color:#0ea5e9; color:#fff; }
+.ctbc-chip.active{ background: var(--tint); border-color: var(--tint); color:#fff; }
 
 /* 6.2 KPI */
 .ctbc-kpiBar{ position: relative; border:1px solid var(--ctbc-border); border-radius:12px; padding:12px; margin-bottom:12px; background:#fff; }
@@ -576,11 +576,11 @@ td.num{ text-align:right; }
   .af-input{ width:100%; font-size:18px; padding:10px 12px; border:1px solid #ddd; border-radius:10px; margin-bottom:12px; }
   .af-pad{ display:grid; grid-template-columns: repeat(5,1fr); gap:8px; }
   .af-key{ padding:10px 0; border:1px solid #eee; border-radius:10px; background:#f8f8f8; font-size:16px; }
-  .af-key[data-k="確定"]{ background:#2f6fed; color:#fff; border-color:#2f6fed; }
+  .af-key[data-k="確定"]{ background: var(--tint); color:#fff; border-color: var(--tint); }
 }
 .cell-af { cursor: pointer; }
 .pill { display:inline-block; padding:4px 10px; }
-.af-pill { background:#eef4ff; color:#204ecf; font-weight:600; }
+.af-pill{ background: var(--tone-info-bg); color: var(--tone-info-fg); border:1px solid var(--tone-info-bd); font-weight:600; }
 .cell-af:hover .af-pill { filter:brightness(0.95); }
 
 #ctbcStatus {
@@ -972,8 +972,7 @@ td.num{ text-align:right; }
 #page-input .tx-table td.txt, #page-input .tx-table td.num { font-size: 18px; }
 
 /* planned 行背景 */
-#page-input .tx-table tbody tr.row-planned td{
-  background: color-mix(in oklab, #22c55e 12%, transparent);
+#page-input .tx-table tbody tr.row-planned td{ background: var(--tone-pos-bg); }
 }
 
 /* 虛擬清單：選取中的列（含深色） */
@@ -996,8 +995,8 @@ html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip{ background:#f
 #acctBalanceCard .bal-row.total .name{ font-weight:800; }
 #acctBalanceCard .bal-row.empty{ color:var(--muted); font-style:italic; opacity:.6; }
 #acctBalanceCard .bal-chip{ display:inline-block; padding:4px 10px; border-radius:999px; font-weight:800; border:1px solid transparent; line-height:1; font-size:12px; }
-#acctBalanceCard .bal-chip.pos{ background:#fde047; color:#111827; border-color:#f59e0b;}
-#acctBalanceCard .bal-chip.neg{ background:#991b1b; color:#fff; border-color:#7f1d1d; }
+#acctBalanceCard .bal-chip.pos{ background: var(--tone-pos-bg); color: var(--tone-pos-fg); border-color: var(--tone-pos-bd); }
+#acctBalanceCard .bal-chip.neg{ background: var(--tone-neg-bg); color: var(--tone-neg-fg); border-color: var(--tone-neg-bd); }
 #acctBalanceTotal{ margin-top:6px; padding-top:6px; border-top:1px dashed color-mix(in oklab, var(--tint) 18%, transparent); font-weight:900; display:flex; justify-content:space-between; }
 #acctBalanceTotal .label{ opacity:.8; }
 #acctBalanceTotal .value{ font-variant-numeric:tabular-nums; }
@@ -1033,16 +1032,9 @@ html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip{ background:#f
   padding:6px 10px; border:1px solid var(--ctbc-border); border-radius:999px;
   font-size:12px; display:inline-flex; align-items:center; justify-content:center; font-weight:700;
 }
-.tx-chip--status.planned{
-  background: color-mix(in oklab, #22c55e 18%, var(--surface));
-  border-color: color-mix(in oklab, #16a34a 28%, var(--ctbc-border));
-  color: color-mix(in oklab, #065f46 60%, var(--text));
-}
-.tx-chip--status.posted{
-  background: color-mix(in oklab, #cbd5e1 40%, var(--surface));
-  border-color: color-mix(in oklab, #94a3b8 40%, var(--ctbc-border));
-  color: color-mix(in oklab, #334155 70%, var(--text));
-}
+.tx-chip--status.planned{ background: var(--tone-warn-bg); border-color: var(--tone-warn-bd); color: var(--tone-warn-fg); }
+.tx-chip--status.posted{  background: var(--tone-info-bg); border-color: var(--tone-info-bd); color: var(--tone-info-fg); }
+
 [data-theme="dark"] .tx-chip--status.planned{
   background: color-mix(in oklab, #16a34a 24%, var(--card));
   border-color: color-mix(in oklab, #16a34a 40%, var(--ctbc-border));
@@ -1523,9 +1515,11 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 
 /* 編輯卡左右箭頭 */
 #page-acc .navArrow{
-  position:absolute; top:8px; width:46px; height:46px; border-radius:12px;
-  display:grid; place-items:center; border:1px solid #2f6efc;
-  background:#2f6efc; color:#fff; box-shadow:0 4px 14px rgba(47,110,252,.22);
+  position:absolute; top:8px; width:46px; height:46px; border-radius:12px; display:grid; place-items:center;
+  border:1px solid var(--tint);
+  background: var(--tint);
+  color:#fff;
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--tint) 22%, transparent);
 }
 #page-acc .navArrow--left{  left:8px; }
 #page-acc .navArrow--right{ right:8px; }
