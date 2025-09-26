@@ -109,6 +109,45 @@
       apply();
     });
   }
+  
+  // 膠囊色票：.swatch[data-color-var] 內的 .swatch-input 與 .swatch-btn
+    function bindSwatches(container){
+      (container ? [container] : [document]).forEach(root=>{
+        root.querySelectorAll('.swatch[data-color-var]').forEach(box=>{
+          const varName = box.getAttribute('data-color-var');
+          const btn  = box.querySelector('.swatch-btn');
+          const input= box.querySelector('.swatch-input');
+          if(!btn || !input || !varName) return;
+
+          const setBtnStyle = (hex)=>{
+            btn.style.background = hex;
+            // 簡單判斷亮/暗，決定文字色
+            const m = /^#?([\\da-f]{2})([\\da-f]{2})([\\da-f]{2})$/i.exec(hex);
+            if(m){
+              const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16);
+              const l = 0.2126*r + 0.7152*g + 0.0722*b; // 相對亮度近似
+              btn.style.color = (l < 140) ? '#fff' : '#111';
+            }
+          };
+
+          const apply = ()=>{
+            const hex = input.value || '#000000';
+            document.documentElement.style.setProperty(varName, hex);
+            setBtnStyle(hex);
+            const prefs = loadPrefs(); prefs.global = prefs.global || {}; prefs.global[varName] = hex; savePrefs(prefs);
+          };
+
+          // 點膠囊開原生色盤
+          btn.addEventListener('click', ()=> input.click());
+          // 選色即時生效
+          input.addEventListener('input', apply);
+
+          // 初始化
+          apply();
+        });
+      });
+    }
+
 
   // 監看 .page.show 切換（若你有自己的路由事件，也可自行呼叫 applyForCurrentPage）
   function applyForCurrentPage(){ const prefs = loadPrefs(); applyGlobal(prefs.global||{}); const id = getActivePageId(); applyPage(id, (prefs.pages&&prefs.pages[id]) || {}); syncControls($('#settingsPanel')); syncControls($('#settingsForm')); }
@@ -152,6 +191,8 @@
   bindSettings($('#settingsPanel')); // 浮層 controls（若存在）
   bindSettings($('#settingsForm'));  // 整頁 controls（若存在）
   bindRgbaPickers();
+  bindSwatches($('#settingsPanel'));
+  bindSwatches($('#settingsForm'));
 
   // 首次載入
   applyForCurrentPage();

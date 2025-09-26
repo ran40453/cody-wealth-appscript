@@ -8,106 +8,78 @@
     </div>
 
     <div class="grid" id="settingsPanel">
-      <!-- 語意色票（Palette）編輯器：支援 hex 與 rgba(alpha) -->
-      <h4>色票 Palette（全域）</h4>
-      <div class="kv-grid">
-        <div class="k">正向字色 (--tone-pos-fg)</div>
-        <div class="v"><input type="color" data-scope="global" data-var="--tone-pos-fg"></div>
+      <!-- ① 色票 Palette（全域） -->
+<div class="card card--ghost">
+  <h4>色票 Palette（全域）</h4>
 
-        <div class="k">負向字色 (--tone-neg-fg)</div>
-        <div class="v"><input type="color" data-scope="global" data-var="--tone-neg-fg"></div>
-
-        <div class="k">資訊字色 (--tone-info-fg)</div>
-        <div class="v"><input type="color" data-scope="global" data-var="--tone-info-fg"></div>
-
-        <div class="k">品牌主字 (--tone-primary-fg)</div>
-        <div class="v"><input type="color" data-scope="global" data-var="--tone-primary-fg"></div>
-
-        <div class="k">輔助主字 (--tone-secondary-fg)</div>
-        <div class="v"><input type="color" data-scope="global" data-var="--tone-secondary-fg"></div>
-      </div>
-
-      <div class="kv-grid">
-        <div class="k">正向底/邊 (--tone-pos-bg/bd)</div>
-        <div class="v" data-rgba-var="--tone-pos-bg">
-          <input type="color" data-role="color" value="#10b981"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
-        </div>
-        <div class="k"></div>
-        <div class="v" data-rgba-var="--tone-pos-bd">
-          <input type="color" data-role="color" value="#10b981"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-        </div>
-
-        <div class="k">負向底/邊 (--tone-neg-bg/bd)</div>
-        <div class="v" data-rgba-var="--tone-neg-bg">
-          <input type="color" data-role="color" value="#ef4444"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
-        </div>
-        <div class="k"></div>
-        <div class="v" data-rgba-var="--tone-neg-bd">
-          <input type="color" data-role="color" value="#ef4444"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-        </div>
-
-        <div class="k">資訊底/邊 (--tone-info-bg/bd)</div>
-        <div class="v" data-rgba-var="--tone-info-bg">
-          <input type="color" data-role="color" value="#3b82f6"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
-        </div>
-        <div class="k"></div>
-        <div class="v" data-rgba-var="--tone-info-bd">
-          <input type="color" data-role="color" value="#3b82f6"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-        </div>
-
-        <div class="k">警示底/邊 (--tone-warn-bg/bd)</div>
-        <div class="v" data-rgba-var="--tone-warn-bg">
-          <input type="color" data-role="color" value="#f59e0b"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.16" data-role="alpha">
-        </div>
-        <div class="k"></div>
-        <div class="v" data-rgba-var="--tone-warn-bd">
-          <input type="color" data-role="color" value="#f59e0b"> α
-          <input type="range" min="0" max="1" step="0.01" value="0.38" data-role="alpha">
-        </div>
-      </div>
-      <!-- 全域 -->
-      <h4>全域 Global</h4>
-      <label>頁面最大寬度 (--container-max)
-        <input type="range" min="800" max="1600" step="10"
-               data-scope="global" data-var="--container-max" data-suffix="px">
-      </label>
-      <label>整體縮放 (--ui-scale)
-        <input type="range" min="0.8" max="1.4" step="0.01"
-               data-scope="global" data-var="--ui-scale">
-      </label>
-      <label>基礎字級 (--font-body)
-        <input type="range" min="14" max="22" step="1"
-               data-scope="global" data-var="--font-body" data-suffix="px">
-      </label>
-
-      <!-- 僅此頁 -->
-      <h4>僅此頁 Page Only</h4>
-      <label>表單字級 (--form-font)
-        <input type="range" min="14" max="22" step="1"
-               data-scope="page" data-var="--form-font" data-suffix="px">
-      </label>
-      <label>表格字級 (--table-font)
-        <input type="range" min="12" max="20" step="1"
-               data-scope="page" data-var="--table-font" data-suffix="px">
-      </label>
-      <label>輸入高度 (--input-h)
-        <input type="range" min="44" max="84" step="2"
-               data-scope="page" data-var="--input-h" data-suffix="px">
-      </label>
-
-      <div class="actions">
-        <button id="btnResetPage"  class="btn-ghost">恢復此頁預設</button>
-        <button id="btnResetAll"   class="btn-ghost">恢復全域預設</button>
-        <button id="btnSave"       class="btn">儲存</button>
-      </div>
+  <!-- 小膠囊色票：字色（hex） -->
+  <div class="palette-grid">
+    <div class="swatch" data-color-var="--tone-pos-fg">
+      <button type="button" class="swatch-btn">正向字色</button>
+      <input type="color" class="swatch-input" value="#0f766e" aria-label="正向字色">
     </div>
+    <div class="swatch" data-color-var="--tone-neg-fg">
+      <button type="button" class="swatch-btn">負向字色</button>
+      <input type="color" class="swatch-input" value="#b91c1c" aria-label="負向字色">
+    </div>
+    <div class="swatch" data-color-var="--tone-info-fg">
+      <button type="button" class="swatch-btn">資訊字色</button>
+      <input type="color" class="swatch-input" value="#0b4a6f" aria-label="資訊字色">
+    </div>
+    <div class="swatch" data-color-var="--tone-primary-fg">
+      <button type="button" class="swatch-btn">品牌主字</button>
+      <input type="color" class="swatch-input" value="#0b1939" aria-label="品牌主字">
+    </div>
+    <div class="swatch" data-color-var="--tone-secondary-fg">
+      <button type="button" class="swatch-btn">輔助主字</button>
+      <input type="color" class="swatch-input" value="#073f35" aria-label="輔助主字">
+    </div>
+  </div>
+
+  <!-- 底/邊（rgba + alpha）— 你原本的 rgba 區塊可保留，建議放在這張卡片下方 -->
+  <!-- 範例：正向底/邊 -->
+  <div class="kv-grid">
+    <div class="k">正向底</div>
+    <div class="v" data-rgba-var="--tone-pos-bg">
+      <input type="color" data-role="color" value="#10b981"> α
+      <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
+    </div>
+    <div class="k">正向邊</div>
+    <div class="v" data-rgba-var="--tone-pos-bd">
+      <input type="color" data-role="color" value="#10b981"> α
+      <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
+    </div>
+  </div>
+  <!-- 其餘 neg/info/warn 的 rgba 區塊依此複製 -->
+</div>
+
+<!-- ② 全域 Global -->
+<div class="card card--ghost">
+  <h4>全域 Global</h4>
+  <!-- 把你既有的「global」inputs 移到這裡 -->
+  <!-- 例如： -->
+  <label>頁面最大寬度 (--container-max)
+    <input type="range" min="800" max="1600" step="10"
+           data-scope="global" data-var="--container-max" data-suffix="px">
+  </label>
+  <!-- ... 其他 global 控件 -->
+  <div class="actions">
+    <button class="btn-ghost btnResetAll">恢復全域預設</button>
+    <button class="btn btnSave">儲存</button>
+  </div>
+</div>
+
+<!-- ③ 僅此頁 Page Only -->
+<div class="card card--ghost">
+  <h4>僅此頁 Page Only</h4>
+  <!-- 把你既有的「page only」inputs 移到這裡 -->
+  <!-- 例如： -->
+  <label>表格字級 (--table-font)
+    <input type="range" min="12" max="20" step="1"
+           data-scope="page" data-var="--table-font" data-suffix="px">
+  </label>
+  <div class="actions">
+    <button class="btn-ghost btnResetPage">恢復此頁預設</button>
   </div>
 </div>
 

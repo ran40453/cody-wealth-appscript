@@ -1554,5 +1554,55 @@ body.hdr-fab-open #hdrFabMenu{
 
     /* 置底操作列 */
     #page-settings .toolbar{ display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end; }
+
+    /* 50% 透明卡片，保留可視背景以便預覽 */
+    #settingsOverlay .card--ghost,
+    #page-settings .card--ghost{
+      background: color-mix(in oklab, var(--card) 50%, transparent);
+      backdrop-filter: blur(2px);
+    }
+
+    /* 膠囊色票：按鈕即色塊，內嵌文字 */
+    #settingsOverlay .palette-grid,
+    #page-settings .palette-grid{
+      display:grid;
+      grid-template-columns: repeat( auto-fit, minmax(140px, 1fr) ); /* 視寬度自適應，可達4-6欄 */
+      gap:10px;
+    }
+
+    #settingsOverlay .swatch,
+    #page-settings .swatch{ position:relative; }
+
+    #settingsOverlay .swatch-input,
+    #page-settings .swatch-input{
+      position:absolute; inset:0;
+      width:0; height:0; opacity:0; pointer-events:none; /* 隱藏原生色盤，但仍可被 click 觸發 */
+    }
+
+    #settingsOverlay .swatch-btn,
+    #page-settings .swatch-btn{
+      display:block; width:100%;
+      border:1px solid var(--hairline);
+      border-radius:999px; padding:8px 12px;
+      font-weight:700; text-align:center;
+      /* 背景顏色會由 JS 動態套入 */
+    }
+
+    #settingsOverlay [data-rgba-var] input[type="color"],
+    #page-settings   [data-rgba-var] input[type="color"]{
+      -webkit-appearance:none; appearance:none;
+      width:22px; height:22px; padding:0; border:0;
+      background:transparent; border-radius:50%; overflow:hidden;
+      box-shadow: inset 0 0 0 1px var(--hairline);
+    }
+    #settingsOverlay [data-rgba-var] input[type="color"]::-webkit-color-swatch,
+    #page-settings   [data-rgba-var] input[type="color"]::-webkit-color-swatch{ border:none; border-radius:50%; }
+    #settingsOverlay [data-rgba-var] input[type="color"]::-moz-color-swatch,
+    #page-settings   [data-rgba-var] input[type="color"]::-moz-color-swatch{ border:none; border-radius:50%; }
+
+    #settingsOverlay [data-rgba-var],
+    #page-settings   [data-rgba-var]{ display:flex; align-items:center; gap:8px; }
+    #settingsOverlay [data-rgba-var] input[type="range"],
+    #page-settings   [data-rgba-var] input[type="range"]{ width:120px; }
   }
   </style>
