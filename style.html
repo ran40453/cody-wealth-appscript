@@ -125,6 +125,17 @@
   /* KPI 面板底色（亮/暗在下方覆寫） */
   --kpi-pane-bg:         #fafafa;
 
+  /* ROI Badge 統一色票（系統全域） */
+  --roi-pos-fg:       #0f766e;
+  --roi-pos-bg:       rgba(16,185,129,.12);
+  --roi-pos-bd:       rgba(16,185,129,.35);
+  --roi-neg-fg:       #b91c1c;
+  --roi-neg-bg:       rgba(239,68,68,.12);
+  --roi-neg-bd:       rgba(239,68,68,.35);
+  --roi-zero-fg:      var(--muted);
+  --roi-zero-bg:      color-mix(in oklab, var(--tint) 10%, transparent);
+  --roi-zero-bd:      color-mix(in oklab, var(--tint) 25%, transparent);
+
   /* Input page 共用尺寸 */
   --input-h:             66px;
   --toggle-w-desktop:    88px;
@@ -403,6 +414,15 @@ td.num{ text-align:right; }
    --------------------------------------------------------- */
 :where(.pill, .af-pill){ border-radius:999px; line-height:1; }
 
+/* ---------------------------------------------------------
+   4.7 Shared ROI Badge（統一基礎 + 色系）
+   說明：集中外觀與顏色為全域；頁內不再單獨調色。
+   --------------------------------------------------------- */
+:where(.roi-badge){ display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; line-height:1; vertical-align:baseline; border:1px solid transparent; }
+.roi-badge.pos{ color:var(--roi-pos-fg); background:var(--roi-pos-bg); border-color:var(--roi-pos-bd); }
+.roi-badge.neg{ color:var(--roi-neg-fg); background:var(--roi-neg-bg); border-color:var(--roi-neg-bd); }
+.roi-badge.zero{ color:var(--roi-zero-fg); background:var(--roi-zero-bg); border-color:var(--roi-zero-bd); }
+
 
 /* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
@@ -452,10 +472,7 @@ td.num{ text-align:right; }
 .ctbc-table .col-fix-3{ left:calc(var(--ctbc-fixed-col-w) * 2); }
 .ctbc-table .col-fix-4{ left:calc(var(--ctbc-fixed-col-w) * 3); box-shadow:4px 0 8px -4px var(--ctbc-shadow); border-right:1px solid var(--ctbc-border); width: 120px;}
 .ctbc-table .empty{ text-align:center; color:#6b7280; padding:18px 0; }
-/* ROI Badge */
-.roi-badge{ display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; line-height:1; vertical-align:baseline; border:1px solid transparent; }
-.roi-badge.pos{ color:#0f766e; background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.35); }
-.roi-badge.neg{ color:#b91c1c; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.35); }
+.ctbc-kpiBar .kpi .roi-badge{ margin-left:6px; }
 .ctbc-kpiBar .kpi .roi-badge{ margin-left:6px; }
 /* P/L 合欄 */
 .pnl-cell{ display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; }
