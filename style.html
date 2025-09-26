@@ -398,10 +398,11 @@ td.num{ text-align:right; }
 :where(.badge, .chip){ border-radius:999px; line-height:1; }
 
 /* ---------------------------------------------------------
-   4.5 Shared Capsules（badge/chip/pill） — TODO
-   說明：後續僅抽「外觀基礎」（display/圓角/line-height），顏色維持各頁；
-   為避免視覺變動，這一步僅標記，不修改任何樣式。
-*/
+   4.6 Shared Pills（pill/af-pill） — Base
+   說明：只統一圓角與行高；顏色與 padding 仍由各頁面/模組自行決定。
+   --------------------------------------------------------- */
+:where(.pill, .af-pill){ border-radius:999px; line-height:1; }
+
 
 /* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
@@ -520,7 +521,7 @@ td.num{ text-align:right; }
   .af-key[data-k="確定"]{ background:#2f6fed; color:#fff; border-color:#2f6fed; }
 }
 .cell-af { cursor: pointer; }
-.pill { display:inline-block; padding:4px 10px; border-radius:999px; line-height:1; }
+.pill { display:inline-block; padding:4px 10px; }
 .af-pill { background:#eef4ff; color:#204ecf; font-weight:600; }
 .cell-af:hover .af-pill { filter:brightness(0.95); }
 
