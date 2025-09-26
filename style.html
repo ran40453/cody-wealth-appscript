@@ -350,7 +350,17 @@ table{ width:100%; border-collapse:collapse; }
 th,td{ padding: calc(var(--table-pad) * var(--ui-scale)); border-bottom:1px solid color-mix(in oklab, var(--tint) 12%, transparent); font-size: calc(var(--table-font) * var(--ui-scale)); }
 th{ text-align:left; color:var(--muted); font-weight:700; }
 td.num{ text-align:right; }
+
 .empty{ color:var(--muted); text-align:center; padding:16px; }
+
+/* ---------------------------------------------------------
+   4.1 Shared KPI Primitives（低權重，不影響各頁排版）
+   說明：統一數字字律與小標樣式；僅做「字型/數字」基線，不動版面
+   --------------------------------------------------------- */
+:where(.kpi-item .v){ font-variant-numeric: tabular-nums; font-weight: 700; }
+:where(.kpi-item .k){ opacity: .75; }
+:where(.num){ font-variant-numeric: tabular-nums; }
+:where(td.num){ text-align: right; }
 
 /* 卡片 header 右上小鈕統一 */
 .card .card-hd .btn-ghost{
@@ -1224,6 +1234,8 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   font-weight:800; font-variant-numeric:tabular-nums;
 }
 
+.kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+/* [T3] 後續將此段搬到 Shared Components；先保留原位以避免版面改變 */
 /* KPI */
 .kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .kpi-item{ display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; padding:6px 8px; border-radius:10px; background:var(--kpi-bg, rgba(0,0,0,.03)); font-weight:200;font-size:23px; }
