@@ -455,6 +455,7 @@ td.num{ text-align:right; }
    --------------------------------------------------------- */
 :where(.pill, .af-pill){ border-radius:999px; line-height:1; }
 
+
 /* ---------------------------------------------------------
    4.7 Shared ROI Badge（統一基礎 + 色系）
    說明：集中外觀與顏色為全域；頁內不再單獨調色。
@@ -463,6 +464,12 @@ td.num{ text-align:right; }
 .roi-badge.pos{ color:var(--roi-pos-fg); background:var(--roi-pos-bg); border-color:var(--roi-pos-bd); }
 .roi-badge.neg{ color:var(--roi-neg-fg); background:var(--roi-neg-bg); border-color:var(--roi-neg-bd); }
 .roi-badge.zero{ color:var(--roi-zero-fg); background:var(--roi-zero-bg); border-color:var(--roi-zero-bd); }
+
+/* ---------------------------------------------------------
+   4.8 Shared Numeric Helpers（KPI/資訊列數字對齊與字律）
+   說明：集中常見容器中的數字字律；用 :where 降權，不影響頁內覆寫。
+   --------------------------------------------------------- */
+:where(.ctbc-kpiBar .v, .kpi-card .v){ font-variant-numeric: tabular-nums; }
 
 
 /* =========================================================
@@ -482,14 +489,14 @@ td.num{ text-align:right; }
 .ctbc-kpiBar .kpi-title{ font-weight:600; }
 .ctbc-kpiBar .kpi{ border:1px dashed var(--ctbc-border); border-radius:10px; padding:8px 10px; background: var(--kpi-pane-bg); }
 .ctbc-kpiBar .k{ color:#64748b; font-size:13px; }
-.ctbc-kpiBar .v{ font-variant-numeric: tabular-nums; }
+/* .ctbc-kpiBar .v{ font-variant-numeric: tabular-nums; } -- moved to shared */
 .ctbc-kpiBar .v.bold{ font-weight:700; }
 .kpi-grid{ display:grid; grid-template-columns: repeat(2, minmax(260px,1fr)); gap:12px; margin-top:10px; }
 .kpi-card{ border:1px dashed var(--ctbc-border); border-radius:10px; padding:10px 12px; background: var(--kpi-pane-bg); }
 .kpi-card .title{ font-weight:600; margin-bottom:6px; font-size:13px; }
 .kpi-card .rows .r{ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
 .kpi-card .k{ color:#64748b; font-size:13px; }
-.kpi-card .v{ font-variant-numeric: tabular-nums; }
+/* .kpi-card .v{ font-variant-numeric: tabular-nums; } -- moved to shared */
 /* 收合只影響幣別卡 */
 .ctbc-kpiBar[data-collapsed="1"] .kpi-grid{ display:none; }
 .kpi-toggle-wrap{ display:flex; justify-content:center; margin-top:10px; }
@@ -504,8 +511,8 @@ td.num{ text-align:right; }
 .ctbc-table thead th, .ctbc-table tbody td{ padding:8px 10px; min-width:var(--ctbc-fixed-col-w); height:var(--ctbc-row-h); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid var(--ctbc-border); }
 .ctbc-table tbody td{ background:#fff; }
 .ctbc-table tbody tr:nth-child(even) td{ background:#fcfcfd; }
-.ctbc-table .num{ text-align:right; font-variant-numeric:tabular-nums; }
-.ctbc-table .txt{ text-align:left; }
+/* .ctbc-table .num{ text-align:right; font-variant-numeric:tabular-nums; } -- now in Shared */
+/* .ctbc-table .txt{ text-align:left; } -- now in Shared */
 /* 左四欄 sticky（桌面） */
 .ctbc-table .col-fix-1,.ctbc-table .col-fix-2,.ctbc-table .col-fix-3,.ctbc-table .col-fix-4{ position:sticky; left:0; background:var(--ctbc-sticky-bg); z-index: var(--z-sticky-cols); }
 .ctbc-table .col-fix-1{ left:calc(var(--ctbc-fixed-col-w) * 0); }
@@ -631,7 +638,7 @@ td.num{ text-align:right; }
 #dbSpacer{ height:0px; }
 .db-table{ width:100%; border-collapse:collapse; position:absolute; left:0; right:0; top:0; }
 .db-table th,.db-table td{ padding: calc(8px * var(--ui-scale)) calc(10px * var(--ui-scale)); border-bottom:1px solid color-mix(in oklab, var(--tint) 10%, transparent); }
-.db-table td.num{ text-align:right; }
+/* .db-table td.num{ text-align:right; } -- now in Shared */
 .db-table thead th{ position:sticky; top:0; background:var(--card); z-index:50; }
 .db2col{ display:grid; gap:var(--space); grid-template-columns:320px 1fr; align-items:start; }
 @media (max-width:1024px){ .db2col{ grid-template-columns:1fr; } }
