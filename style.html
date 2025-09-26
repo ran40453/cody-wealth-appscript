@@ -125,16 +125,57 @@
   /* KPI 面板底色（亮/暗在下方覆寫） */
   --kpi-pane-bg:         #fafafa;
 
-  /* ROI Badge 統一色票（系統全域） */
-  --roi-pos-fg:       #0f766e;
-  --roi-pos-bg:       rgba(16,185,129,.12);
-  --roi-pos-bd:       rgba(16,185,129,.35);
-  --roi-neg-fg:       #b91c1c;
-  --roi-neg-bg:       rgba(239,68,68,.12);
-  --roi-neg-bd:       rgba(239,68,68,.35);
-  --roi-zero-fg:      var(--muted);
-  --roi-zero-bg:      color-mix(in oklab, var(--tint) 10%, transparent);
-  --roi-zero-bd:      color-mix(in oklab, var(--tint) 25%, transparent);
+  /* =====================================================
+     色票（Palette）— 全域語意基準，供所有元件引用
+     說明：在這裡新增/修改語意色，元件只吃下方的 --tone-* 變數；
+          如需新增色票，請依此格式加在這一區，並用中文註解說明用途。
+     ===================================================== */
+     /* 正向（獲利/成功/上漲） */
+     --tone-pos-fg:  #0f766e;              /* 深綠字：KPI/徽章正向主字色，例：獲利、上漲 */
+     --tone-pos-bg:  rgba(16,185,129,.12); /* 淺綠底：背景填充，例：正向徽章、pill */
+     --tone-pos-bd:  rgba(16,185,129,.35); /* 綠色邊：邊框顏色，例：正向徽章、pill */
+
+     /* 負向（虧損/失敗/下跌） */
+     --tone-neg-fg:  #b91c1c;              /* 暗紅字：KPI/徽章負向主字色，例：虧損、下跌 */
+     --tone-neg-bg:  rgba(239,68,68,.12);  /* 淺紅底：背景填充，例：負向徽章、pill */
+     --tone-neg-bd:  rgba(239,68,68,.35);  /* 紅色邊：邊框顏色，例：負向徽章、pill */
+
+     /* 中性（無變化/持平/灰階） */
+     --tone-zero-fg: var(--muted);                                  /* 灰字：持平/無資料 */
+     --tone-zero-bg: color-mix(in oklab, var(--tint) 10%, transparent); /* 淺灰底：中性背景 */
+     --tone-zero-bd: color-mix(in oklab, var(--tint) 25%, transparent); /* 灰邊：中性邊框 */
+
+    /* 警示（提醒/未完成/注意） */
+      --tone-warn-fg:  #b45309;              /* 褐橙字：警示主字色，例：提醒、待確認 */
+      --tone-warn-bg:  rgba(251, 191, 36, .16); /* 淺橙底：背景填充，例：警示徽章 */
+      --tone-warn-bd:  rgba(251, 191, 36, .38); /* 橙邊：邊框顏色，例：警示徽章 */
+
+      /* 資訊（中性提示/一般訊息） */
+      --tone-info-fg:  #0b4a6f;              /* 靛藍字：資訊主字色，例：通知、描述 */
+      --tone-info-bg:  rgba(59, 130, 246, .12); /* 淺藍底：背景填充，例：info 標籤 */
+      --tone-info-bd:  rgba(59, 130, 246, .35); /* 藍邊：邊框顏色，例：info 標籤 */
+
+      /* 品牌主色（Primary）— 由 --tint 推導 */
+      --tone-primary-fg: #0b1939;                  /* 深藍字：主動作文字 */
+      --tone-primary-bg: color-mix(in oklab, var(--tint) 26%, transparent); /* 主色底 */
+      --tone-primary-bd: color-mix(in oklab, var(--tint) 60%, transparent); /* 主色邊 */
+
+      /* 輔助色（Secondary）— 由 --accent 推導 */
+      --tone-secondary-fg: #073f35;                /* 深青字：輔助動作文字 */
+      --tone-secondary-bg: color-mix(in oklab, var(--accent) 22%, transparent); /* 輔助底 */
+      --tone-secondary-bd: color-mix(in oklab, var(--accent) 55%, transparent); /* 輔助邊 */
+
+     /* ===== 相容性別名（舊元件可沿用；新元件請改用 --tone-*） ===== */
+     /* ROI 徽章（舊名） → 指向全域語意色 */
+     --roi-pos-fg:   var(--tone-pos-fg);   /* 舊：正向字色 → 全域正向字 */
+     --roi-pos-bg:   var(--tone-pos-bg);   /* 舊：正向底色 → 全域正向底 */
+     --roi-pos-bd:   var(--tone-pos-bd);   /* 舊：正向邊框 → 全域正向邊 */
+     --roi-neg-fg:   var(--tone-neg-fg);   /* 舊：負向字色 → 全域負向字 */
+     --roi-neg-bg:   var(--tone-neg-bg);   /* 舊：負向底色 → 全域負向底 */
+     --roi-neg-bd:   var(--tone-neg-bd);   /* 舊：負向邊框 → 全域負向邊 */
+     --roi-zero-fg:  var(--tone-zero-fg);  /* 舊：中性字色 → 全域中性字 */
+     --roi-zero-bg:  var(--tone-zero-bg);  /* 舊：中性底色 → 全域中性底 */
+     --roi-zero-bd:  var(--tone-zero-bd);  /* 舊：中性邊框 → 全域中性邊 */
 
   /* Input page 共用尺寸 */
   --input-h:             66px;
@@ -609,14 +650,14 @@ td.num{ text-align:right; }
   background: color-mix(in oklab, var(--surface) 85%, transparent);
   box-shadow: 0 4px 12px var(--shadow);
 }
-.pnl-pill.pos{ color:#0f766e; background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.35); }
-.pnl-pill.neg{ color:#b91c1c; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.35); }
-.pnl-pill.zero{ color:#64748b; background:rgba(148,163,184,.14); border-color:rgba(148,163,184,.35); }
+.pnl-pill.pos{ color:var(--tone-pos-fg); background:var(--tone-pos-bg); border-color:var(--tone-pos-bd); }
+.pnl-pill.neg{ color:var(--tone-neg-fg); background:var(--tone-neg-bg); border-color:var(--tone-neg-bd); }
+.pnl-pill.zero{ color:var(--tone-zero-fg); background:var(--tone-zero-bg); border-color:var(--tone-zero-bd); }
 
 /* header 右上狀態膠囊色系（依 kind 設定 data-kind） */
-#dbStatusPill[data-kind="info"]{ background: color-mix(in oklab, var(--tint) 10%, var(--surface)); border-color: color-mix(in oklab, var(--tint) 32%, transparent); }
-#dbStatusPill[data-kind="ok"]  { background: color-mix(in oklab, var(--accent) 14%, var(--surface)); border-color: color-mix(in oklab, var(--accent) 40%, transparent); }
-#dbStatusPill[data-kind="error"]{ background: color-mix(in oklab, var(--danger) 12%, var(--surface)); border-color: color-mix(in oklab, var(--danger) 42%, transparent); }
+#dbStatusPill[data-kind="info"]{ background: var(--tone-info-bg); border-color: var(--tone-info-bd); color: var(--tone-info-fg); }
+#dbStatusPill[data-kind="ok"]  { background: var(--tone-pos-bg);  border-color: var(--tone-pos-bd);  color: var(--tone-pos-fg); }
+#dbStatusPill[data-kind="error"]{ background: var(--tone-neg-bg); border-color: var(--tone-neg-bd); color: var(--tone-neg-fg); }
 
 /* ── Database 最新一列高亮（亮/暗主題自動換色） ─────────── */
 .db-table tr.is-latest td{
@@ -1513,8 +1554,8 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 .totalbar{ display:flex; align-items:center; justify-content:center; gap:8px; padding:4px 0; }
 .totalbar .totalchip{ display:inline-flex; align-items:center; gap:10px; border:1px solid var(--hairline); border-radius:999px; padding:10px 14px; font-weight:700; background: var(--chip-bg, transparent); }
 .totalbar .delta{ display:inline-flex; align-items:center; gap:6px; border:1px solid var(--hairline); border-radius:999px; padding:6px 10px; font-weight:600; background: var(--chip-bg, transparent); }
-.totalbar .delta.pos{ background: color-mix(in oklab, #41c17d 16%, transparent); border-color: color-mix(in oklab, #41c17d 40%, var(--hairline)); }
-.totalbar .delta.neg{ background: color-mix(in oklab, #e05252 16%, transparent); border-color: color-mix(in oklab, #e05252 40%, var(--hairline)); }
+.totalbar .delta.pos{ background: var(--tone-pos-bg); border-color: var(--tone-pos-bd); color: var(--tone-pos-fg); }
+.totalbar .delta.neg{ background: var(--tone-neg-bg); border-color: var(--tone-neg-bd); color: var(--tone-neg-fg); }
 
 /* 最近異動 */
 #page-acc .recent-head{ font-weight:600; opacity:.8; margin-bottom:6px; }
@@ -1538,8 +1579,8 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 
 /* Dashmain 膠囊色票 */
 .badge, .chip{ display:inline-flex; align-items:center; justify-content:center; padding:2px 8px; font-weight:500; font-size:13px; }
-.badge.pos { background:#3c6e4e; color:#b7efc5; }
-.badge.neg { background:#6e3c3c; color:#efb7b7; }
+.badge.pos { background: var(--tone-pos-bg); color: var(--tone-pos-fg); border:1px solid var(--tone-pos-bd); }
+.badge.neg { background: var(--tone-neg-bg); color: var(--tone-neg-fg); border:1px solid var(--tone-neg-bd); }
 
 
 
