@@ -374,6 +374,14 @@ td.num{ text-align:right; }
    --------------------------------------------------------- */
 :where(.kpi-grid){ display:grid; gap:8px; }
 
+/* ---------------------------------------------------------
+   4.3 Shared KPI Item Base（通用外觀；頁面可覆寫排版）
+   --------------------------------------------------------- */
+.kpi-item{ display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; padding:6px 8px; border-radius:10px; background:var(--kpi-bg, rgba(0,0,0,.03)); font-weight:200; font-size:23px; }
+.kpi-item .k{ opacity:.7; }
+.kpi-item .v{ text-align:right; font-variant-numeric:tabular-nums; }
+.kpi-item.span2{ grid-column:1 / span 2; }
+
 
 /* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
@@ -1240,12 +1248,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   font-weight:800; font-variant-numeric:tabular-nums;
 }
 
-/* [T3] 後續將此段搬到 Shared Components；先保留原位以避免版面改變 */
-/* KPI */
-.kpi-item{ display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; padding:6px 8px; border-radius:10px; background:var(--kpi-bg, rgba(0,0,0,.03)); font-weight:200;font-size:23px; }
-.kpi-item .k{ opacity:.7; }
-.kpi-item .v{ text-align:right; font-variant-numeric:tabular-nums; }
-.kpi-item.span2{ grid-column:1 / span 2; }
 
 /* CTBC 小格 */
 .ctbc-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
