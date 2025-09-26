@@ -1,13 +1,49 @@
 <style>
-/* =========================================================
-   page.css（重整版）
-   - 移除重複規則、合併覆寫、修正層級/語法小錯
-   - 優先用結構順序取代 !important；必要處保留
-   ========================================================= */
+/* =====================================================================
+   CSS AUDIT — PHASE 0（只做標註，不改任何樣式）
+   目的：標出重點/風險/重複，為 Phase 1 重排與去重做準備。
+
+   ■ 目錄（TOC）
+     0. Foundations/Tokens (:root, :root.light, .mobile)
+     1. Base/Reset (*, html/body, .app)
+     2. Utilities/State (.drawer-open, .mask-on, .is-mobile, .no-mask…)
+     3. Layout Blocks (header/drawer/nowbar/tabbar/sheet/popmenu/animations)
+     4. Shared Components (card/grid/btn/table/膠囊)
+     5. Feature Modules
+        - CTBC（chips/kpi/table/virtual scroll/mask）
+        - Database（db-*）
+        - Input（#page-input）
+        - Dashmain（#page-dashmain）
+        - ACC（#page-acc）
+        - Policy（#page-policy）
+     6. Brand/Themes（銀行色票）
+     7. Patches/Overrides（必要覆寫）
+
+   ■ 高風險依賴（請勿改 selector/結構）
+     - 遮罩：body.mask-on + .pnl-cell>.num/.roi-badge 的 ::after 星號覆蓋
+     - 行動 FAB：header-actions 隱藏 + #hdrFabWrap 顯示（JS 依賴 .hdr-fab-open）
+     - 抽屜：body.drawer-open、.drawer.show；桌機用 right 推擠、手機用 display
+     - 虛擬清單：#ctbcSpacer/#dbSpacer/#txSpacer 高度 + 祖先 overflow
+     - 表格 sticky：thead th{position:sticky}+容器 z-index（CTBC/DB/Policy）
+
+   ■ TODO（僅標記，不改動）
+     [T1] 重複規則：.pnl-pill（通用 + Dashmain 各一份）→ Phase 1 僅保留通用
+     [T2] 變數命名不一致：--hdrH vs --header-h、--tabbar-h vs --app-tabbar-h、--logo-h-*
+          → Phase 2 先加別名 alias，再逐步替換
+     [T3] 共用件收斂：kpi-grid/kpi-item/v、badge/chip/roi-badge → 收斂到 Shared
+     [T4] 降權：頁面區塊用 :where() 包裝以降低 specificity（不動功能 selector）
+     [T5] Mobile 16px 規則多處重覆 → Phase 1 合併到 Base 或模組最近處
+====================================================================== */
+
 
 /* =========================================================
    #0 Root Vars（全域變數 & 主題）
    ========================================================= */
+
+/* [T2] 命名別名提案（Phase 2 先加 alias，不立即替換用處）
+   - --header-h  → 先作為 --hdrH 的別名
+   - --tabbar-h  ↔ --app-tabbar-h（統一以 --tabbar-h；--app-tabbar-h 改為別名）
+   - --logo-h-desktop / --logo-h-mobile → 後續收斂為 --logo-h（媒體查詢覆蓋） */
 :root{
   /* 尺寸/排版 */
   --ui-scale:            0.9;
@@ -18,6 +54,9 @@
   --hdrH-desktop:        72px;
   --hdrH-mobile:         56px;
   --hdrH:                var(--hdrH-desktop);
+  /* Phase 2 Aliases */
+  --header-h:          var(--hdrH);
+  --logo-h:            var(--logo-h-desktop);
 
   --logo-h-desktop: 30px;
   --logo-h-mobile:  24px;
@@ -121,10 +160,24 @@ body{
   padding: env(safe-area-inset-top) 16px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra));
 }
 /* 鎖捲時避免跳動 */
+
 .lock-scroll body{ position: fixed; width: 100%; top: calc(-1 * var(--scrollY)); left: 0; right: 0; overflow: hidden; }
 
 /* =========================================================
+   #1.5 Utilities / State（行為切換，不提高權重）
+   ========================================================= */
+/* Page 顯示切換（由 JS 控制 .show） */
+.page{ display:none; }
+.page.show{ display:block; }
+
+/* Mobile 全域：防 iOS 輸入放大；互動元件觸控優化 */
+.mobile input, .mobile select, .mobile textarea{ font-size:16px; }
+button, .btn, .btn-ghost { touch-action: manipulation; }
+
+/* =========================================================
    #2 Header
+   /* JS 依賴：.header-actions（桌機顯示）；行動端以 #hdrFabWrap 取代。
+   Sticky/backdrop-blur 的 z-index 需高於 drawer/tabbar。 
    ========================================================= */
 header{
   position:sticky; top:0; z-index:var(--z-header);
@@ -133,13 +186,13 @@ header{
   backdrop-filter: blur(12px);
   padding:14px 12px;
   display:grid; grid-template-columns:1fr auto; grid-auto-rows:auto;
-  align-items:center; gap:8px 12px; min-height: var(--hdrH);
+  align-items:center; gap:8px 12px; min-height: var(--header-h);
 }
 header .title-wrap{
   position: absolute; left: 50%; transform: translateX(-50%);
   display:flex; align-items:center; justify-content:center; gap:8px;
 }
-header .app-logo{ height: var(--logo-h-desktop); width:auto; display:block; }
+:root header .app-logo{ height: var(--logo-h); width:auto; display:block; }
 :root:not(.light) header .app-logo{ filter: invert(1) hue-rotate(180deg); }
 
 .title{ grid-column:1; grid-row:1; font-weight:800; font-size: calc(var(--title-size) * var(--ui-scale)); letter-spacing:.2px; }
@@ -172,7 +225,7 @@ header .app-logo{ height: var(--logo-h-desktop); width:auto; display:block; }
 
 @media (max-width: 1024px){
   header .title-wrap{ gap:8px; }
-  header .app-logo{ height: var(--logo-h-mobile); }
+  :root{ --logo-h: var(--logo-h-mobile); }
   .menuBtn{ display:none; }
    /* 手機版隱藏 menu（已有 tabbar） */
 }
@@ -184,6 +237,8 @@ header .app-logo{ height: var(--logo-h-desktop); width:auto; display:block; }
 
 /* =========================================================
    #3 Drawer（右側）
+   /* JS 依賴：body.drawer-open、.drawer.show；桌機以 right 推擠 .app，手機以 display 切換。
+   請勿改 .drawer.show 的 right:10px。 
    ========================================================= */
 .drawer{
   position:fixed; top: calc(var(--hdrH) + 10px); bottom:10px; right: calc(-1 * var(--drawerW) - 10px);
@@ -263,8 +318,6 @@ header .app-logo{ height: var(--logo-h-desktop); width:auto; display:block; }
 /* =========================================================
    #4 Cards / Forms / Tables（通用）
    ========================================================= */
-.page{ display:none; }
-.page.show{ display:block; }
 .card{ background:var(--card); border:1px solid color-mix(in oklab, var(--tint) 10%, transparent); border-radius:var(--radius); padding:14px; box-shadow:0 8px 28px var(--shadow); overflow:hidden; }
 .grid{ display:grid; gap:var(--space); }
 @media (min-width:1024px){ .grid-2{ grid-template-columns:1fr 1fr; } }
@@ -308,6 +361,8 @@ td.num{ text-align:right; }
 
 /* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
+   /* 結構依賴：#ctbcViewport 內 .ctbc-table（thead sticky、左四欄 sticky）+ #ctbcSpacer 虛擬高度。
+   遮罩：body.mask-on 對 .pnl-cell .num 與 .roi-badge 以 ::after 星號覆蓋；勿改 class/DOM 階層。 
    ========================================================= */
 /* 6.1 Chips */
 #ctbcFilterBar{ position:sticky; top:var(--hdrH); z-index:var(--z-ui); background:var(--bg); padding:6px 0 8px; border-bottom:1px solid color-mix(in oklab, var(--tint) 14%, transparent); }
@@ -442,6 +497,7 @@ td.num{ text-align:right; }
 
 /* =========================================================
    #7 Database
+   /* 結構依賴：#dbSpacer 虛擬高度、.db-viewport 為滾動容器；thead sticky 保持 z-index。 
    ========================================================= */
 .db-shell{ display:flex; flex-direction:column; gap:var(--space); }
 .db-filter{ position:sticky; top:var(--hdrH); z-index:940; }
@@ -483,7 +539,7 @@ td.num{ text-align:right; }
 .db-latest .k{ color:var(--muted); }
 .db-latest .v{ font-weight:900; font-variant-numeric:tabular-nums; }
 
-
+/* [T1] 通用版本（保留） */
 /* ── P/L 今日損益膠囊（綠漲紅跌） ───────────────────────── */
 .pnl-pill{
   display:inline-block; padding:6px 10px; border-radius:999px; font-weight:800; line-height:1;
@@ -545,9 +601,9 @@ td.num{ text-align:right; }
 .sheet .handle{ display:none; }
 @media (max-width:480px){ .sheet{ width:88vw; min-width:88vw; } }
 
-/* =========================================================
-   #11 Popmenu（行動）
-   ========================================================= */
+# =========================================================
+#11 Popmenu（行動）
+# =========================================================
 #popmenus-root{ position:fixed; inset:0; pointer-events:none; z-index:var(--z-drawer); --pm-zoom:1; }
 .popmenu-overlay{ position:absolute; inset:0; background: color-mix(in oklab, var(--bg) 8%, transparent); backdrop-filter: blur(2px); pointer-events:auto; }
 .popmenu-overlay--top{ position: fixed; left: 0; right: 0; top: 0; background: color-mix(in oklab, var(--bg) 8%, transparent); backdrop-filter: blur(2px); pointer-events: auto; z-index: var(--z-popmenu-top); }
@@ -558,10 +614,6 @@ td.num{ text-align:right; }
 .popmenu .item:hover{ background: color-mix(in oklab, var(--tint) 10%, transparent); }
 .popmenu .ico{ width: calc(28px * var(--pm-zoom)); height: calc(28px * var(--pm-zoom)); display:grid; place-items:center; border-radius:999px; background: color-mix(in oklab, var(--tint) 16%, transparent); }
 .popmenu .txt{ font-size: 1em; line-height: 1.1; }
-
-/* 防 iOS 輸入放大（Mobile 全域） */
-.mobile input, .mobile select, .mobile textarea{ font-size:16px; }
-button, .btn, .btn-ghost { touch-action: manipulation; }
 
 /* =========================================================
    #12 Animations
@@ -576,6 +628,8 @@ button, .btn, .btn-ghost { touch-action: manipulation; }
 
 /* =========================================================
    #13 Input（page_input）
+   /* 行為依賴：.toggleSign、#btnSubmit、.tx-table .selected（含暗色覆寫）。
+   iOS 16px 保底規則分散 → [T5] Phase 1 合併；虛擬清單用 #txSpacer。 
    ========================================================= */
 /* 13.1 版面配置（Desktop：三欄；Mobile：上半 2 欄、下半 1 欄） */
 #page-input .input-layout{
@@ -919,6 +973,8 @@ html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip{ background:#f
 
 /* =========================================================
    #15 隱藏數字（mask）
+   /* 關鍵策略：只在 body.mask-on 啟用；以 ::after 疊字並保留對齊（數字靠右、徽章置中）。
+   不可改 .pnl-cell 結構與 .num/.roi-badge 名稱，否則星號會位移。 
    ========================================================= */
 
 /* ── [CTBC 專用] 遮罩 ctbcViewport 內的「現值 / 含息損益 / 報酬率」──────────────── */
@@ -1080,6 +1136,8 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 
 /* =========================================================
    #17 Dashmain（版面與 KPI）
+   /* 佈局依賴：桌機 12 欄、手機 2×2 固定格；卡片內需自成滾動區（min-height:0 + overflow:auto）。
+   注意：此區有重覆的 .pnl-pill → [T1] Phase 1 只保留通用版本。 
    ========================================================= */
 .app-header{ display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.5rem; padding:.25rem .75rem; position:sticky; top:0; height: var(--header-h, 48px); z-index:1000; }
 .hdr-left{ display:flex; align-items:center; }
@@ -1293,19 +1351,10 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 
 
 
-/* 綠漲紅跌：當日損益膠囊 */
-.pnl-pill{
-  display:inline-block; font-weight:900; font-variant-numeric:tabular-nums;
-  padding:6px 10px; border-radius:999px; border:1px solid transparent;
-  background: color-mix(in oklab, var(--surface) 85%, transparent);
-}
-.pnl-pill.pos{ color:#0f766e; background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.35); }
-.pnl-pill.neg{ color:#b91c1c; background:rgba(239,68,68,.12); border-color:rgba(239,68,68,.35); }
-.pnl-pill.zero{ color:var(--muted); border-color: color-mix(in oklab, var(--tint) 25%, transparent); }
-
 
 /* =========================================================
    #18 Page ACC
+   /* 結構依賴：左列 .cap 選中高亮、Editor/Recent 區塊各自滾動；行動端僅顯示 submit。 
    ========================================================= */
 #page-acc .acc-layout{
   display:grid; gap:10px; padding:12px;
@@ -1447,12 +1496,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 /* =========================================================
    #19 其他小調整
    ========================================================= */
-/* iOS/行動字級保底（避免放大） */
-@media (max-width:1024px){
-  #page-input input.fx-field,
-  #page-input select.fx-select,
-  #page-input textarea.fx-field { font-size:16px; }
-}
 
 /* ===== header FAB (mobile only) ===== */
 #hdrFabWrap{ position: relative; display:none; }
@@ -1511,6 +1554,8 @@ body.hdr-fab-open #hdrFabMenu{
 
 /* =========================================================
    #20 Policy
+   /* 結構依賴：三段高度比例（桌機）+ 明細表頭 sticky；≤1024px 改直排。
+   thead sticky 要落在卡片內部的滾動容器頂端。 
    ========================================================= */
 /* page_policy 版面：三卡滿版高度（桌機），內部滾動 */
 #page-policy{
