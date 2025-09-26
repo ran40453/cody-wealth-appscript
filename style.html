@@ -130,7 +130,7 @@
   --toggle-w-desktop:    88px;
   --toggle-w-mobile:     132px;
 
-  --app-header-h: var(--hdrH);
+  --app-header-h: var(--header-h);
   --app-tabbar-h: calc(var(--tabbar-h) * var(--ui-scale));
   --tabbar-extra:       20px; /* 額外底部留白（內容與 Tabbar 之間） */
 
@@ -288,7 +288,7 @@ header .title-wrap{
 @media (min-width: 1024px){
   .drawer{
     background: var(--surface); border:1px solid color-mix(in oklab, var(--tint) 16%, transparent);
-    border-radius: 16px; box-shadow: 0 16px 48px var(--shadow); padding: 12px; top: 10px; padding-top: calc(var(--hdrH) + 8px);
+    border-radius: 16px; box-shadow: 0 16px 48px var(--shadow); padding: 12px; top: 10px; padding-top: calc(var(--header-h) + 8px);
   }
   .drawer .navItem, .drawer .navSubItem{
     background: transparent; border: none; border-radius: 12px;
