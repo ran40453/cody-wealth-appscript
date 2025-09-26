@@ -241,7 +241,7 @@ header .title-wrap{
    請勿改 .drawer.show 的 right:10px。 
    ========================================================= */
 .drawer{
-  position:fixed; top: calc(var(--hdrH) + 10px); bottom:10px; right: calc(-1 * var(--drawerW) - 10px);
+  position:fixed; top: calc(var(--header-h) + 10px); bottom:10px; right: calc(-1 * var(--drawerW) - 10px);
   width: var(--drawerW); z-index:var(--z-drawer);
   background: color-mix(in oklab, var(--surface) 90%, transparent);
   box-shadow:-16px 0 48px var(--shadow);
@@ -365,7 +365,7 @@ td.num{ text-align:right; }
    遮罩：body.mask-on 對 .pnl-cell .num 與 .roi-badge 以 ::after 星號覆蓋；勿改 class/DOM 階層。 
    ========================================================= */
 /* 6.1 Chips */
-#ctbcFilterBar{ position:sticky; top:var(--hdrH); z-index:var(--z-ui); background:var(--bg); padding:6px 0 8px; border-bottom:1px solid color-mix(in oklab, var(--tint) 14%, transparent); }
+#ctbcFilterBar{ position:sticky; top:var(--header-h); z-index:var(--z-ui); background:var(--bg); padding:6px 0 8px; border-bottom:1px solid color-mix(in oklab, var(--tint) 14%, transparent); }
 .ctbc-chips{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
 .ctbc-chip{ padding:6px 10px; border:1px solid var(--ctbc-border); border-radius:999px; background:#fff; font-size:13px; cursor:pointer; user-select:none; display:inline-flex; align-items:center; justify-content:center; font-weight:800; color:#0b1526; }
 .ctbc-chip.active{ background:#0ea5e9; border-color:#0ea5e9; color:#fff; }
@@ -500,8 +500,8 @@ td.num{ text-align:right; }
    /* 結構依賴：#dbSpacer 虛擬高度、.db-viewport 為滾動容器；thead sticky 保持 z-index。 
    ========================================================= */
 .db-shell{ display:flex; flex-direction:column; gap:var(--space); }
-.db-filter{ position:sticky; top:var(--hdrH); z-index:940; }
-.db-summary{ position:sticky; top:calc(var(--hdrH) + var(--space) + 64px); z-index:930; background:var(--bg); }
+.db-filter{ position:sticky; top:var(--header-h); z-index:940; }
+.db-summary{ position:sticky; top:calc(var(--header-h) + var(--space) + 64px); z-index:930; background:var(--bg); }
 .db-filter-row{ display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap; }
 .db-filter .db-filter-group label{ font-size: calc(13px * var(--ui-scale)); color:var(--muted); margin-bottom:6px; }
 .db-dates{ display:flex; align-items:center; gap:8px; }
@@ -533,7 +533,7 @@ td.num{ text-align:right; }
 .db-table thead th{ position:sticky; top:0; background:var(--card); z-index:50; }
 .db2col{ display:grid; gap:var(--space); grid-template-columns:320px 1fr; align-items:start; }
 @media (max-width:1024px){ .db2col{ grid-template-columns:1fr; } }
-.db-latest{ position:sticky; top:calc(var(--hdrH) + 8px); z-index:800; }
+.db-latest{ position:sticky; top:calc(var(--header-h) + 8px); z-index:800; }
 .db-latest .kv{ display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed color-mix(in oklab, var(--tint) 14%, transparent); }
 .db-latest .kv:last-child{ border-bottom:none; }
 .db-latest .k{ color:var(--muted); }
