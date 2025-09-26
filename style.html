@@ -369,6 +369,12 @@ td.num{ text-align:right; }
   font-weight: 600; line-height: 1; font-size:10px;
 }
 
+/* ---------------------------------------------------------
+   4.2 Shared KPI Grid（基礎顯示，不設定欄數）
+   --------------------------------------------------------- */
+:where(.kpi-grid){ display:grid; gap:8px; }
+
+
 /* =========================================================
    #6 CTBC（chips / KPI / table / virtual scroll）
    /* 結構依賴：#ctbcViewport 內 .ctbc-table（thead sticky、左四欄 sticky）+ #ctbcSpacer 虛擬高度。
@@ -1234,10 +1240,8 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   font-weight:800; font-variant-numeric:tabular-nums;
 }
 
-.kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 /* [T3] 後續將此段搬到 Shared Components；先保留原位以避免版面改變 */
 /* KPI */
-.kpi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .kpi-item{ display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; padding:6px 8px; border-radius:10px; background:var(--kpi-bg, rgba(0,0,0,.03)); font-weight:200;font-size:23px; }
 .kpi-item .k{ opacity:.7; }
 .kpi-item .v{ text-align:right; font-variant-numeric:tabular-nums; }
