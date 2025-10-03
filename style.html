@@ -120,6 +120,13 @@
   --tint:                #3aa3ff;
   --accent:              #00e0b8;
   --danger:              #ff5a5f;
+  /* Button palette aliases (map to existing theme tokens) */
+    --c-primary: var(--tint);
+    --c-primary-600: color-mix(in oklab, var(--tint) 84%, #000 16%);
+    --c-dark: #111827;
+    --c-dark-700: #0f172a;
+    --c-danger: var(--danger);
+    --c-danger-600: color-mix(in oklab, var(--danger) 86%, #000 14%);
   --shadow:              rgba(0,0,0,.35);
 
   /* 其他 */
@@ -1689,15 +1696,20 @@ body.hdr-fab-open #hdrFabMenu{
         gap: 16px;
         height: calc(100vh - 120px);
       }
-      .card {
-        background: var(--card); /* ← 改用全域變數，隨主題切換 */
-        border: none;
+      .links-layout :where(.card){
+        background: var(--card);
+        border: none;                /* 本頁要的外觀，只影響 links 區域 */
         border-radius: 12px;
-        box-shadow: var(--card-shadow);  /* 用主題陰影變數 */
+        box-shadow: var(--card-shadow);
       }
-      
-      .card-hd { padding: 12px 16px; border-bottom: var(--card-hd-sep); font-weight: 600;}
-      .card-bd { padding: 12px 12px 8px 12px; }
+      .links-layout :where(.card-hd){
+        padding: 12px 16px;
+        border-bottom: var(--card-hd-sep);
+        font-weight: 600;
+      }
+      .links-layout :where(.card-bd){
+        padding: 12px 12px 8px 12px;
+      }
       /* links: actions-inline 置中，預覽區改為單欄（移除縮圖後讓 meta 吃滿寬度） */
       .actions-inline{
         display:flex;
@@ -1795,10 +1807,14 @@ body.hdr-fab-open #hdrFabMenu{
       .card-actions { grid-column: 2 / 3; grid-row: 2 / 3; display:flex; align-items:center; }
       .actions-inner { display:flex; gap:12px; padding: 12px 16px; align-items:center; }
       .btn {
-        padding: 10px 14px; border-radius: 10px; border: 1px solid #e6e6e6; background:#fff; cursor:pointer;
-        font-weight: 600; transition: background .08s ease, border-color .08s ease, transform .06s ease;
+        padding: 10px 14px; border-radius: 10px; 
+        border: 1px solid var(--btn-bd, var(--card-bd, color-mix(in oklab, var(--tint) 16%, transparent))); 
+        color: var(--btn-fg, var(--text));
+        background: var(--btn-bg, var(--card));
+        font-weight: 600; 
+        transition: background .12s ease, border-color .12s ease, color .12s ease, transform .06s ease;
       }
-      .btn:hover { background:#f8f8f8; }
+      .btn:hover{ filter: brightness(1.02); }  
       .btn:active { transform: translateY(1px); }
       .btn-primary {
         background: var(--pri, #3b82f6); border-color: var(--pri, #3b82f6); color:#fff;
@@ -1807,6 +1823,15 @@ body.hdr-fab-open #hdrFabMenu{
         background: #ef4444; border-color: #ef4444; color:#fff;
       }
       .btn[disabled] { opacity:.5; pointer-events:none; }
+      /* Variants define ONLY variables; they don't set colors directly */
+      :where(.btn).btn--primary{ --btn-bg: var(--c-primary); --btn-bd: var(--c-primary); --btn-fg: #fff; }
+      :where(.btn).btn--primary:hover{ --btn-bg: var(--c-primary-600); --btn-bd: var(--c-primary-600); }
+
+      :where(.btn).btn--dark{ --btn-bg: var(--c-dark); --btn-bd: var(--c-dark); --btn-fg: #fff; }
+      :where(.btn).btn--dark:hover{ --btn-bg: var(--c-dark-700); --btn-bd: var(--c-dark-700); }
+
+      :where(.btn).btn--danger{ --btn-bg: var(--c-danger); --btn-bd: var(--c-danger); --btn-fg: #fff; }
+      :where(.btn).btn--danger:hover{ --btn-bg: var(--c-danger-600); --btn-bd: var(--c-danger-600); }
 
       /* 新增連結 Modal */
       .modal-mask {

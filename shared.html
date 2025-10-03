@@ -56,7 +56,25 @@
   --roi-zero-fg:  var(--tone-zero-fg);  /* 舊：中性字色 → 全域中性字 */
   --roi-zero-bg:  var(--tone-zero-bg);  /* 舊：中性底色 → 全域中性底 */
   --roi-zero-bd:  var(--tone-zero-bd);  /* 舊：中性邊框 → 全域中性邊 */
+
+  /* === Shared Buttons (low-specificity, variable-driven) === */
+    /* palette */
+    --c-primary: #3b82f6;      /* blue-500 */
+    --c-primary-600: #2563eb;  /* blue-600 */
+    --c-dark: #111827;         /* gray-900 */
+    --c-dark-700: #0f172a;     /* slate-900 */
+    --c-danger: #ef4444;       /* red-500 */
+    --c-danger-600: #dc2626;   /* red-600 */
 }
+  :root[data-theme="dark"]{
+    /* 深色略提亮，確保對比 */
+    --c-primary: #60a5fa;      /* blue-400 */
+    --c-primary-600: #3b82f6;  /* blue-500 */
+    --c-dark: #1f2937;         /* gray-800 */
+    --c-dark-700: #111827;     /* gray-900 */
+    --c-danger: #f87171;       /* red-400 */
+    --c-danger-600: #ef4444;   /* red-500 */
+  }
 
 /* =========================================================
    #4 Cards / Forms / Tables（通用，已抽離）
@@ -84,7 +102,7 @@ textarea{ min-height:72px; resize:vertical; }
   transition: transform .06s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.btn{ background:var(--tint); color:#fff; }
+.btn{ background: var(--btn-bg, var(--tint)); color: var(--btn-fg, #fff); }
 .btn-ghost{ background:transparent; color:var(--text); }
 @media (pointer:coarse){ .btn:active{ transform: scale(.97); } }
 .actions{ display:flex; gap:10px; }
@@ -153,6 +171,21 @@ th{ text-align:left; color:var(--muted); font-weight:700; }
   grid-template-columns:1fr 1fr;
   gap:8px;
 }
+
+/* Base button — 不強制白底/白字，改用變數 */
+
+  /* 大尺寸（不動你 page_input 的高度控制，這裡只有基礎邊角/內距） */
+  :where(.btn).btn--lg{ padding: 10px 16px; font-weight: 600; border-radius: 10px; }
+
+  /* 變體：只設定變數，不直接寫顏色 → 主題自然切換 */
+  :where(.btn).btn--primary{ --btn-bg: var(--c-primary); --btn-bd: var(--c-primary); --btn-fg: #fff; }
+  :where(.btn).btn--primary:hover{ --btn-bg: var(--c-primary-600); --btn-bd: var(--c-primary-600); }
+
+  :where(.btn).btn--dark{ --btn-bg: var(--c-dark); --btn-bd: var(--c-dark); --btn-fg: #fff; }
+  :where(.btn).btn--dark:hover{ --btn-bg: var(--c-dark-700); --btn-bd: var(--c-dark-700); }
+
+  :where(.btn).btn--danger{ --btn-bg: var(--c-danger); --btn-bd: var(--c-danger); --btn-fg: #fff; }
+  :where(.btn).btn--danger:hover{ --btn-bg: var(--c-danger-600); --btn-bd: var(--c-danger-600); }
 /* @extract-end shared */
 }
 
