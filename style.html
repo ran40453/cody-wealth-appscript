@@ -138,12 +138,23 @@
   --app-tabbar-h: calc(var(--tabbar-h) * var(--ui-scale));
   --tabbar-extra:       20px; /* 額外底部留白（內容與 Tabbar 之間） */
 
+  /* === Card shadows & header separators by theme === */
+  --card-shadow: 0 1px 2px rgba(0,0,0,.06);                    /* 淺色 */
+  --card-hd-sep: 1px solid var(--card-bd, #e6e6e6);
+
 }
 :root.light{
   --bg:#f6f8fb; --surface:#ffffff; --card:#ffffff; --text:#0b1526; --muted:#5a6b7f;
   --tint:#1e74ff; --accent:#00b392; --danger:#ff3b30; --shadow:rgba(0,0,0,.08);
   --kpi-pane-bg:#fafafa;
 }
+
+:root[data-theme="dark"]{
+  /* 深色：不要亮邊線，陰影柔和一點 */
+  --card-shadow: 0 1px 1px rgba(0,0,0,.35), 0 8px 24px rgba(0,0,0,.28);
+  --card-hd-sep: 1px solid color-mix(in oklab, var(--tint) 22%, transparent);
+}
+
 :root.mobile{ --ui-scale: var(--ui-scale-mobile); }
 :root:not(.light){ --kpi-pane-bg: color-mix(in oklab, var(--surface) 88%, transparent); }
 
@@ -1680,13 +1691,51 @@ body.hdr-fab-open #hdrFabMenu{
       }
       .card {
         background: var(--card); /* ← 改用全域變數，隨主題切換 */
-        border: 1px;
+        border: none;
         border-radius: 12px;
-        box-shadow: var(--shadow-sm, 0 1px 2px rgba(0,0,0,.06));
+        box-shadow: var(--card-shadow);  /* 用主題陰影變數 */
       }
       
-      .card-hd { padding: 12px 16px; border-bottom: 1px; font-weight: 600; }
+      .card-hd { padding: 12px 16px; border-bottom: var(--card-hd-sep); font-weight: 600;}
       .card-bd { padding: 12px 12px 8px 12px; }
+      /* links: actions-inline 置中，預覽區改為單欄（移除縮圖後讓 meta 吃滿寬度） */
+      .actions-inline{
+        display:flex;
+        justify-content:center;
+        gap:12px;
+        margin-bottom:10px;
+      }
+      .preview-wrap{ 
+        display:flex; 
+        flex-direction:column;   /* 垂直排，去掉左右排版 */
+        gap:12px; 
+        align-items:stretch;     /* 子項目吃滿寬 */
+      }
+      .preview-meta{ width:100%; }
+/* === Global card zoom scope (desktop hover + mobile touch) === */
+.cards-zoom-scope{ 
+  --card-zoom-scale: 1.02;
+  --card-rest-scale: 0.97;
+  --card-zoom-duration: 120ms;
+}
+.cards-zoom-scope .card{
+  position: relative;
+  transition: transform var(--card-zoom-duration) ease, box-shadow 120ms ease, filter 120ms ease;
+  will-change: transform;
+}
+.cards-zoom-scope:hover .card{ 
+  transform: scale(var(--card-rest-scale)); 
+  filter: saturate(0.96);
+}
+.cards-zoom-scope:hover .card:hover{
+  transform: scale(var(--card-zoom-scale));
+  z-index: 2;
+  filter: none;
+  box-shadow: 0 6px 24px rgba(0,0,0,.12);
+}
+.cards-zoom-scope.is-touching .card{ transform: scale(var(--card-rest-scale)); filter: saturate(0.96); }
+.cards-zoom-scope.is-touching .card.card--hot{ transform: scale(var(--card-zoom-scale)); z-index: 2; filter:none; box-shadow: 0 6px 24px rgba(0,0,0,.12); }
+@media (prefers-reduced-motion: reduce){ .cards-zoom-scope .card{ transition:none; } }
 
       /* 左側清單卡片 */
       .card-list { grid-column: 1 / 2; grid-row: 1 / 3; display:flex; flex-direction:column; }

@@ -527,4 +527,27 @@ else appStart();
   }
 })();
 
+// ===== Card zoom touch helpers (global, reusable) =====
+(function(){
+  const SCOPE = '.cards-zoom-scope';
+  function onTouchStart(e){
+    const card = e.target.closest('.card');
+    if (!card) return;
+    const scope = card.closest(SCOPE);
+    if (!scope) return;
+    scope.classList.add('is-touching');
+    scope.querySelectorAll('.card--hot').forEach(c => c.classList.remove('card--hot'));
+    card.classList.add('card--hot');
+  }
+  function clearTouch(){
+    document.querySelectorAll(SCOPE).forEach(scope => {
+      scope.classList.remove('is-touching');
+      scope.querySelectorAll('.card--hot').forEach(c => c.classList.remove('card--hot'));
+    });
+  }
+  document.addEventListener('touchstart', onTouchStart, { passive: true });
+  document.addEventListener('touchend',   clearTouch,    { passive: true });
+  document.addEventListener('touchcancel',clearTouch,    { passive: true });
+})();
+
 </script>
