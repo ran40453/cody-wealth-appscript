@@ -1,0 +1,240 @@
+<!-- links_js.html -->
+<script>
+(() => {
+  // —— 簡單狀態 —— 
+  let state = {
+    rows: [],            // [{row, title, url, domain, favicon, thumb}]
+    selected: null,      // index in rows array
+    itemHeight: 56,      // 估計每顆膠囊高度
+    viewportCount: 20,   // 一次渲染幾個
+    start: 0
+  };
+
+  // —— El refs —— 
+  const el = sel => document.querySelector(sel);
+  const listScroll = () => el('#listScroll');
+  const host = () => el('#listHost');
+  const padTop = () => el('#listPadTop');
+  const padBot = () => el('#listPadBot');
+
+  const pvTitle = () => el('#pvTitle');
+  const pvUrl = () => el('#pvUrl');
+  const pvFavicon = () => el('#pvFavicon');
+  const pvThumb = () => el('#pvThumb');
+  const pvDomain = () => el('#pvDomain');
+
+  const btnGo = () => el('#btnGo');
+  const btnRemove = () => el('#btnRemove');
+
+  const modalMask = () => el('#modalMask');
+  const inpUrl = () => el('#inpUrl');
+  const inpTitle = () => el('#inpTitle');
+  const btnConfirm = () => el('#btnConfirm');
+
+  // —— Utils —— 
+  function getDomain(u){
+    try { return (new URL(u)).hostname; } catch { return ''; }
+  }
+  function originFrom(u){
+    try { return (new URL(u)).origin; } catch { return ''; }
+  }
+  function shortDomain(u){
+    const d = getDomain(u);
+    return d.replace(/^www\./,'');
+  }
+  function fallbackFavicon(u){
+    const origin = originFrom(u);
+    return origin ? `${origin}/favicon.ico` : '';
+  }
+  function googleFavicon(u){
+    const d = getDomain(u);
+    return d ? `https://www.google.com/s2/favicons?sz=64&domain=${encodeURIComponent(d)}` : '';
+  }
+
+  // —— Render list (virtual-ish) —— 
+  function renderList(){
+    const ls = listScroll();
+    const total = state.rows.length;
+    const vpH = ls.clientHeight;
+    const per = state.itemHeight;
+    const visibleCount = Math.max(state.viewportCount, Math.ceil(vpH / per) + 6);
+
+    const scrollTop = ls.scrollTop;
+    const start = Math.max(0, Math.floor(scrollTop / per) - 3);
+    const end = Math.min(total, start + visibleCount);
+    state.start = start;
+
+    padTop().style.height = (start * per) + 'px';
+    padBot().style.height = ((total - end) * per) + 'px';
+
+    host().innerHTML = '';
+    for(let i = start; i < end; i++){
+      const item = state.rows[i];
+      const div = document.createElement('div');
+      div.className = 'link-item' + (state.selected === i ? ' active' : '');
+      div.dataset.idx = i;
+
+      const ico = document.createElement('img');
+      ico.className = 'link-ico';
+      ico.alt = 'icon';
+      ico.referrerPolicy = 'no-referrer';
+      ico.src = item.favicon || googleFavicon(item.url) || fallbackFavicon(item.url);
+
+      const meta = document.createElement('div');
+      meta.className = 'link-meta';
+
+      const t = document.createElement('div');
+      t.className = 'link-title';
+      t.textContent = item.title || item.url;
+
+      const d = document.createElement('div');
+      d.className = 'link-domain';
+      d.textContent = shortDomain(item.url);
+
+      meta.appendChild(t);
+      meta.appendChild(d);
+
+      div.appendChild(ico);
+      div.appendChild(meta);
+
+      div.addEventListener('click', () => {
+        state.selected = i;
+        updatePreview();
+        renderList(); // 重畫以更新 active 樣式
+      });
+      host().appendChild(div);
+    }
+  }
+
+  function updatePreview(){
+    const sel = state.rows[state.selected];
+    const hasSel = !!sel;
+    btnGo().disabled = !hasSel;
+    btnRemove().disabled = !hasSel;
+
+    pvTitle().textContent = hasSel ? sel.title || '—' : '—';
+    pvUrl().textContent = hasSel ? sel.url || '—' : '—';
+    pvDomain().textContent = hasSel ? shortDomain(sel.url) : '—';
+
+    pvFavicon().src = hasSel ? (sel.favicon || googleFavicon(sel.url) || fallbackFavicon(sel.url)) : '';
+    pvFavicon().alt = 'icon';
+
+    pvThumb().src = hasSel ? (sel.thumb || '') : '';
+    pvThumb().alt = 'preview';
+
+    if (hasSel && !sel.thumb) {
+      // 用 og:image 當縮圖（後端已嘗試抓），若沒有就用 favicon 放大
+      pvThumb().src = sel.favicon || googleFavicon(sel.url) || fallbackFavicon(sel.url);
+    }
+  }
+
+  function loadList(){
+    google.script.run
+      .withSuccessHandler(data => {
+        state.rows = data || [];
+        // 預設選第一個
+        state.selected = state.rows.length ? 0 : null;
+        renderList();
+        updatePreview();
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+        alert('讀取連結失敗');
+      })
+      .getLinks();
+  }
+
+  // —— Actions —— 
+  btnGo().addEventListener('click', () => {
+    const sel = state.rows[state.selected];
+    if (!sel) return;
+    window.open(sel.url, '_blank', 'noopener,noreferrer');
+  });
+
+  btnRemove().addEventListener('click', () => {
+    const sel = state.rows[state.selected];
+    if (!sel) return;
+    if (!confirm(`要移除「${sel.title || sel.url}」嗎？`)) return;
+
+    google.script.run
+      .withSuccessHandler(() => {
+        // 從本地狀態移除
+        state.rows.splice(state.selected, 1);
+        if (state.rows.length === 0) {
+          state.selected = null;
+        } else {
+          state.selected = Math.min(state.selected, state.rows.length - 1);
+        }
+        renderList();
+        updatePreview();
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+        alert('移除失敗');
+      })
+      .removeLink(sel.row);
+  });
+
+  // —— Add Modal —— 
+  function openModal(){
+    modalMask().style.display = 'flex';
+    inpUrl().value = '';
+    inpTitle().value = '';
+    btnConfirm().disabled = true;
+    setTimeout(() => inpUrl().focus(), 30);
+  }
+  function closeModal(){ modalMask().style.display = 'none'; }
+
+  el('#btnAddLink').addEventListener('click', openModal);
+  el('#modalClose').addEventListener('click', closeModal);
+  el('#btnCancel').addEventListener('click', closeModal);
+  modalMask().addEventListener('click', (e) => { if (e.target === modalMask()) closeModal(); });
+
+  // URL 變更 → 嘗試抓標題
+  let titleProbeTimer = null;
+  inpUrl().addEventListener('input', () => {
+    const url = inpUrl().value.trim();
+    btnConfirm().disabled = !url;
+    if (titleProbeTimer) clearTimeout(titleProbeTimer);
+    if (!url) { inpTitle().value=''; return; }
+
+    titleProbeTimer = setTimeout(() => {
+      google.script.run
+        .withSuccessHandler(meta => {
+          if (!inpTitle().value) inpTitle().value = (meta && meta.title) || '';
+        })
+        .withFailureHandler(() => {})
+        .probeUrlMeta(url);
+    }, 380);
+  });
+
+  // 確認新增
+  btnConfirm().addEventListener('click', () => {
+    const url = inpUrl().value.trim();
+    let title = inpTitle().value.trim();
+    if (!url) return;
+
+    google.script.run
+      .withSuccessHandler(newRow => {
+        if (newRow) {
+          state.rows.push(newRow);
+          state.selected = state.rows.length - 1;
+          renderList();
+          updatePreview();
+        }
+        closeModal();
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+        alert('新增失敗，請確認網址是否正確');
+      })
+      .addLink({ url, title });
+  });
+
+  // 清單滾動（虛擬渲染）
+  el('#listScroll').addEventListener('scroll', renderList);
+
+  // 啟動
+  document.addEventListener('DOMContentLoaded', loadList);
+})();
+</script>

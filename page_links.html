@@ -1,3 +1,73 @@
-<section id="page-links" class="page">
-  <div class="card"><h3 style="margin:0">其他連結</h3><div class="empty">尚未接資料</div></div>
+<!-- page_links -->
+<section id="page-links" class="page show">
+
+<div class="links-layout">
+      <!-- 左：虛擬清單 -->
+      <section class="card card-list">
+        <div class="card-hd">我的連結</div>
+        <div id="listScroll" class="list-scroll">
+          <div id="listPadTop"></div>
+          <div id="listHost"></div>
+          <div id="listPadBot"></div>
+          <!-- 永遠在底部：新增一列（虛線框） -->
+          <div id="btnAddLink" class="link-item link-add">
+            ＋ 新增連結
+          </div>
+        </div>
+      </section>
+
+      <!-- 右上：預覽 -->
+      <section class="card card-preview">
+        <div class="card-hd">預覽</div>
+        <div class="card-bd">
+          <div class="preview-wrap">
+            <img id="pvThumb" class="preview-thumb" alt="預覽縮圖" />
+            <div class="preview-meta">
+              <h3 id="pvTitle" class="preview-title">—</h3>
+              <div id="pvUrl" class="preview-url">—</div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <img id="pvFavicon" class="link-ico" alt="icon" />
+                <div id="pvDomain" class="link-domain">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右下：固定按鈕列 -->
+      <section class="card card-actions">
+        <div class="actions-inner">
+          <button id="btnGo" class="btn btn-primary" disabled>前往此站</button>
+          <button id="btnRemove" class="btn btn-danger" disabled>移除此頁</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 新增連結 Modal -->
+    <div id="modalMask" class="modal-mask" role="dialog" aria-modal="true">
+      <div class="modal">
+        <div class="card-hd">
+          <div>新增連結</div>
+          <button id="modalClose" class="btn">✕</button>
+        </div>
+        <div class="card-bd">
+          <div class="form-row">
+            <label for="inpUrl">網址（貼上即可）</label>
+            <input id="inpUrl" type="url" placeholder="https://example.com/..." />
+          </div>
+          <div class="form-row">
+            <label for="inpTitle">網站標題（自動擷取，可修改）</label>
+            <input id="inpTitle" type="text" placeholder="網站標題" />
+          </div>
+        </div>
+        <div class="card-ft">
+          <button id="btnCancel" class="btn">取消</button>
+          <button id="btnConfirm" class="btn btn-primary" disabled>確定新增</button>
+        </div>
+      </div>
+    </div>
 </section>
+
+<style>
+
+    </style>

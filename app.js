@@ -976,3 +976,117 @@ function runRecordAddRow(){
   addRowAndSnapshot(name);  // 你已經實作好的主程式
   return { ok:true, msg:'已新增一列（H~末欄轉值、A 寫時間），並在下一列鋪回公式骨架。' };
 }
+
+/**===================links========================== */
+
+// —— Links 後端 API ——
+// 資料表：sheet 名稱 "links"，A: title, B: url
+function getLinksSheet_() {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName('links') || ss.insertSheet('links');
+  // 保障標題列（如果你不需要標題列，可移除這段）
+  const firstRow = sh.getRange(1,1,1,2).getValues()[0];
+  const isHeaderMissing = !firstRow[0] && !firstRow[1];
+  if (isHeaderMissing) sh.getRange(1,1,1,2).setValues([['title','url']]);
+  return sh;
+}
+
+function getLinks() {
+  const sh = getLinksSheet_();
+  const last = sh.getLastRow();
+  if (last <= 1) return []; // 只有標題列
+
+  const values = sh.getRange(2, 1, last - 1, 2).getValues(); // A:B
+  const out = [];
+  for (let i = 0; i < values.length; i++) {
+    const [title, url] = values[i];
+    if (!url) continue;
+    const row = i + 2; // 真實 row index
+    const domain = tryGetDomain_(url);
+    out.push({
+      row,
+      title: title || '',
+      url,
+      domain,
+      favicon: domain ? ('https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain)) : '',
+      thumb: '' // 若需要可再填
+    });
+  }
+  return out;
+}
+
+function addLink(payload) {
+  const url = (payload && payload.url || '').trim();
+  let title = (payload && payload.title || '').trim();
+  if (!url) throw new Error('缺少網址');
+
+  // 嘗試抓標題 / 縮圖
+  const meta = safeProbe_(url);
+  if (!title) title = meta.title || url;
+
+  const sh = getLinksSheet_();
+  const row = sh.getLastRow() + 1;
+  sh.getRange(row, 1, 1, 2).setValues([[title, url]]);
+
+  const domain = tryGetDomain_(url);
+  return {
+    row,
+    title,
+    url,
+    domain,
+    favicon: domain ? ('https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain)) : '',
+    thumb: meta.image || ''
+  };
+}
+
+function removeLink(row) {
+  const sh = getLinksSheet_();
+  const last = sh.getLastRow();
+  if (row < 2 || row > last) throw new Error('列號超出範圍');
+  sh.deleteRow(row);
+  return true;
+}
+
+// 用於新增彈窗貼上網址自動抓標題
+function probeUrlMeta(url) {
+  const meta = safeProbe_(url);
+  return { title: meta.title || '', image: meta.image || '' };
+}
+
+// —— Helpers —— 
+function tryGetDomain_(u) {
+  try { return (new URL(u)).hostname; } catch (e) { return ''; }
+}
+
+function safeProbe_(u) {
+  try {
+    const res = UrlFetchApp.fetch(u, { muteHttpExceptions: true, followRedirects: true, timeout: 10000 });
+    const html = res.getContentText() || '';
+    return {
+      title: parseTitle_(html) || parseOG_(html, 'og:title') || parseMetaName_(html, 'title') || '',
+      image: parseOG_(html, 'og:image') || ''
+    };
+  } catch (e) {
+    // 失敗就回空
+    return { title: '', image: '' };
+  }
+}
+
+function parseTitle_(html) {
+  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  if (m && m[1]) return sanitize_(m[1]);
+  return '';
+}
+function parseOG_(html, property) {
+  const re = new RegExp(`<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["']`, 'i');
+  const m = html.match(re);
+  return m && m[1] ? m[1] : '';
+}
+function parseMetaName_(html, name) {
+  const re = new RegExp(`<meta[^>]+name=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i');
+  const m = html.match(re);
+  return m && m[1] ? m[1] : '';
+}
+function sanitize_(s) {
+  return s.replace(/\s+/g,' ').trim();
+}
