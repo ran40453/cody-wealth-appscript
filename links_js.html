@@ -20,7 +20,6 @@
   const pvTitle = () => el('#pvTitle');
   const pvUrl = () => el('#pvUrl');
   const pvFavicon = () => el('#pvFavicon');
-  const pvThumb = () => el('#pvThumb');
   const pvDomain = () => el('#pvDomain');
   const pvNote = () => el('#pvNote');
   const btnSaveNote = () => el('#btnSaveNote');
@@ -121,10 +120,6 @@
 
     pvFavicon().src = hasSel ? (sel.favicon || googleFavicon(sel.url) || fallbackFavicon(sel.url)) : '';
     pvFavicon().alt = 'icon';
-
-    pvThumb().src = hasSel ? (sel.thumb || '') : '';
-    pvThumb().alt = 'preview';
-    if (hasSel && !sel.thumb) pvThumb().src = sel.favicon || googleFavicon(sel.url) || fallbackFavicon(sel.url);
 
     // 備註
     if (hasSel) {
@@ -237,7 +232,7 @@
         }
         closeModal();
       })
-      
+
       .withFailureHandler(err => {
         console.error(err);
         alert('新增失敗，請確認網址是否正確');

@@ -1727,12 +1727,20 @@ body.hdr-fab-open #hdrFabMenu{
 
       /* 右上預覽卡片 */
       .card-preview { grid-column: 2 / 3; grid-row: 1 / 2; display:flex; flex-direction:column; }
-      .preview-wrap { display:flex; gap:12px; align-items:flex-start; }
+      .preview-wrap {
+        display: flex;
+        flex-direction: column;  /* 垂直排列就好 */
+        gap: 12px;
+        align-items: stretch;    /* 子項目撐滿寬度 */
+      }
       .preview-thumb {
         width: 120px; height: 80px; object-fit: cover; border-radius: 8px; border:1px solid #eee; background:#f6f6f6;
       }
       .preview-title { font-size: 16px; font-weight: 700; margin: 0 0 6px 0; }
       .preview-url { font-size: 13px; color:#666; margin-bottom: 6px; word-break: break-all; }
+      .preview-meta {
+        width: 100%;             /* 吃滿卡片寬度 */
+      }
 
       /* 右下固定按鈕列卡片 */
       .card-actions { grid-column: 2 / 3; grid-row: 2 / 3; display:flex; align-items:center; }
@@ -1782,7 +1790,12 @@ body.hdr-fab-open #hdrFabMenu{
       }
 
       /* 預覽按鈕列與備註框 */
-      .actions-inline{ display:flex; gap:12px; margin-bottom:10px; }
+      .actions-inline {
+        display: flex;
+        justify-content: center;  /* 水平置中 */
+        gap: 12px;
+        margin-bottom: 10px;
+      }
       .btn-ghost{
         background: transparent;
         color: var(--text);
@@ -1791,7 +1804,7 @@ body.hdr-fab-open #hdrFabMenu{
       .note-wrap{ margin-top:10px; display:flex; flex-direction:column; gap:6px; }
       .note-label{ font-size:12px; color: var(--muted); }
       .note-box{
-        min-height:72px; padding:10px;
+        min-height:72px; padding:10px;font-size: 14px;
         border:1px solid var(--card-bd, #e6e6e6); border-radius:8px;
         background: color-mix(in oklab, var(--surface) 86%, transparent);
         color: var(--text);
@@ -1809,9 +1822,9 @@ body.hdr-fab-open #hdrFabMenu{
       }
       .card-list{ grid-column: 1 / 2; font-size:40px; }
       .card-preview{ display:block; grid-column: 2 / 3; font-size:40px;}
-      .link-title, .btn-primary, .preview-title, .note-box, .btn-danger {
+      .link-title, .btn-primary, .preview-title, .btn-danger {
       font-size: 30px; 
-      }
+      
 
     }
   </style>

@@ -61,17 +61,15 @@
 
     ],
     dashmain: [
-      { key:'dashmain', icon:'dashboard',   text:'Dashboard', action: ()=>go && go('dashmain') },
-      { key:'charts',   icon:'bar_chart',   text:'Charts',    action: ()=>go && go('charts') },
-      { key:'ctbc',   icon:'account_balance', text:'CTBC 匯入', action: ()=>go && go('ctbc') }
+      { key:'dashmain', icon:'dashboard',   text:'Dashboard', action: ()=>go && go('dashmain') }
     ],
     list: [
       { key:'record', icon:'database', text:'Database', action: ()=>go && go('record') }
     ],
     _menu: [
-      { key:'links',   icon:'link',     text:'其他連結', action: ()=>go && go('links') },
-      { key:'record',  icon:'database', text:'Database', action: ()=>go && go('record') },
+      { key:'ctbc',   icon:'account_balance', text:'CTBC', action: ()=>go && go('ctbc') },
       { key:'policy',  icon:'policy',   text:'定存保單', action: ()=>go && go('policy') },
+      { key:'links',   icon:'link',     text:'其他連結', action: ()=>go && go('links') },
       { key:'settings',icon:'tune',     text:'偏好設定', action: ()=>{ try{ openSettings&&openSettings(); }catch(_){} } }
     ]
   };
