@@ -16,10 +16,17 @@
         </div>
       </section>
 
-      <!-- 右上：預覽 -->
+      <!-- 右側：預覽（含上方按鈕列 + 備註） -->
       <section class="card card-preview">
         <div class="card-hd">預覽</div>
         <div class="card-bd">
+
+          <!-- 置於預覽上方的按鈕列 -->
+          <div class="actions-inline">
+            <button id="btnGo" class="btn btn-primary" disabled>前往此站</button>
+            <button id="btnRemove" class="btn btn-danger" disabled>移除此頁</button>
+          </div>
+
           <div class="preview-wrap">
             <img id="pvThumb" class="preview-thumb" alt="預覽縮圖" />
             <div class="preview-meta">
@@ -29,19 +36,21 @@
                 <img id="pvFavicon" class="link-ico" alt="icon" />
                 <div id="pvDomain" class="link-domain">—</div>
               </div>
+
+              <!-- 備註（對應 Sheet C 欄） -->
+              <div class="note-wrap">
+                <label for="pvNote" class="note-label">備註</label>
+                <div id="pvNote" class="note-box" contenteditable="true" data-placeholder="輸入備註…"></div>
+                <div class="note-tools">
+                  <button id="btnSaveNote" class="btn btn-ghost" disabled>儲存備註</button>
+                  <span id="noteStatus" class="note-status" aria-live="polite"></span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      <!-- 右下：固定按鈕列 -->
-      <section class="card card-actions">
-        <div class="actions-inner">
-          <button id="btnGo" class="btn btn-primary" disabled>前往此站</button>
-          <button id="btnRemove" class="btn btn-danger" disabled>移除此頁</button>
         </div>
       </section>
-    </div>
 
     <!-- 新增連結 Modal -->
     <div id="modalMask" class="modal-mask" role="dialog" aria-modal="true">

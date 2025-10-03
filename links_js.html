@@ -22,6 +22,9 @@
   const pvFavicon = () => el('#pvFavicon');
   const pvThumb = () => el('#pvThumb');
   const pvDomain = () => el('#pvDomain');
+  const pvNote = () => el('#pvNote');
+  const btnSaveNote = () => el('#btnSaveNote');
+  const noteStatus = () => el('#noteStatus');
 
   const btnGo = () => el('#btnGo');
   const btnRemove = () => el('#btnRemove');
@@ -121,10 +124,19 @@
 
     pvThumb().src = hasSel ? (sel.thumb || '') : '';
     pvThumb().alt = 'preview';
+    if (hasSel && !sel.thumb) pvThumb().src = sel.favicon || googleFavicon(sel.url) || fallbackFavicon(sel.url);
 
-    if (hasSel && !sel.thumb) {
-      // 用 og:image 當縮圖（後端已嘗試抓），若沒有就用 favicon 放大
-      pvThumb().src = sel.favicon || googleFavicon(sel.url) || fallbackFavicon(sel.url);
+    // 備註
+    if (hasSel) {
+      pvNote().textContent = sel.note || '';
+      pvNote().dataset.row = sel.row;
+      btnSaveNote().disabled = true;
+      noteStatus().textContent = '';
+    } else {
+      pvNote().textContent = '';
+      delete pvNote().dataset.row;
+      btnSaveNote().disabled = true;
+      noteStatus().textContent = '';
     }
   }
 
@@ -217,6 +229,7 @@
     google.script.run
       .withSuccessHandler(newRow => {
         if (newRow) {
+          if (!('note' in newRow)) newRow.note = '';
           state.rows.push(newRow);
           state.selected = state.rows.length - 1;
           renderList();
@@ -224,6 +237,7 @@
         }
         closeModal();
       })
+      
       .withFailureHandler(err => {
         console.error(err);
         alert('新增失敗，請確認網址是否正確');
@@ -233,6 +247,45 @@
 
   // 清單滾動（虛擬渲染）
   el('#listScroll').addEventListener('scroll', renderList);
+
+  // 編輯備註 → 啟用「儲存」
+  pvNote().addEventListener('input', () => {
+    const sel = state.rows[state.selected];
+    if (!sel) return;
+    const cur = pvNote().textContent.trim();
+    btnSaveNote().disabled = (cur === (sel.note || '').trim());
+  });
+
+  // Ctrl/Cmd+S 快速儲存
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+      const sel = state.rows[state.selected];
+      if (!sel) return;
+      e.preventDefault();
+      btnSaveNote().click();
+    }
+  });
+
+  // 點擊儲存
+  btnSaveNote().addEventListener('click', () => {
+    const sel = state.rows[state.selected];
+    if (!sel) return;
+    const note = pvNote().textContent.trim();
+    btnSaveNote().disabled = true;
+    noteStatus().textContent = '儲存中…';
+    google.script.run
+      .withSuccessHandler(() => {
+        sel.note = note;
+        noteStatus().textContent = '已儲存';
+        setTimeout(() => noteStatus().textContent = '', 1200);
+      })
+      .withFailureHandler(err => {
+        console.error(err);
+        noteStatus().textContent = '儲存失敗';
+        btnSaveNote().disabled = false;
+      })
+      .saveLinkNote(sel.row, note);
+  });
 
   // 啟動
   document.addEventListener('DOMContentLoaded', loadList);

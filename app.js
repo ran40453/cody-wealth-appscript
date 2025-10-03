@@ -809,6 +809,14 @@ function setBalance(payload) {
   return { ok: true, saved: Number(value) || 0, dash };
 }
 
+/* ===== 連結清單（給前端管理用） ===== */
+function saveLinkNote(row, note){
+  const sh = getLinksSheet_();
+  if (row < 2 || row > sh.getLastRow()) throw new Error('列號超出範圍');
+  sh.getRange(row, 3).setValue(note || '');
+  return true;
+}
+
 /** （可選）=公式交給 Sheets 引擎算，例如 =SUM(100, 200) → 回計算後的數字 */
 function evalBySheetsEngine(expr) {
   if (!/^=/.test(expr)) throw new Error('Not a formula');
@@ -984,32 +992,28 @@ function runRecordAddRow(){
 function getLinksSheet_() {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName('links') || ss.insertSheet('links');
-  // 保障標題列（如果你不需要標題列，可移除這段）
-  const firstRow = sh.getRange(1,1,1,2).getValues()[0];
-  const isHeaderMissing = !firstRow[0] && !firstRow[1];
-  if (isHeaderMissing) sh.getRange(1,1,1,2).setValues([['title','url']]);
+  const firstRow = sh.getRange(1,1,1,3).getValues()[0];
+  const isHeaderMissing = !firstRow[0] && !firstRow[1] && !firstRow[2];
+  if (isHeaderMissing) sh.getRange(1,1,1,3).setValues([['title','url','note']]);
   return sh;
 }
 
 function getLinks() {
   const sh = getLinksSheet_();
   const last = sh.getLastRow();
-  if (last <= 1) return []; // 只有標題列
-
-  const values = sh.getRange(2, 1, last - 1, 2).getValues(); // A:B
+  if (last <= 1) return [];
+  const values = sh.getRange(2, 1, last - 1, 3).getValues(); // A:C
   const out = [];
   for (let i = 0; i < values.length; i++) {
-    const [title, url] = values[i];
+    const [title, url, note] = values[i];
     if (!url) continue;
-    const row = i + 2; // 真實 row index
+    const row = i + 2;
     const domain = tryGetDomain_(url);
     out.push({
-      row,
-      title: title || '',
-      url,
+      row, title: title || '', url, note: note || '',
       domain,
       favicon: domain ? ('https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain)) : '',
-      thumb: '' // 若需要可再填
+      thumb: ''
     });
   }
   return out;
@@ -1020,19 +1024,16 @@ function addLink(payload) {
   let title = (payload && payload.title || '').trim();
   if (!url) throw new Error('缺少網址');
 
-  // 嘗試抓標題 / 縮圖
   const meta = safeProbe_(url);
   if (!title) title = meta.title || url;
 
   const sh = getLinksSheet_();
   const row = sh.getLastRow() + 1;
-  sh.getRange(row, 1, 1, 2).setValues([[title, url]]);
+  sh.getRange(row, 1, 1, 3).setValues([[title, url, ""]]); // A,B,C
 
   const domain = tryGetDomain_(url);
   return {
-    row,
-    title,
-    url,
+    row, title, url, note: '',
     domain,
     favicon: domain ? ('https://www.google.com/s2/favicons?sz=64&domain=' + encodeURIComponent(domain)) : '',
     thumb: meta.image || ''
