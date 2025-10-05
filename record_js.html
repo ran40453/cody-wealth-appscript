@@ -15,6 +15,24 @@
     return `<span class="${cls}">${maskHTML(sign + fmtNumTW(n))}</span>`;
   }
 
+  function numOr(){
+    for (let i=0;i<arguments.length;i++){
+      const n = Number(arguments[i]);
+      if (isFinite(n)) return n;
+    }
+    return 0;
+  }
+  function pickNum(obj){
+    for (let i=1;i<arguments.length;i++){
+      const k = arguments[i];
+      if (obj && k in obj){
+        const n = Number(obj[k]);
+        if (isFinite(n)) return n;
+      }
+    }
+    return 0;
+  }
+
   // —— 虛擬表 ——
   function createVirtualTable({viewportId, spacerId, theadId, tbodyId, fetcher, pageSize=100}){
     const state = {
@@ -119,18 +137,31 @@
   function loadRecordLatest(){
     const box = document.getElementById('dbLatestBox');
     if (box) box.innerHTML = `<div class="empty">載入中…</div>`;
+    if (!window.google?.script?.run?.withSuccessHandler){
+      console.warn('[record] google.script.run not available');
+      if (box) box.innerHTML = `<div class="empty">無法連線 Apps Script 環境</div>`;
+      return;
+    }
     google.script.run
       .withSuccessHandler(res=>{
         if (!res){ box.innerHTML = `<div class="empty">沒有資料</div>`; return; }
+        const L = res || {};
+        const total      = pickNum(L, 'C','total','Total','TOTAL');
+        const withDad    = pickNum(L, 'D','withDad','totalWithDad');
+        const avail      = pickNum(L, 'E','avail','available');
+        const dayPnl     = pickNum(L, 'F','dayPnl','todayPnl','pnl');
+        const cash       = pickNum(L, 'G','cash');
+        const debt       = pickNum(L, 'BB','debt');
+        const usdHolding = pickNum(L, 'CV','usd','USD');
         const rows = [
-          ['日期', (res && res.date) || '-'],
-          ['總資產', maskHTML(fmtNumTW(res.C))],
-          ['加上爸爸', maskHTML(fmtNumTW(res.D))],
-          ['可動用', maskHTML(fmtNumTW(res.E))],
-          ['當日損益', pnlBadgeHTML(res.F)],
-          ['現金', maskHTML(fmtNumTW(res.G))],
-          ['債務', maskHTML(fmtNumTW(res.BB))],
-          ['持有 USD', maskHTML(fmtNumTW(res.CV))]
+          ['日期', (L && L.date) || '-'],
+          ['總資產', maskHTML(fmtNumTW(total))],
+          ['加上爸爸', maskHTML(fmtNumTW(withDad))],
+          ['可動用', maskHTML(fmtNumTW(avail))],
+          ['當日損益', pnlBadgeHTML(dayPnl)],
+          ['現金', maskHTML(fmtNumTW(cash))],
+          ['債務', maskHTML(fmtNumTW(debt))],
+          ['持有 USD', maskHTML(fmtNumTW(usdHolding))]
         ];
         box.innerHTML = rows.map(([k,v])=>`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
         syncKpiFromLatest(res); // 若 dash KPI 容器存在就同步
@@ -144,26 +175,32 @@
 
   // —— 同步 dash KPI（只在 .kpi-list 存在時更新，不覆寫現有渲染流程）——
   function syncKpiFromLatest(latest){
+    const L = latest || {};
+    const total = pickNum(L, 'C','total');
+    const debt  = pickNum(L, 'BB','debt');
+    const cash  = pickNum(L, 'G','cash');
+    const avail = pickNum(L, 'E','avail','available');
+    const net   = numOr(pickNum(L,'net'), total - debt);
+    const dayPnl= pickNum(L, 'F','dayPnl','todayPnl','pnl');
     const kpiList = document.querySelector('.kpi-list');
     if (!kpiList) return; // dashboard 不在畫面就略過
 
     const map = {
-      kpiTotal: latest.C,
-      kpiNet:   Number(latest.C||0) - Number(latest.BB||0),
-      kpiCash:  latest.G,
-      kpiAvail: latest.E,
-      // kpiUSD:   latest.CV,
-      kpiDebt:  latest.BB
+      kpiTotal: total,
+      kpiNet:   net,
+      kpiCash:  cash,
+      kpiAvail: avail,
+      kpiDebt:  debt
     };
     Object.entries(map).forEach(([id, val])=>{
       const el = document.getElementById(id);
-      if (el) el.textContent = fmtNumTW(val);
+      if (el) el.textContent = fmtNumTW(numOr(val));
     });
     const d = document.getElementById('kpiDate');
     if (d) d.textContent = latest.date || '—';
     const pnlEl = document.getElementById('dashPnlPill');
     if (pnlEl){
-      const n = Number(latest.F||0);
+      const n = numOr(dayPnl);
       const sign = n>0?'+':'';
       pnlEl.textContent = sign + fmtNumTW(n);
       pnlEl.classList.remove('pos','neg','zero');
@@ -187,6 +224,11 @@
       tbodyId:'dbTbody',
       pageSize:100,
       fetcher: (q, cb)=>{
+        if (!window.google?.script?.run?.withSuccessHandler){
+          console.warn('[record] google.script.run not available for table fetch');
+          cb({headers:[], total:0, rows:[]});
+          return;
+        }
         q.order = 'desc';
         google.script.run
           .withSuccessHandler(cb)
