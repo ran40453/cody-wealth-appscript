@@ -26,11 +26,37 @@ App.modules.pageInput = (function(){
     if (d){ const today = new Date(); d.value = today.toISOString().slice(0,10); }
 
     bindForm();
-    // 篩選器
-    const cPln = byId('statusFilterPlanned');
-    const cPst = byId('statusFilterPosted');
-    if (cPln) cPln.addEventListener('change', ()=>{ vs.filters.planned = !!cPln.checked; applyStatusFilter(); });
-    if (cPst) cPst.addEventListener('change', ()=>{ vs.filters.posted  = !!cPst.checked; applyStatusFilter(); });
+    // 初次同步一次（若有預設選中）
+    (function(){
+      const typeSel = document.querySelector('input[name="type"]:checked');
+      if (typeSel){ const ev = new Event('change'); typeSel.dispatchEvent(ev); }
+    })();
+    // 篩選器：segmented buttons（.seg-sm）優先；無則回退至舊 checkbox
+    const btnPln = byId('statusPlanned');  // <button id="statusPlanned">
+    const btnPst = byId('statusPosted');   // <button id="statusPosted">
+    if (btnPln && btnPst){
+      function syncStatusButtons(){
+        btnPln.classList.toggle('active', !!vs.filters.planned);
+        btnPln.setAttribute('aria-pressed', vs.filters.planned ? 'true' : 'false');
+        btnPst.classList.toggle('active', !!vs.filters.posted);
+        btnPst.setAttribute('aria-pressed', vs.filters.posted ? 'true' : 'false');
+      }
+      btnPln.addEventListener('click', ()=>{ vs.filters.planned = !vs.filters.planned; syncStatusButtons(); applyStatusFilter(); });
+      btnPst.addEventListener('click', ()=>{ vs.filters.posted  = !vs.filters.posted;  syncStatusButtons(); applyStatusFilter(); });
+      // 初始狀態：兩者皆開
+      vs.filters.planned = true; vs.filters.posted = true; syncStatusButtons();
+    } else {
+      // Fallback：舊 checkbox
+      const cPln = byId('statusFilterPlanned');
+      const cPst = byId('statusFilterPosted');
+      if (cPln) cPln.addEventListener('change', ()=>{ vs.filters.planned = !!cPln.checked; applyStatusFilter(); });
+      if (cPst) cPst.addEventListener('change', ()=>{ vs.filters.posted  = !!cPst.checked; applyStatusFilter(); });
+      // 初始：如果 checkbox 存在且已勾選，沿用；否則預設皆開
+      if (cPln || cPst){
+        vs.filters.planned = cPln ? !!cPln.checked : true;
+        vs.filters.posted  = cPst ? !!cPst.checked : true;
+      }
+    }
 
     // 虛擬清單視口
     setupViewport();
@@ -44,18 +70,26 @@ App.modules.pageInput = (function(){
 
   /* ===== 表單 ===== */
   function bindForm(){
-  // ± 切換
-  const btn = byId('btnToggleSign');
+  // in/out segment（radio）— 規則：out=收入=負號；in=支出=正號
   const amt = byId('inAmount');
-  if (btn && amt){
-    btn.addEventListener('click', ()=>{
-      const v = String(amt.value || '').trim();
-      if (!v){ amt.value = ''; return; }
-      const n = parseFloat(v);
-      if (!isFinite(n)) return;
-      amt.value = (n === 0) ? '0' : String(-n);
-    });
+  const typeIn  = document.getElementById('typeIn');   // value="in"
+  const typeOut = document.getElementById('typeOut');  // value="out"
+  function applySignByType(){
+    if (!amt) return;
+    const raw = String(amt.value||'').trim();
+    if (raw === '') return; // 空值不動
+    const n = Number(raw.replace(/,/g,''));
+    if (!isFinite(n)) return;
+    const abs = Math.abs(n);
+    const sel = document.querySelector('input[name="type"]:checked');
+    const v   = sel ? String(sel.value).toLowerCase() : 'in'; // 預設 in（支出）
+    const isOut = (v === 'out'); // out=收入=負
+    amt.value = String(isOut ? -abs : abs);
   }
+  typeIn?.addEventListener('change', applySignByType);
+  typeOut?.addEventListener('change', applySignByType);
+  // 使用者輸入金額時也即時依 radio 套用正負
+  amt?.addEventListener('input', applySignByType);
 
   // 送出（新增一筆）
   byId('btnSubmit')?.addEventListener('click', ()=>{
@@ -77,8 +111,31 @@ App.modules.pageInput = (function(){
       .submitCashflow(rec);   // ★ 這行一定要有！
   });
 
-  // 清空（也同時取消選取狀態）
-  byId('btnClear')?.addEventListener('click', clearFormAndSelection);
+  // 由「清空」改為「移除選擇列」
+  byId('btnClear')?.addEventListener('click', ()=>{
+    if (!vs.selectedRow){
+      alert('請先在左側清單點選要移除的一列');
+      return;
+    }
+    const row = Number(vs.selectedRow);
+    const ok = confirm('確定要刪除此筆紀錄嗎？此動作無法復原。');
+    if (!ok) return;
+    if (!google?.script?.run){
+      alert('移除失敗：未連線到 Apps Script');
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(()=>{
+        clearFormAndSelection(false);
+        App?.modules?.pageInput?.reloadList?.();
+        updateBalanceCard();
+      })
+      .withFailureHandler(err=>{
+        console.error('deleteTransaction failed:', err);
+        alert('移除失敗：' + (err?.message || err));
+      })
+      .deleteTransaction(row);
+  });
 
   // 更新（覆寫所選列，不新增）
   byId('btnUpdateTx')?.addEventListener('click', ()=>{
@@ -116,8 +173,15 @@ App.modules.pageInput = (function(){
     const account = byId('inAccount')?.value || '';
     const status  = byId('inStatus')?.value || 'auto';
     const note    = byId('inNote')?.value || '';
-    const amount  = amountV === '' ? '' : Number(amountV);
-    return { date, item, amount, account, status, note };
+    const typeSel = document.querySelector('input[name="type"]:checked');
+    const type    = (typeSel ? String(typeSel.value) : 'in').toLowerCase(); // 預設 in（支出=正）
+
+    if (amountV === '') return { date, item, amount:'', account, status, note, type };
+    const nRaw = Number(String(amountV).replace(/,/g,''));
+    const abs  = Math.abs(isFinite(nRaw) ? nRaw : 0);
+    const amount = (type === 'out') ? -abs : abs; // out=收入=負；in=支出=正
+
+    return { date, item, amount, account, status, note, type };
   }
 
   function clearForm(){
@@ -243,6 +307,19 @@ function loadTx(account){
       if (!el) return;
       el.value = rec[k] ?? '';
     });
+    // 依金額正負決定 in/out，並把金額欄顯示絕對值
+    try{
+      const n = Number(rec.amount);
+      const isOut = isFinite(n) && n < 0; // out=收入=負
+      const rOut = document.getElementById('typeOut'); // value="out"
+      const rIn  = document.getElementById('typeIn');  // value="in"
+      if (rOut && rIn){
+        rOut.checked = isOut;
+        rIn.checked  = !isOut;
+      }
+      const amtEl = byId('inAmount');
+      if (amtEl){ amtEl.value = String(Math.abs(isFinite(n)?n:0)); }
+    }catch(e){}
   }
 
   function applyStatusFilter(){

@@ -15,35 +15,35 @@
         </div>
 
         <!-- KPI（可收合；All + 幣別卡） -->
-        <div class="ctbc-kpiBar" id="ctbcKPI" data-collapsed="0">
+        <div class="ctbc-kpiBar" id="ctbcKPI" data-collapsed="0"> <div id="ctbcStatus" class="ctbc-status" style="min-height:1.2em;margin:4px 0;color:#888;"></div>
           <!-- All(USD) 一列，數字加粗 -->
           <div class="kpi-row" id="kpiAll">
             <div class="kpi-title">All (USD)</div>
-            <div class="kpi"><div class="k">成本</div><div class="v bold" id="kpiAllN">—</div></div>
-            <div class="kpi"><div class="k">現值</div><div class="v bold" id="kpiAllNoInt">—</div></div>
-            <div class="kpi"><div class="k">含息損益</div><div class="v bold" id="kpiAllT">—</div></div>
-            <div class="kpi"><div class="k">含息報酬率</div><div class="v bold" id="kpiAllROI">—</div></div>
-            <div class="kpi"><div class="k">已領利息</div><div class="v bold" id="kpiAllAF">—</div></div>
+            <div class="kpi"><div class="k">成本</div><div class="v bold" id="ctbcAllN">—</div></div>
+            <div class="kpi"><div class="k">現值</div><div class="v bold" id="ctbcAllNoInt">—</div></div>
+            <div class="kpi"><div class="k">含息損益</div><div class="v bold" id="ctbcAllT">—</div></div>
+            <div class="kpi"><div class="k">含息報酬率</div><div class="v bold" id="ctbcAllROI">—</div></div>
+            <div class="kpi"><div class="k">已領利息</div><div class="v bold" id="ctbcAllAF">—</div></div>
           </div>
 
           <!-- 幣別卡：左側一欄標題、右側只放數字 -->
           <div class="kpi-grid">
-            <div class="kpi-card" id="kpiTWD">
+            <div class="kpi-card" id="ctbcTWD">
               <div class="title">TWD</div>
               <div class="rows">
-                <div class="r"><span class="k">現值</span><b class="v" id="kpiTWD_N">—</b></div>
-                <div class="r"><span class="k">含息損益</span><b class="v" id="kpiTWD_T">—</b></div>
-                <div class="r"><span class="k">含息報酬率</span><b class="v" id="kpiTWD_ROI">—</b></div>
-                <div class="r"><span class="k">已領利息</span><b class="v" id="kpiTWD_AF">—</b></div>
-              </div>
+                <div class="r"><span class="k">現值</span><b class="v" id="ctbcTWD_N">—</b></div>
+                <div class="r"><span class="k">含息損益</span><b class="v" id="ctbcTWD_T">—</b></div>
+                <div class="r"><span class="k">含息報酬率</span><b class="v" id="ctbcTWD_ROI">—</b></div>
+                <div class="r"><span class="k">已領利息</span><b class="v" id="ctbcTWD_AF">—</b></div>
+                          </div>
             </div>
-            <div class="kpi-card" id="kpiUSD">
+            <div class="kpi-card" id="ctbcUSD">
               <div class="title">USD</div>
               <div class="rows">
-                <div class="r"><span class="k">現值</span><b class="v" id="kpiUSD_N">—</b></div>
-                <div class="r"><span class="k">含息損益</span><b class="v" id="kpiUSD_T">—</b></div>
-                <div class="r"><span class="k">含息報酬率</span><b class="v" id="kpiUSD_ROI">—</b></div>
-                <div class="r"><span class="k">已領利息</span><b class="v" id="kpiUSD_AF">—</b></div>
+                <div class="r"><span class="k">現值</span><b class="v" id="ctbcUSD_N">—</b></div>
+                <div class="r"><span class="k">含息損益</span><b class="v" id="ctbcUSD_T">—</b></div>
+                <div class="r"><span class="k">含息報酬率</span><b class="v" id="ctbcUSD_ROI">—</b></div>
+                <div class="r"><span class="k">已領利息</span><b class="v" id="ctbcUSD_AF">—</b></div>
               </div>
             </div>
           </div>
@@ -77,6 +77,6 @@
   </div>
 </div>
   </div>
-  <div id="ctbcStatus"></div>
+  
 
 </section>

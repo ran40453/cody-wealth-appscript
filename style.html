@@ -149,6 +149,12 @@
   --card-shadow: 0 1px 2px rgba(0,0,0,.06);                    /* 淺色 */
   --card-hd-sep: 1px solid var(--card-bd, #e6e6e6);
 
+  /* Segmented control aliases (map to existing theme tokens) */
+  --field-bg:     color-mix(in oklab, var(--card) 88%, transparent);
+  --field-border: color-mix(in oklab, var(--tint) 22%, transparent);
+  --line:         color-mix(in oklab, var(--tint) 22%, transparent);
+  --fg:           var(--text);
+
 }
 :root.light{
   --bg:#f6f8fb; --surface:#ffffff; --card:#ffffff; --text:#0b1526; --muted:#5a6b7f;
@@ -645,7 +651,29 @@ header .title-wrap{
   #page-input .tx-panel{ width:100%; }
 }
 
-/* 13.2 表單欄位 */
+#page-input .fx-field:focus{
+  border-color: color-mix(in oklab, var(--tint) 65%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--tint) 28%, transparent);
+}
+
+/* Segmented controls (small & regular) */
+.seg-sm{ display:flex; gap:6px; }
+.seg-sm button{
+  border:1px solid var(--line); background: var(--field-bg); color: var(--fg);
+  border-radius: 12px; padding: 6px 10px; font-size: 13px; cursor:pointer;
+}
+.seg-sm button.active{
+  background: var(--tint); color: #fff; border-color: transparent;
+  box-shadow: 0 4px 10px rgba(10,132,255,.25);
+}
+.seg-sm button { transition: background .15s ease, box-shadow .15s ease, color .15s ease, border-color .15s ease; }
+
+.seg{ display:flex; border:1px solid var(--field-border); border-radius: 14px; padding: 3px; background: var(--field-bg); }
+.seg input{ display:none; }
+.seg label{ flex:1; text-align:center; padding:10px 8px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+.seg input:checked + label{ background: var(--tint); color: white; box-shadow: 0 6px 14px rgba(10,132,255,.25); }
+
+
 #page-input .sr-only{
   position:absolute; width:1px; height:1px; padding:0; margin:-1px;
   overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;

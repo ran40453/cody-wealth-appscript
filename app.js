@@ -366,6 +366,14 @@ function getCTBCInvestments(){
     ? Utilities.formatDate(v, tz, 'yyyy-MM-dd')
     : (v == null ? '' : String(v));
 
+  // 幣別正規化（不改動原 V，另提供 CUR）
+  function normCur_(v){
+    const s = String(v||'').toUpperCase();
+    if (s.includes('USD')) return 'USD';
+    if (s.includes('TWD') || s.includes('NTD') || /(NT|台幣|新台幣)/i.test(s)) return 'TWD';
+    return '';
+  }
+
   // 輸出：每列是一個物件，包含列號 ROW（2 起算）
   const out = values.map((r, i) => ({
     ROW: i + 2, // 真實試算表列號
@@ -378,11 +386,96 @@ function getCTBCInvestments(){
     T:  Number(r[INDEX.T  - 1]) || 0,
     U:  Number(r[INDEX.U  - 1]) || 0,
     V:  toStr(r[INDEX.V  - 1]),
+    CUR: normCur_(r[INDEX.V - 1]),
     AF: Number(r[INDEX.AF - 1]) || 0,
     AH: toStr(r[INDEX.AH - 1]),
   }));
 
   return out;
+}
+
+/**
+ * CTBC 匯總（供 ctbc_js 直接呼叫）
+ * 來源：getCTBCInvestments()（不可重複實作）
+ * 回傳鍵名對齊前端 IDs：
+ *   ctbcAllN, ctbcAllT, ctbcAllNoInt, ctbcAllAF,
+ *   ctbcTWD_N, ctbcTWD_T, ctbcTWD_AF,
+ *   ctbcUSD_N, ctbcUSD_T, ctbcUSD_AF,
+ *   ctbcAllROI, ctbcTWD_ROI, ctbcUSD_ROI
+ */
+function getCTBCAggregates(kind){
+  const rowsAll = getCTBCInvestments() || [];
+
+  // 允許 'fund' 或 '基金' 觸發基金篩選（比對 H/K）
+  const k = String(kind||'').toLowerCase();
+  const isFundReq = k.includes('fund') || k.includes('基金');
+  const isFund = (r)=> /基金|FUND/i.test(String(r.H||'')) || /基金|FUND/i.test(String(r.K||''));
+  const rows = isFundReq ? rowsAll.filter(isFund) : rowsAll;
+
+  // 幣別挑選：優先 CUR，否則以 V 判斷
+  const pick = (code)=> rows.filter(r=>{
+    const cur = (r.CUR || '').toUpperCase();
+    if (cur) return cur === code;
+    const v = String(r.V||'').toUpperCase();
+    if (code === 'USD') return v.includes('USD');
+    if (code === 'TWD') return v.includes('TWD') || v.includes('NTD') || /(NT|台幣|新台幣)/i.test(v);
+    return false;
+  });
+
+  // 與前端 ctbc_js 一致的 normalizeU：|U|≤1 視為小數，乘 100；否則視為百分比
+  function normalizeU(u){
+    var n = Number(u||0);
+    if (!isFinite(n)) n = 0;
+    return (Math.abs(n) <= 1) ? (n * 100) : n;
+  }
+
+  // 匯總：N/T/AF/L，同時計算「以 N 加權」的 U 加權平均（roiU）
+  function agg(list){
+    var N=0, T=0, AF=0, Lsum=0, w=0, wU=0;
+    for (var i=0;i<list.length;i++){
+      var r = list[i];
+      var n = Number(r.N||0);
+      var t = Number(r.T||0);
+      var af= Number(r.AF||0);
+      var l = Number(r.L||0);
+      var u = normalizeU(r.U);
+      if (!isFinite(n)) n = 0;
+      if (!isFinite(t)) t = 0;
+      if (!isFinite(af)) af = 0;
+      if (!isFinite(l)) l = 0;
+      N += n; T += t; AF += af; Lsum += l;
+      if (n){ w += n; wU += (u * n); }
+    }
+    var roiU = w ? (wU / w) : null; // 與前端一致：N 加權的 U 平均（百分比）
+    return { N:N, T:T, AF:AF, Lsum:Lsum, roiU:roiU };
+  }
+
+  var all = agg(rows);
+  var twd = agg(pick('TWD'));
+  var usd = agg(pick('USD'));
+
+  // AllNoInt = 現值合計（ΣN），依照當前篩選後的集合計算
+  var allNoInt = all.N;
+
+  return {
+    ctbcAllN:     all.Lsum,
+    ctbcAllT:     all.T,
+    ctbcAllNoInt: allNoInt,
+    ctbcAllAF:    all.AF,
+
+    ctbcTWD_N:    twd.N,
+    ctbcTWD_T:    twd.T,
+    ctbcTWD_AF:   twd.AF,
+
+    ctbcUSD_N:    usd.N,
+    ctbcUSD_T:    usd.T,
+    ctbcUSD_AF:   usd.AF,
+
+    // ROI 與前端相同：以 U 的 N 加權平均（百分比值）
+    ctbcAllROI:   (all.roiU==null?0:all.roiU),
+    ctbcTWD_ROI:  (twd.roiU==null?0:twd.roiU),
+    ctbcUSD_ROI:  (usd.roiU==null?0:usd.roiU)
+  };
 }
 
 /** 讀取某列 AF 儲存格的公式與顯示值（優先回公式） */
@@ -599,15 +692,15 @@ function getRecordLatest(){
     return n;
   }
 
-  // 直接指定欄位：A/C/D/E/F/G/BB/CV   ← ★ 多了 F
+  // 直接指定欄位：A/C/D/E/F/G/BA/CU   ← AQ 移除後向左位移一欄
     var cDate = colLetter('A');
     var cWhole= colLetter('C');
     var cWithDad=colLetter('D');
     var cAvail= colLetter('E');
-    var cPnL  = colLetter('F');  // ★ 當日損益（新增）
+    var cPnL  = colLetter('F');  // ★ 當日損益
     var cCash = colLetter('G');
-    var cDebt = colLetter('BB');
-    var cUSD  = colLetter('CV');
+    var cDebt = colLetter('BA'); // 原 BB 因移除 AQ 改為 BA
+    var cUSD  = colLetter('CU'); // 原 CV 因移除 AQ 改為 CU
 
   // 判斷是否為空列：關鍵欄位全都空 → 才算空
   function isEmptyRow(r){
@@ -673,23 +766,23 @@ function getRecordLatest(){
     C:   toNum(rVal[cWhole-1],   rDisp[cWhole-1]),
     D:   toNum(rVal[cWithDad-1], rDisp[cWithDad-1]),
     E:   toNum(rVal[cAvail-1],   rDisp[cAvail-1]),
-    F:   toNum(rVal[cPnL-1],     rDisp[cPnL-1]),   // ★ 新增：當日損益
+    F:   toNum(rVal[cPnL-1],     rDisp[cPnL-1]),
     G:   toNum(rVal[cCash-1],    rDisp[cCash-1]),
-    BB:  toNum(rVal[cDebt-1],    rDisp[cDebt-1]),
-    CV:  toNum(rVal[cUSD-1],     rDisp[cUSD-1])
+    BA:  toNum(rVal[cDebt-1],    rDisp[cDebt-1]),   // 債務（內部計算用）
+    CU:  toNum(rVal[cUSD-1],     rDisp[cUSD-1])    // 持有 USD
   };
 }
 
 /** 一次回傳 Dashboard 基礎資料（Database 最新 + Cashflow TOTAL + CTBC 總覽） */
 function getDashboardData(){
   // --- Database 最新（已有 getRecordLatest）
-  const latest = getRecordLatest() || { date:'', C:0, D:0, E:0, G:0, BB:0, CV:0 };
+  const latest = getRecordLatest() || { date:'', C:0, D:0, E:0, G:0, BA:0, CU:0 };
   const kpi_total = Number(latest.C||0);
-  const kpi_debt  = Number(latest.BB||0);
-  const kpi_cash  = Number(latest.G||0);  // 現金抓 G 欄
-  const kpi_avail = Number(latest.E||0);  // 可動用
-  const kpi_usd   = Number(latest.CV||0); // 持有 USD
-  const kpi_net   = kpi_total - kpi_debt;
+  const kpi_debt  = Number(latest.BA||0); // 內部用於淨資產計算
+  const kpi_cash  = Number(latest.G||0);
+  const kpi_avail = Number(latest.E||0);
+  const kpi_usd   = Number(latest.CU||0);
+  const kpi_net   = Number(latest.D||0); // 以 D 欄 Whole Assets 作為「淨資產」顯示
 
   // --- Cashflow TOTAL（已有 getSummaryCF：含 TOTAL）
   const cfRows = getSummaryCF() || [];
@@ -716,8 +809,7 @@ function getDashboardData(){
       net:   kpi_net,
       cash:  kpi_cash,
       avail: kpi_avail,
-      usd:   kpi_usd,
-      debt:  kpi_debt
+      usd:   kpi_usd
     },
     cashflow: {
       total: cfTotal,
@@ -727,7 +819,7 @@ function getDashboardData(){
       allUSD: { value: all.value, pnl: all.pnl, ret, interest: all.interest }
     },
     database: {
-      latest // {date,C,D,E,G,BB,CV}
+      latest // {date,C,D,E,G,BA,CU}
     }
   };
 }
@@ -847,6 +939,7 @@ function getDashNumbers() {
  * @param {number} row  試算表實際列號（含表頭，通常 >= 2）
  * @param {Object} rec  {date,item,amount,account,status,note}
  */
+
 function updateTransaction(row, rec){
   const sh = SpreadsheetApp.getActive().getSheetByName(CF_SHEET);
   if (!sh) throw new Error('找不到工作表：' + CF_SHEET);
@@ -894,6 +987,23 @@ function updateTransaction(row, rec){
   }
   SpreadsheetApp.flush();       // ★ 讓前端下一次讀到最新值
   return { ok:true, row };
+}
+
+/** 刪除指定列（Cashflow!A:F 的整列）
+ * @param {number} row 真實試算表列號（含表頭，通常 >= 2）
+ * @return {{ok:boolean,row:number}}
+ */
+function deleteTransaction(row){
+  const sh = SpreadsheetApp.getActive().getSheetByName(CF_SHEET);
+  if (!sh) throw new Error('找不到工作表：' + CF_SHEET);
+  const last = sh.getLastRow();
+  const nRow = Number(row);
+  if (!nRow || nRow < HEADER_ROW + 1 || nRow > last) {
+    throw new Error('row 不合法（需為資料列，通常 ≥ ' + (HEADER_ROW+1) + ' 且 ≤ ' + last + '）：' + row);
+  }
+  sh.deleteRow(nRow);
+  SpreadsheetApp.flush();
+  return { ok:true, row:nRow };
 }
 
 

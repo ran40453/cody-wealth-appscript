@@ -9,12 +9,19 @@
   }
   function setText(id, v, frac=0, suffix=''){
     const el = document.getElementById(id);
-    if (!el) return;
+    if (!el){
+      if (typeof console!== 'undefined') console.warn('[setText] element not found:', id);
+      return false;
+    }
     const num = Number(v);
-    el.textContent = isFinite(num) ? fmt(num, frac) + (suffix||'') : '—';
+    const ok  = isFinite(num);
+    el.textContent = ok ? fmt(num, frac) + (suffix||'') : '—';
     // 讓遮罩機制一致（和其它 KPI 同樣 class / data-attr）
     el.classList.add('mask-num');
     el.dataset.maskStr = '＊＊＊';
+    // 同步 data-value 方便偵錯
+    el.dataset.value = ok ? String(num) : '';
+    return ok;
   }
 
   function setPnlPill(el, num, suffix=''){
@@ -128,18 +135,35 @@
     const kNet   = numOr(kp.net);
     const kCash  = numOr(kp.cash);
     const kAvail = numOr(kp.avail);
-    const kDebt  = numOr(kp.debt);
+    // USD 可能尚未由後端 kpis.usd 提供，這裡加上 latest.CU 的後援
+    const kUSD  = numOr(kp.usd, latest.CU, kp.CU);
     // Day PnL may have moved from database.latest.F; fall back to KPI aliases if needed.
     const dayPnl = numOr(latest.F, kp.dayPnl, kp.todayPnl, kp.pnl);
 
-    // A. KPI（TWD；USD 有後備 latest.CV）
+    // A. KPI（TWD；USD 顯示獨立）
     setText('kpiTotal', kTotal);
     setText('kpiNet',   kNet);
     setText('kpiCash',  kCash);
     setText('kpiAvail', kAvail);
-    setText('kpiDebt',  kDebt);
+    const wroteUSD = setText('kpiUSD',   kUSD);
+    // 若被其它流程覆寫或延遲渲染，下一個 microtask 再寫一次
+    if (typeof queueMicrotask === 'function'){
+      queueMicrotask(()=>{ setText('kpiUSD', kUSD); });
+    } else {
+      setTimeout(()=>{ setText('kpiUSD', kUSD); }, 0);
+    }
+    // 驗證實際文字
+    const usdEl = document.getElementById('kpiUSD');
+    if (usdEl && typeof console !== 'undefined'){
+      console.log('[kpiUSD verify]', {wroteUSD, text: usdEl.textContent, dataValue: usdEl.dataset.value});
+    }
     const d = document.getElementById('kpiDate');
     if (d) d.textContent = kp.date || '—';
+
+    if (typeof console !== 'undefined' && !window.__dashUSDLogged){
+      console.log('[dashmain] USD debug', {usdFromKpis: kp.usd, usdFromLatest: latest.CU, kUSD});
+      window.__dashUSDLogged = true;
+    }
 
     // B. 當日損益膠囊（源自 latest.F）
     setPnlPill(document.getElementById('dashPnlPill'), dayPnl);
@@ -148,11 +172,14 @@
     const cf = data.cashflow || { plannedTop:[] };
     renderPlannedList(cf.plannedTop);
 
-    // D. CTBC KPI
+    // D. CTBC KPI（Dash 顯示）
     const ct = (data.ctbc && data.ctbc.allUSD) || {value:0,pnl:0,ret:0,interest:0};
     setText('ctVal', ct.value, 1);
     setText('ctPnl', ct.pnl,   1);
-    // 優先取用 page_ctbc 當前 chips 篩選的 ROI（若該模組已載入）；否則以 allUSD 的 (ΣT/ΣN)*100
+
+    // 先給一個保底 ROI：
+    // 1) 若 page_ctbc 暫存有當前 chips 匯總，用它；
+    // 2) 否則用 allUSD 的 pnl/value；
     let roiForDash = NaN;
     if (typeof window.CTBC_getCurrentSummary === 'function'){
       const s = window.CTBC_getCurrentSummary();
@@ -162,13 +189,23 @@
         roiForDash = s.roi; // 已是百分比
       }
     }
-    if (!isFinite(roiForDash) && isFinite(Number(ct.ret))){
-      roiForDash = Number(ct.ret);
-    }
     if (!isFinite(roiForDash)){
       roiForDash = (numOr(ct.value) ? (numOr(ct.pnl) / numOr(ct.value)) * 100 : 0);
     }
+    // 先顯示保底 ROI
     setPnlPill(document.getElementById('ctRetPill'), roiForDash, '%');
+
+    // 再以「僅基金」ROI 覆蓋（後端統一計算）
+    google.script.run
+      .withSuccessHandler(res => {
+        const roi = Number(res && res.ctbcAllROI) || 0;
+        setPnlPill(document.getElementById('ctRetPill'), roi, '%');
+      })
+      .withFailureHandler(err => {
+        console.warn('[dashmain] getCTBCAggregates(fund) failed:', err);
+      })
+      .getCTBCAggregates('fund');
+
     setText('ctInt', ct.interest, 1);
   }
 

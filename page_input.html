@@ -23,12 +23,10 @@
       <div class="tx-toolbar cards-zoom-scope">
         <div class="fx-select-wrap">
           <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
-            <label class="tx-chip tx-chip--status planned" style="cursor:pointer;">
-              <input type="checkbox" id="statusFilterPlanned" checked style="margin-right:6px;"> planned
-            </label>
-            <label class="tx-chip tx-chip--status posted" style="cursor:pointer;">
-              <input type="checkbox" id="statusFilterPosted" checked style="margin-right:6px;"> posted
-            </label>
+            <div class="seg-sm" id="statusSeg">
+              <button id="statusPlanned" type="button" aria-pressed="true" class="active">planned</button>
+              <button id="statusPosted"  type="button" aria-pressed="true" class="active">posted</button>
+            </div>
           </div>
           <select id="txAccountPick" class="fx-select">
             <option value="">請選擇帳戶</option>
@@ -52,19 +50,24 @@
       <input type="text" id="inItem" class="fx-field" placeholder="輸入項目" />
 
       <div class="row amount-row">
-        <button class="btn-ghost toggleSign" id="btnToggleSign" type="button" title="切換正/負">±</button>
+        <div class="col">
+          <div class="seg" role="tablist" aria-label="收入或支出">
+            <input type="radio" id="typeIn"  name="type" value="in"  checked>
+            <label for="typeIn">支出</label>
+            <input type="radio" id="typeOut" name="type" value="out">
+            <label for="typeOut">收入</label>
+          </div>
+        </div>
         <input type="number" inputmode="decimal" id="inAmount" class="fx-field" placeholder="請輸入金額" />
       </div>
 
       <div class="fx-select-wrap">
-          <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
-            <label class="tx-chip tx-chip--status planned">
-              <input type="checkbox" id="statusFilterPlanned" checked> planned
-            </label>
-            <label class="tx-chip tx-chip--status posted">
-              <input type="checkbox" id="statusFilterPosted" checked> posted
-            </label>
-      </div>
+        <div class="seg" role="tablist" aria-label="狀態（posted 或 planned）" id="formStatusSeg">
+          <input type="radio" id="txStatusPosted" name="txStatus" value="posted" checked>
+          <label for="txStatusPosted">posted</label>
+          <input type="radio" id="txStatusPlanned" name="txStatus" value="planned">
+          <label for="txStatusPlanned">planned</label>
+        </div>
         <select id="inAccount" class="fx-select">
           <option value="">請選擇帳戶</option>
         </select>
@@ -78,7 +81,7 @@
 
       <div class="form-actions">
       <button id="btnSubmit"   class="btn btn--lg btn--primary">送出</button>
-      <button id="btnClear"    class="btn btn--lg btn--dark">清空</button>
+      <button id="btnClear"    class="btn btn--lg btn--dark">移除</button>
       <button id="btnUpdateTx" class="btn btn--lg btn--danger" disabled>更新</button>
       </div>
         
