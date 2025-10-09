@@ -80,7 +80,7 @@
 
   // ★ 計算 planned 總額並更新 pill（rows.amount 已是數字、且你 server 端已把 planned 轉為負數）
   const total = (rows||[]).reduce((s,r)=> s + numOr(r.amount), 0);
-  setPnlPill(document.getElementById('planPnlPill'), total);
+  setText('planPnlPill', total, 0);
 }
 
 
@@ -91,7 +91,7 @@
   if (!rows || !rows.length){
     wrap.innerHTML = '<div class="empty">尚無帳戶資料</div>';
     // ★ 沒資料時 pill 顯示 0
-    setPnlPill(document.getElementById('accSumPill'), 0);
+    setText('accSumPill', 0, 0);
     return;
   }
   wrap.innerHTML = rows.map(r=>{
@@ -106,7 +106,7 @@
 
   // ★ 計算帳戶「現有餘額」總和並更新 pill
   const sum = rows.reduce((s,r)=> s + numOr(r.now), 0);
-  setPnlPill(document.getElementById('accSumPill'), sum);
+  setText('accSumPill', sum, 0);
 }
 
 
@@ -166,7 +166,7 @@
     }
 
     // B. 當日損益膠囊（源自 latest.F）
-    setPnlPill(document.getElementById('dashPnlPill'), dayPnl);
+    setText('dashPnlPill', dayPnl, 0);
 
     // C. Planned Top5
     const cf = data.cashflow || { plannedTop:[] };
@@ -195,19 +195,59 @@
     // 先顯示保底 ROI
     setPnlPill(document.getElementById('ctRetPill'), roiForDash, '%');
 
-    // 再以「僅基金」ROI 覆蓋（後端統一計算）
+    // 再以「全部項目」ROI 覆蓋（後端統一計算）
     google.script.run
       .withSuccessHandler(res => {
         const roi = Number(res && res.ctbcAllROI) || 0;
         setPnlPill(document.getElementById('ctRetPill'), roi, '%');
       })
       .withFailureHandler(err => {
-        console.warn('[dashmain] getCTBCAggregates(fund) failed:', err);
+        console.warn('[dashmain] getCTBCAggregates(all) failed:', err);
       })
-      .getCTBCAggregates('fund');
+      .getCTBCAggregates();
 
     setText('ctInt', ct.interest, 1);
   }
+
+  // 最小版 ROI 膠囊（沿用全域 .roi-badge 樣式）
+  function roiChipHTML(v){
+    if (v == null || !isFinite(+v)) return '<span class="roi-badge zero">—</span>';
+    const n = Number(v);
+    const cls  = n>0 ? 'pos' : (n<0 ? 'neg' : 'zero');
+    const sign = n>0 ? '+' : (n<0 ? '−' : '');
+    const s = Math.abs(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1});
+    return `<span class="roi-badge ${cls}">${sign}${s}%</span>`;
+  }
+  function setPnlPill(elOrId, v){
+    const el = (typeof elOrId === 'string') ? document.getElementById(elOrId) : elOrId;
+    if (!el) return;
+    el.innerHTML = roiChipHTML(v);
+  }
+
+  function setMoneyText(id, num, digits){
+    const el = document.getElementById(id);
+    if (!el) return;
+    const n = Number(num||0);
+    el.dataset.value = String(n);
+    el.textContent = n.toLocaleString('zh-Hant-TW', {
+      minimumFractionDigits: digits ?? 0,
+      maximumFractionDigits: digits ?? 0
+    });
+  }
+
+  // 在 getDashboardData 成功後，或你的 init() 裡額外呼叫：
+  google.script.run
+    .withSuccessHandler(res=>{
+      // res = { fund:{value, roi}, stock:{value, roi} }
+      setMoneyText('ctFundVal',  res?.fund?.value || 0, 0);
+      setPnlPill('ctFundROI',    res?.fund?.roi   ?? 0);
+
+      setMoneyText('ctStockVal', res?.stock?.value || 0, 0);
+      setPnlPill('ctStockROI',   res?.stock?.roi   ?? 0);
+    })
+    .withFailureHandler(err=>console.error('[dashmain] getCTBCFundStock failed', err))
+    .getCTBCFundStock();
+    
 
   // —— 載入 ——
   function loadDashboard(){

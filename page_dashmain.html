@@ -21,20 +21,34 @@
     <section class="card ctbc">
       <header class="card-hd">
         <div class="title">投資</div>
-        <span id="ctRetPill" class="pnl-pill" data-mask-str="＊＊＊">—</span>
+        <span id="ctRetPill" class="pnl-pill">—</span>
         <button class="btn-ghost" data-go="ctbc" title="去記帳頁"><span class="material-symbols-outlined">savings</span></button>
       </header>
-      <div class="ctbc-list">
-        <div class="kpi-item"><div class="k">現值 (USD)</div><div id="ctVal" class="v money capsule">—</div></div>
-        <div class="kpi-item"><div class="k">含息損益</div><div id="ctPnl" class="v money capsule">—</div></div>
-        <div class="kpi-item"><div class="k">已領利息</div><div id="ctInt" class="v money capsule">—</div></div>
-      </div>
+        <div class="ctbc-list">
+          <div class="kpi-item"><div class="k">現值 (USD)</div><div id="ctVal" class="v money capsule">—</div></div>
+          <div class="kpi-item"><div class="k">含息損益</div><div id="ctPnl" class="v money capsule">—</div></div>
+          <div class="kpi-item"><div class="k">已領利息</div><div id="ctInt" class="v money capsule">—</div></div>
+          <div class="kpi-item">
+            <div class="k">股票</div>
+            <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span class="money capsule" id="ctStockVal">—</span>
+              <span id="ctStockROI"></span>
+            </div>
+          </div>
+          <div class="kpi-item">
+            <div class="k">基金</div>
+            <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+              <span class="money capsule" id="ctFundVal">—</span>
+              <span id="ctFundROI"></span>
+            </div>
+          </div>
+        </div>
     </section>
 
     <!-- C：Plan（把標題改 Plan，右邊放 pill） -->
       <section class="card planned">
         <header class="card-hd">
-          <div class="title">待繳</div>
+          <div class="title">近期</div>
           <span id="planPnlPill" class="pnl-pill">–</span>
           <button class="btn-ghost" data-go="input" title="歷史數據">
             <span class="material-symbols-outlined">edit</span>

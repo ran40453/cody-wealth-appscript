@@ -1149,6 +1149,14 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   white-space: normal;
 }
 
+/* Allow inner scroll for KPI & CTBC lists when zoomed */
+#kpi-list, #ctbc-list {
+    overflow: auto;
+    max-height: min(48vh, 560px);
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
 /* 手機/平板：全部單欄，避免擠爆 */
 @media (max-width: 1024px){
   #page-dashmain .card.kpi,

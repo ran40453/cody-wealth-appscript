@@ -41,6 +41,8 @@ App.modules = App.modules || {};
     // ===== chips（用 H 欄類型）=====
     function renderChips(kinds){
       const box = byId('ctbcChips'); if (!box) return;
+      // 移除工作表標題（✅!G2 的「類型」）避免被當成 chip
+      kinds = Array.isArray(kinds) ? kinds.filter(k => String(k||'').trim() !== '類型') : [];
       const cleanKinds = kinds.map(k => String(k||'').trim()).filter(Boolean);
       const union = new Set([ ...CHIP_ORDER, ...cleanKinds ]);
       const arr = Array.from(union);
@@ -52,6 +54,7 @@ App.modules = App.modules || {};
       });
       box.innerHTML = `
         <div class="ctbc-chips">
+          <button class="ctbc-chip all-toggle" id="ctbcSelectAll" data-on="0">全選</button>
           ${arr.map(k => `
             <button class="ctbc-chip ${DEFAULT_ON.has(k)?'active':''}" data-type="${esc(k)}">${esc(k)}</button>
           `).join('')}
@@ -63,6 +66,18 @@ App.modules = App.modules || {};
           applyAll();
         });
       });
+      const selBtn = box.querySelector('#ctbcSelectAll');
+      if (selBtn){
+        selBtn.addEventListener('click', ()=>{
+          const on = selBtn.getAttribute('data-on') === '1' ? false : true; // flip
+          selBtn.setAttribute('data-on', on ? '1' : '0');
+          box.querySelectorAll('.ctbc-chip').forEach(btn=>{
+            if (btn.classList.contains('all-toggle')) return;
+            btn.classList.toggle('active', on);
+          });
+          applyAll();
+        });
+      }
     }
 
     // ===== KPI 收合 =====
@@ -138,11 +153,11 @@ App.modules = App.modules || {};
     renderTable(viewRows);
   }
 
-  function getActiveTypes(){
-    const set = new Set();
-    qsa('#ctbcChips .ctbc-chip.active').forEach(el=> set.add(el.dataset.type));
-    return set.size ? set : new Set(DEFAULT_ON);
-  }
+    function getActiveTypes(){
+      const set = new Set();
+      qsa('#ctbcChips .ctbc-chip.active:not(.all-toggle)').forEach(el=> set.add(el.dataset.type));
+      return set.size ? set : new Set(DEFAULT_ON);
+    }
 
   // ===== 數值工具 =====
   function toNum(v){

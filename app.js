@@ -406,11 +406,14 @@ function getCTBCInvestments(){
 function getCTBCAggregates(kind){
   const rowsAll = getCTBCInvestments() || [];
 
-  // 允許 'fund' 或 '基金' 觸發基金篩選（比對 H/K）
+  // 允許 'fund' 或 '基金' 觸發基金篩選（比對 H/K）；允許 'stock' 或 '股票' 觸發股票篩選
   const k = String(kind||'').toLowerCase();
-  const isFundReq = k.includes('fund') || k.includes('基金');
+  const isFundReq  = k.includes('fund')  || k.includes('基金');
+  const isStockReq = k.includes('stock') || k.includes('股票');
   const isFund = (r)=> /基金|FUND/i.test(String(r.H||'')) || /基金|FUND/i.test(String(r.K||''));
-  const rows = isFundReq ? rowsAll.filter(isFund) : rowsAll;
+  const rows = isFundReq ? rowsAll.filter(isFund)
+              : isStockReq ? rowsAll.filter(r=> !isFund(r))
+              : rowsAll;
 
   // 幣別挑選：優先 CUR，否則以 V 判斷
   const pick = (code)=> rows.filter(r=>{
@@ -476,6 +479,33 @@ function getCTBCAggregates(kind){
     ctbcTWD_ROI:  (twd.roiU==null?0:twd.roiU),
     ctbcUSD_ROI:  (usd.roiU==null?0:usd.roiU)
   };
+}
+
+/**
+ * 一次回傳「基金 / 股票」的現值與 ROI（與前端一致：U 以 N 加權；U 在 -1..1 視為小數×100）
+ * 回傳：{ fund:{ value, roi }, stock:{ value, roi } }
+ */
+function getCTBCFundStock(){
+  const rowsAll = getCTBCInvestments() || [];
+  const isFund = (r)=> /基金|FUND/i.test(String(r.H||'')) || /基金|FUND/i.test(String(r.K||''));
+  const fundRows  = rowsAll.filter(isFund);
+  const stockRows = rowsAll.filter(r=> !isFund(r));
+
+  function normalizeU(u){
+    var n = Number(u||0); if (!isFinite(n)) n = 0;
+    return (Math.abs(n) <= 1) ? (n * 100) : n;
+  }
+  function agg(list){
+    var N=0, w=0, wU=0;
+    for (var i=0;i<list.length;i++){
+      var n = Number(list[i].N||0); if (!isFinite(n)) n=0;
+      var u = normalizeU(list[i].U);
+      N += n; if (n){ w += n; wU += (u*n); }
+    }
+    return { value: N, roi: w ? (wU/w) : 0 };
+  }
+
+  return { fund: agg(fundRows), stock: agg(stockRows) };
 }
 
 /** 讀取某列 AF 儲存格的公式與顯示值（優先回公式） */
