@@ -1258,68 +1258,67 @@ function getSTKRows(){
   }));
 }
 
-/**
- * 寫回 STK 的指定列欄位。
- * @param {number} row  資料所在「工作表列號」（含表頭，故從 2 起）
- * @param {{E?:number, R?:number, S?:string}} payload 欲寫回的欄位
- */
-function setSTKCells(row, payload){
+/** === STK 讀取：A..V === */
+function getSTKRows(){
   const SHEET = 'STK';
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
-  if (!sh) throw new Error('STK sheet not found');
-  if (!row || row < 2) throw new Error('row must be >= 2');
+  if (!sh) return [];
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  if (lastRow <= 1) return [];
 
-  const toDate = s=>{
-    if (!s) return new Date();
-    const d = new Date(s);
-    return isNaN(d) ? new Date() : d;
-  };
+  const n = lastRow - 1;
+  const values = sh.getRange(2, 1, n, Math.min(22, lastCol)).getValues(); // V=22
+  const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
+  const toStr = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : (v==null?'':String(v));
 
-  const updates = [];
-  if (Object.prototype.hasOwnProperty.call(payload, 'E')) updates.push({col:5,  val: Number(payload.E)||0}); // E
-  if (Object.prototype.hasOwnProperty.call(payload, 'R')) updates.push({col:18, val: Number(payload.R)||0}); // R
-  // S 欄（更新日）
-  const dateStr = payload && payload.S ? String(payload.S) : null;
-  if (dateStr !== null){
-    updates.push({col:19, val: toDate(dateStr)}); // S
-  }
+  return values.map((r,i)=>({
+    ROW: i+2,
+    A:r[0],  B:r[1],  C:num(r[2]),  D:num(r[3]),  E:num(r[4]),
+    F:num(r[5]), G:num(r[6]), H:r[7], I:r[8],
+    J:num(r[9]), K:num(r[10]),
+    L:toStr(r[11]), M:toStr(r[12]), N:num(r[13]),
+    O:num(r[14]), P:num(r[15]), Q:num(r[16]),
+    R:num(r[17]), S:toStr(r[18]), T:toStr(r[19]), U:toStr(r[20]), V:num(r[21])
+  }));
 
-  if (updates.length){
-    updates.forEach(u => sh.getRange(row, u.col).setValue(u.val));
-  }
-  return true;
+  function num(x){ x = Number(x); return isFinite(x)? x : 0; }
 }
 
-/**
- * 回寫 STK 的現價(E)、股息(R)、更新日(S)
- * payload: { row:number, E:number|null, R:number|null, S:'yyyy-MM-dd' }
+/** === STK 單格寫入通用：可選擇順便寫「更新日」(S 欄) ===
+ * @param {number} row           - 實際列號（含表頭從第2列開始，所以通常 >=2）
+ * @param {string} colLetter     - 欄位字母（例如 'E' 或 'R'）
+ * @param {number|string} value  - 要寫入的值（數字或字串都可）
+ * @param {string|null} updateDateColLetter - 若提供（例如 'S'），會一併把該欄寫成今天 yyyy-MM-dd
  */
-function setSTKPriceDividend(payload){
-  const { row, E, R, S } = payload || {};
-  if (!row || row < 2) throw new Error('row 無效');
-
+function setSTKValue(row, colLetter, value, updateDateColLetter){
   const SHEET = 'STK';
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
-  if (!sh) throw new Error('找不到 STK 工作表');
+  if (!sh) throw new Error('找不到工作表：' + SHEET);
+  if (!row || row < 2) throw new Error('列號不合法');
 
-  // 欄位號（1-based）
-  const COL_E = 5;   // 現價
-  const COL_R = 18;  // 股息
-  const COL_S = 19;  // 更新日（你把 S 欄當更新日）
+  const col = colIndex(colLetter);
+  sh.getRange(row, col).setValue(value);
 
-  const rangeList = [];
-
-  if (E != null && isFinite(E)) {
-    sh.getRange(row, COL_E).setNumberFormat('0.0000').setValue(Number(E));
+  if (updateDateColLetter){
+    const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
+    const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    const uCol = colIndex(updateDateColLetter);
+    sh.getRange(row, uCol).setValue(today);
   }
-  if (R != null && isFinite(R)) {
-    sh.getRange(row, COL_R).setNumberFormat('0.0000').setValue(Number(R));
-  }
-  if (S) {
-    // 允許字串日期，交給試算表處理；也可 parse 後 setValue(Date)
-    sh.getRange(row, COL_S).setValue(S);
-  }
-
-  SpreadsheetApp.flush();
   return true;
+
+  function colIndex(letter){
+    let s = String(letter||'').trim().toUpperCase(), n=0;
+    for (let i=0;i<s.length;i++){ const code = s.charCodeAt(i); if (code>=65 && code<=90) n = n*26 + (code-64); }
+    return n;
+  }
+}
+
+/** === 便利包：專寫現價(E)、股息(R) === */
+function setSTKPrice(row, price){
+  return setSTKValue(row, 'E', Number(price) || 0, 'S');
+}
+function setSTKDividend(row, divd){
+  return setSTKValue(row, 'R', Number(divd) || 0, 'S');
 }

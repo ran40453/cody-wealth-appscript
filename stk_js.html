@@ -4,26 +4,34 @@ window.App = window.App || {};
 App.modules = App.modules || {};
 
 App.modules.stk = (function(){
-  // ====== state ======
+  // ===== Config（之後要擴充可編輯欄位就在這裡加）=====
+  const EDITABLE_FIELDS = {
+    E: { key:'E', label:'現價', type:'number', decimals:3, min:0, updateDateCol:'S' },
+    R: { key:'R', label:'股息', type:'number', decimals:2, min:0, updateDateCol:'S' }
+    // 範例：之後想開 K(成本)、Q(手續+稅)… 只要加：
+    // ,K:{ key:'K', label:'成本', type:'number', decimals:1, min:0, updateDateCol:'S' }
+  };
+
+  // ===== State =====
   let allRows = [];
   let viewRows = [];
   const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
 
-  // ====== init ======
+  // ===== Init =====
   function init(){
-    bindKPIFold();
     setupViewport();
-    bindEditing();                // ← 新增：編輯對話框事件
+    bindKPIFold();
+    bindGlobalEditModal();
     setBodyLoading(true);
     fetchData();
   }
 
-  // ====== data ======
+  // ===== Data =====
   function fetchData(){
     if (!(window.google && google.script && google.script.run)) {
       if (!fetchData._try) fetchData._try = 0;
       if (fetchData._try++ < 40) { setTimeout(fetchData, 250); return; }
-      failUI('載入失敗：Apps Script 物件未就緒');
+      failUI('載入失敗：Apps Script 未就緒');
       return;
     }
     google.script.run
@@ -34,218 +42,228 @@ App.modules.stk = (function(){
         renderHead();
         renderTable(viewRows);
       })
-      .withFailureHandler(err=>{
-        console.error('[STK] load error:', err);
-        failUI((err && err.message) || '讀取失敗');
-      })
+      .withFailureHandler(err=> failUI(err && err.message || '讀取失敗'))
       .getSTKRows();
   }
 
-  // ====== KPI ======
+  // ===== KPI =====
   function renderKPI(rows){
-    const sum = (key)=> rows.reduce((s,r)=> s + toNum(r[key]), 0);
-    const totalMV   = sum('N');   // 市場價值 ΣN
-    const totalCost = sum('K');   // 成本 ΣK
-    const totalUPL  = sum('J');   // 未實現損益 ΣJ
-    const totalPL   = sum('G');   // 損益(NT) ΣG
-    let w=0, wU=0;                // 以 N 加權的 ROI
+    const sum = k => rows.reduce((s,r)=> s + toNum(r[k]), 0);
+    const totalMV   = sum('N'); // 市場價值
+    const totalCost = sum('K'); // 成本
+    const totalUPL  = sum('J'); // 未實現損益
+    const totalPL   = sum('G'); // 損益(NT)
+
+    // 加權 ROI（用 N 權重）
+    let w=0, wU=0;
     rows.forEach(r=>{
       const n = toNum(r.N);
-      const u = normalizeU(r.H);
+      const u = normalizePercent(r.H);
       if (n) { w += n; wU += (n * u); }
     });
     const roi = w ? (wU / w) : null;
 
-    setText('stkKpiMV',   totalMV,   1);
-    setText('stkKpiCost', totalCost, 1);
-    setText('stkKpiUPL',  totalUPL,  1);
-    setText('stkKpiPL',   totalPL,   1);
-    setPnlPill('stkKpiROI', roi);
+    setNum('stkKpiMV',   totalMV,   1);
+    setNum('stkKpiCost', totalCost, 1);
+    setNum('stkKpiUPL',  totalUPL,  1);
+    setNum('stkKpiPL',   totalPL,   1);
+    setRoiPill(byId('stkKpiROI'), roi);
   }
 
-  // ====== head ======
+  // ===== Head =====
   function renderHead(){
     if (!vs.thead) return;
     vs.thead.innerHTML = `<tr>
       <th class="txt">產品</th>               <!-- B -->
       <th class="num col-fix-1">股數</th>     <!-- C -->
       <th class="num col-fix-2">均價</th>     <!-- F -->
-      <th class="num col-fix-3">現價</th>     <!-- E，點擊可編輯 -->
+      <th class="num col-fix-3">現價</th>     <!-- E (editable) -->
       <th class="num col-fix-4">市場價值</th> <!-- N -->
       <th class="num">成本</th>               <!-- K -->
       <th class="txt">未實現損益 / ROI</th>  <!-- J + H -->
-      <th class="num">股息</th>               <!-- R，點擊可編輯 -->
+      <th class="num">股息</th>               <!-- R (editable) -->
       <th class="num">手續+稅</th>           <!-- Q -->
       <th class="txt">市場</th>               <!-- T -->
       <th class="txt">單位</th>               <!-- U -->
       <th class="txt">買日</th>               <!-- L -->
       <th class="txt">賣日</th>               <!-- M -->
       <th class="txt">狀態</th>               <!-- A -->
+      <th class="txt">更新日</th>             <!-- S -->
     </tr>`;
   }
 
-  // ====== body (virtual) ======
+  // ===== Body (virtual list) =====
   function renderTable(rows){
     if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH) + 'px';
     if (vs.tbody)  { vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML=''; }
     vs.last = [-1,-1];
     renderVirtual();
   }
-
   function renderVirtual(){
     if (!vs.viewport || !vs.tbody) return;
-    const rows = viewRows;
     const top  = vs.viewport.scrollTop;
     const h    = vs.viewport.clientHeight;
     const start= Math.max(0, Math.floor(top / vs.rowH) - 10);
     const need = Math.ceil(h / vs.rowH) + 20;
-    const end  = Math.min(rows.length, start + need);
+    const end  = Math.min(viewRows.length, start + need);
     if (vs.last[0]===start && vs.last[1]===end) return;
     vs.last = [start, end];
 
-    const slice = rows.slice(start, end);
+    const slice = viewRows.slice(start, end);
     vs.tbody.style.transform = `translateY(${start * vs.rowH}px)`;
     vs.tbody.innerHTML = slice.map(r=>{
-      const name = esc(r.B || '-');
-      const shares = fmtNum(r.C);
-      const avg = fmtMoney(r.F);
-      const cur = fmtMoney(r.E);
+      const roi = normalizePercent(r.H);
       const mv  = fmtMoney(r.N);
       const cost= fmtMoney(r.K);
       const upl = fmtMoney(r.J);
-      const roi = normalizeU(r.H);
-      const uplRoi = `
-        <div class="pnl-cell">
-          <span class="num">${esc(upl)}</span>
-          ${roiChipHTML(roi)}
-        </div>`;
-      const divd= fmtMoney(r.R);
-      const fee = fmtMoney(r.Q);
-      const mkt = esc(r.T||'');
-      const lot = esc(r.U||'');
-      const buy = esc(fmtDate(r.L));
-      const sell= esc(fmtDate(r.M));
-      const sold= String(r.A||'').trim() ? '已賣出' : '-';
 
-      // 可編輯欄位加上 data-edit 與 data-key
       return `<tr data-row="${Number(r.ROW||0)}">
-        <td class="txt">${name}</td>
-        <td class="num col-fix-1">${shares}</td>
-        <td class="num col-fix-2">${avg}</td>
-        <td class="num col-fix-3 cell-edit" data-edit="1" data-key="E" title="點擊編輯現價">${cur}</td>
+        <td class="txt">${esc(r.B||'-')}</td>
+        <td class="num col-fix-1">${fmtInt(r.C)}</td>
+        <td class="num col-fix-2">${fmtMoney(r.F)}</td>
+
+        <td class="num col-fix-3">
+          <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney(r.E)}</button>
+        </td>
+
         <td class="num col-fix-4">${mv}</td>
         <td class="num">${cost}</td>
-        <td class="txt">${uplRoi}</td>
-        <td class="num cell-edit" data-edit="1" data-key="R" title="點擊編輯股息">${divd}</td>
-        <td class="num">${fee}</td>
-        <td class="txt">${mkt}</td>
-        <td class="txt">${lot}</td>
-        <td class="txt">${buy}</td>
-        <td class="txt">${sell}</td>
-        <td class="txt">${sold}</td>
+        <td class="txt">
+          <div class="pnl-cell">
+            <span class="num">${upl}</span>
+            ${roiPillHTML(roi)}
+          </div>
+        </td>
+
+        <td class="num">
+          <button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button>
+        </td>
+
+        <td class="num">${fmtMoney(r.Q)}</td>
+        <td class="txt">${esc(r.T||'')}</td>
+        <td class="txt">${esc(r.U||'')}</td>
+        <td class="txt">${fmtDate(r.L)}</td>
+        <td class="txt">${fmtDate(r.M)}</td>
+        <td class="txt">${String(r.A||'').trim()? '已賣出':'—'}</td>
+        <td class="txt">${fmtDate(r.S)}</td>
       </tr>`;
     }).join('');
 
-    if (!slice.length){
-      vs.tbody.style.transform = 'translateY(0px)';
-      vs.tbody.innerHTML = `<tr><td class="empty" colspan="14">目前沒有資料</td></tr>`;
-    }
-  }
-
-  // ====== editing (dialog + writeback) ======
-  function bindEditing(){
-    const tb = byId('stkBody');
-    if (!tb) return;
-    tb.addEventListener('click', (ev)=>{
-      const td = ev.target.closest('td[data-edit="1"]');
-      const tr = ev.target.closest('tr[data-row]');
-      if (!td || !tr) return;
-      const row = Number(tr.dataset.row);
-      const key = td.dataset.key;   // 'E' or 'R'
-      openEditDialog(row, key);
+    // 綁定本頁 slice 的編輯事件（事件代理）
+    vs.tbody.querySelectorAll('.cell-edit').forEach(btn=>{
+      btn.addEventListener('click', onEditCellClick);
     });
 
-    const form = byId('stkEditForm');
-    const dlg  = byId('stkEditDlg');
-    const btnSave = byId('stkEditSave');
-
-    if (form && dlg && btnSave){
-      form.addEventListener('submit', (e)=>{ e.preventDefault(); });
-      btnSave.addEventListener('click', ()=>{
-        const row = Number(byId('stkEditRow').value);
-        const price = toNum(byId('stkEditPrice').value);
-        const dividend = toNum(byId('stkEditDividend').value);
-        const dateStr = (byId('stkEditDate').value || todayISO());
-        saveEdits(row, price, dividend, dateStr, dlg);
-      });
+    if (!slice.length){
+      vs.tbody.style.transform = 'translateY(0px)';
+      vs.tbody.innerHTML = `<tr><td class="empty" colspan="15">目前沒有資料</td></tr>`;
     }
   }
 
-  function openEditDialog(row, focusKey){
-    const r = (allRows || []).find(x => Number(x.ROW) === Number(row));
-    if (!r) return;
-
-    byId('stkEditRow').value = row;
-    byId('stkEditName').textContent = r.B || '—';
-    byId('stkEditPrice').value = isFinite(+r.E) ? String(+r.E) : '';
-    byId('stkEditDividend').value = isFinite(+r.R) ? String(+r.R) : '';
-    byId('stkEditDate').value = guessDateForS(r.S);
-
+  // ===== Edit modal =====
+  function bindGlobalEditModal(){
     const dlg = byId('stkEditDlg');
-    dlg?.showModal();
+    const form= byId('stkEditForm');
+    const input= byId('stkEditInput');
+    const ok  = byId('stkEditOk');
+    const cancel = byId('stkEditCancel');
 
-    // 聚焦
-    setTimeout(()=>{
-      if (focusKey === 'E') byId('stkEditPrice')?.focus();
-      else if (focusKey === 'R') byId('stkEditDividend')?.focus();
-      else byId('stkEditPrice')?.focus();
-    }, 50);
+    if (!dlg || !form) return;
+
+    cancel.onclick = () => closeEdit();
+    ok.onclick = (e)=>{ e.preventDefault(); submitEdit(); };
+    form.onsubmit = (e)=>{ e.preventDefault(); submitEdit(); };
+    input.onkeydown = (e)=>{ if (e.key === 'Escape') closeEdit(); };
   }
 
-  function guessDateForS(S){
-    // 若 S 欄（更新日）空白，預設今天；若有值且可解析，沿用
-    const s = String(S||'').trim();
-    if (!s) return todayISO();
-    const d = new Date(s);
-    return isNaN(d) ? todayISO() : d.toISOString().slice(0,10);
+  function onEditCellClick(e){
+    const btn = e.currentTarget;
+    const tr  = btn.closest('tr');
+    const row = Number(tr && tr.dataset.row || 0);
+    const col = String(btn.dataset.col||'').toUpperCase();
+
+    const field = EDITABLE_FIELDS[col];
+    if (!row || !field) return;
+
+    const r = allRows.find(x => Number(x.ROW)===row);
+    const current = r ? r[col] : '';
+
+    openEdit({
+      row, col,
+      title: field.label,
+      type: field.type,
+      value: toNum(current),
+      decimals: field.decimals ?? 2,
+      min: field.min ?? null,
+      updateDateCol: field.updateDateCol || null
+    });
   }
 
-  function saveEdits(row, price, dividend, dateISO, dlg){
-    if (!(window.google && google.script && google.script.run)) return;
+  function openEdit(meta){
+    const dlg = byId('stkEditDlg');
+    if (!dlg) return;
+    dlg.dataset.row = meta.row;
+    dlg.dataset.col = meta.col;
+    dlg.dataset.decimals = meta.decimals;
+    dlg.dataset.min = (meta.min==null ? '' : String(meta.min));
+    dlg.dataset.updateDateCol = meta.updateDateCol || '';
+    byId('stkEditTitle').textContent = `編輯：${meta.title}`;
+    const input = byId('stkEditInput');
+    input.type = (meta.type==='number' ? 'number' : 'text');
+    input.step = (meta.type==='number' ? 'any' : undefined);
+    input.value = (meta.value ?? '');
+    dlg.style.display = 'block';
+    setTimeout(()=> input.focus(), 0);
+  }
+  function closeEdit(){
+    const dlg = byId('stkEditDlg');
+    if (!dlg) return;
+    dlg.style.display = 'none';
+    dlg.dataset.row = dlg.dataset.col = dlg.dataset.decimals = dlg.dataset.min = dlg.dataset.updateDateCol = '';
+  }
 
-    const payload = {
-      row: Number(row),
-      E: isFinite(price) ? price : null,
-      R: isFinite(dividend) ? dividend : null,
-      S: dateISO
-    };
+  function submitEdit(){
+    const dlg = byId('stkEditDlg');
+    if (!dlg) return;
+    const row = Number(dlg.dataset.row||0);
+    const col = String(dlg.dataset.col||'');
+    const decimals = Number(dlg.dataset.decimals||2);
+    const min = (dlg.dataset.min===''? null : Number(dlg.dataset.min));
+    const updateDateCol = dlg.dataset.updateDateCol || '';
+    const input = byId('stkEditInput');
+    let val = input.value;
 
-    // 樂觀更新：先改前端，成功後再校正
-    const idx = allRows.findIndex(x=>Number(x.ROW)===Number(row));
-    if (idx >= 0){
-      if (payload.E!=null) allRows[idx].E = payload.E;
-      if (payload.R!=null) allRows[idx].R = payload.R;
-      allRows[idx].S = payload.S;
-      // 可能影響 N/J/H 的計算來自試算表；先不在前端強算，存檔後重撈
+    if (val==='' || val==null){
+      alert('請輸入數值');
+      return;
     }
-    viewRows = allRows.slice();
-    renderKPI(viewRows);
-    renderVirtual();
+    let num = toNum(val);
+    if (min!=null && num < min){
+      alert(`數值不可小於 ${min}`);
+      return;
+    }
 
+    // 後端 API：setSTKValue(row, col, value, updateDateCol)
+    toggleBusy(true);
     google.script.run
-      .withSuccessHandler((ok)=>{
-        // 成功後重抓一遍確保數字（N、J、H等公式欄）同步
-        fetchData();
-        dlg?.close();
+      .withSuccessHandler(ok=>{
+        toggleBusy(false);
+        closeEdit();
+        // 更新前端快取
+        const r = allRows.find(x=> Number(x.ROW)===row);
+        if (r){ r[col] = round(num, decimals); if (updateDateCol) r[updateDateCol] = todayISO(); }
+        // 重新算 KPI & 局部重繪：這裡偷懶直接重繪虛擬片段
+        renderKPI(viewRows);
+        renderVirtual();
       })
-      .withFailureHandler((err)=>{
-        console.error('[STK] writeback error:', err);
-        alert('儲存失敗：' + ((err && err.message) || ''));
+      .withFailureHandler(err=>{
+        toggleBusy(false);
+        alert('寫入失敗：' + (err && err.message || ''));
       })
-      .setSTKPriceDividend(payload);
+      .setSTKValue(row, col, round(num, decimals), updateDateCol || null);
   }
 
-  // ====== viewport / fold ======
+  // ===== UI helpers =====
   function setupViewport(){
     vs.viewport = byId('stkViewport');
     vs.spacer   = byId('stkSpacer');
@@ -270,23 +288,25 @@ App.modules.stk = (function(){
     }
   }
 
-  // ====== helpers ======
+  // ===== Generic helpers =====
   function byId(id){ return document.getElementById(id); }
   function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m])); }
   function toNum(v){
-    if (v == null || v === '') return NaN;
-    if (typeof v === 'number') return isFinite(v) ? v : NaN;
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number') return isFinite(v) ? v : 0;
     const s = String(v).replace(/[%\uFFE5\u00A5$￥]/g,'').replace(/[\s,]/g,'');
     const x = parseFloat(s);
-    return isFinite(x) ? x : NaN;
+    return isFinite(x) ? x : 0;
   }
-  function normalizeU(u){
+  function round(n, dec=2){ const f = Math.pow(10, dec); return Math.round(n * f) / f; }
+  function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function normalizePercent(u){
     const n = Number(u||0);
     if (!isFinite(n)) return null;
-    return (Math.abs(n) <= 1) ? (n*100) : n;
+    return (Math.abs(n) <= 1) ? (n*100) : n; // 0.12 => 12%
   }
   function fmtMoney(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '—'; }
-  function fmtNum(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW') : '—'; }
+  function fmtInt(v){ return isFinite(+v) ? Math.round(+v).toLocaleString('zh-Hant-TW') : '—'; }
   function fmtDate(v){
     try{
       if (v instanceof Date) {
@@ -298,25 +318,14 @@ App.modules.stk = (function(){
       return isNaN(d) ? s : d.toISOString().slice(0,10);
     }catch(_){ return String(v||''); }
   }
-  function setText(id, v, frac=1){
-    const el = byId(id);
-    if (!el) return;
-    let txt = '—';
-    if (v != null){
-      const n = Number(v);
-      txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac}) : String(v);
-    }
-    el.textContent = txt;
+  function setNum(id, v, frac=1){
+    const el = byId(id); if (!el) return;
+    const n = Number(v);
+    el.textContent = isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac}) : '—';
     if (!el.classList.contains('mask-num')) el.classList.add('mask-num');
     if (!el.dataset.maskStr) el.dataset.maskStr = '＊＊＊';
   }
-  function setPnlPill(elOrId, v){
-    const el = (typeof elOrId==='string') ? byId(elOrId) : elOrId;
-    if (!el) return false;
-    el.innerHTML = roiChipHTML(v);
-    return true;
-  }
-  function roiChipHTML(v){
+  function roiPillHTML(v){
     if (v == null || !isFinite(+v)) return '<span class="roi-badge zero">—</span>';
     const n = Number(v);
     const cls  = n>0 ? 'pos' : (n<0 ? 'neg' : 'zero');
@@ -324,19 +333,24 @@ App.modules.stk = (function(){
     const s = Math.abs(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1});
     return `<span class="roi-badge ${cls}">${sign}${s}%</span>`;
   }
+  function setRoiPill(el, v){ if (el) el.innerHTML = roiPillHTML(v); }
   function setBodyLoading(on){
     const tb = byId('stkBody'); if (!tb) return;
-    tb.innerHTML = on
-      ? `<tr><td class="empty" colspan="14">載入中…</td></tr>`
-      : '';
+    tb.innerHTML = on ? `<tr><td class="empty" colspan="15">載入中…</td></tr>` : '';
   }
   function failUI(msg){
-    const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="14">發生錯誤：${esc(msg||'')}</td></tr>`;
+    const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="15">發生錯誤：${esc(msg||'')}</td></tr>`;
   }
-  function todayISO(){
-    const d = new Date();
-    d.setHours(0,0,0,0);
-    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  function toggleBusy(on){
+    const ok = byId('stkEditOk');
+    const txt= byId('stkEditOkTxt');
+    const sp = byId('stkEditOkSpin');
+    if (!ok) return;
+    ok.disabled = !!on;
+    if (txt && sp){
+      txt.style.display = on ? 'none' : 'inline';
+      sp.style.display  = on ? 'inline-block' : 'none';
+    }
   }
 
   return { init };
