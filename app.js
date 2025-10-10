@@ -1231,3 +1231,95 @@ function parseMetaName_(html, name) {
 function sanitize_(s) {
   return s.replace(/\s+/g,' ').trim();
 }
+
+
+//** 讀取 STK A..V 欄（第1列表頭，從第2列開始資料） */
+function getSTKRows(){
+  const SHEET = 'STK';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) return [];
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  if (lastRow <= 1) return [];
+
+  const n = lastRow - 1;
+  const values = sh.getRange(2, 1, n, Math.min(22, lastCol)).getValues(); // 22 = V 欄
+  const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
+  const toStr = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : (v==null?'':String(v));
+
+  return values.map((r,i)=>({
+    ROW: i+2, // 真實列號
+    A:r[0],  B:r[1],  C:Number(r[2])||0,  D:Number(r[3])||0,  E:Number(r[4])||0,
+    F:Number(r[5])||0, G:Number(r[6])||0, H:Number(r[7]),    I:r[8],
+    J:Number(r[9])||0, K:Number(r[10])||0,
+    L:toStr(r[11]), M:toStr(r[12]), N:Number(r[13])||0,
+    O:Number(r[14])||0, P:Number(r[15])||0, Q:Number(r[16])||0,
+    R:Number(r[17])||0, S:toStr(r[18]), T:toStr(r[19]), U:toStr(r[20]), V:Number(r[21])
+  }));
+}
+
+/**
+ * 寫回 STK 的指定列欄位。
+ * @param {number} row  資料所在「工作表列號」（含表頭，故從 2 起）
+ * @param {{E?:number, R?:number, S?:string}} payload 欲寫回的欄位
+ */
+function setSTKCells(row, payload){
+  const SHEET = 'STK';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('STK sheet not found');
+  if (!row || row < 2) throw new Error('row must be >= 2');
+
+  const toDate = s=>{
+    if (!s) return new Date();
+    const d = new Date(s);
+    return isNaN(d) ? new Date() : d;
+  };
+
+  const updates = [];
+  if (Object.prototype.hasOwnProperty.call(payload, 'E')) updates.push({col:5,  val: Number(payload.E)||0}); // E
+  if (Object.prototype.hasOwnProperty.call(payload, 'R')) updates.push({col:18, val: Number(payload.R)||0}); // R
+  // S 欄（更新日）
+  const dateStr = payload && payload.S ? String(payload.S) : null;
+  if (dateStr !== null){
+    updates.push({col:19, val: toDate(dateStr)}); // S
+  }
+
+  if (updates.length){
+    updates.forEach(u => sh.getRange(row, u.col).setValue(u.val));
+  }
+  return true;
+}
+
+/**
+ * 回寫 STK 的現價(E)、股息(R)、更新日(S)
+ * payload: { row:number, E:number|null, R:number|null, S:'yyyy-MM-dd' }
+ */
+function setSTKPriceDividend(payload){
+  const { row, E, R, S } = payload || {};
+  if (!row || row < 2) throw new Error('row 無效');
+
+  const SHEET = 'STK';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('找不到 STK 工作表');
+
+  // 欄位號（1-based）
+  const COL_E = 5;   // 現價
+  const COL_R = 18;  // 股息
+  const COL_S = 19;  // 更新日（你把 S 欄當更新日）
+
+  const rangeList = [];
+
+  if (E != null && isFinite(E)) {
+    sh.getRange(row, COL_E).setNumberFormat('0.0000').setValue(Number(E));
+  }
+  if (R != null && isFinite(R)) {
+    sh.getRange(row, COL_R).setNumberFormat('0.0000').setValue(Number(R));
+  }
+  if (S) {
+    // 允許字串日期，交給試算表處理；也可 parse 後 setValue(Date)
+    sh.getRange(row, COL_S).setValue(S);
+  }
+
+  SpreadsheetApp.flush();
+  return true;
+}

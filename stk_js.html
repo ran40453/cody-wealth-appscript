@@ -1,0 +1,344 @@
+<!-- stk_js.html -->
+<script>
+window.App = window.App || {};
+App.modules = App.modules || {};
+
+App.modules.stk = (function(){
+  // ====== state ======
+  let allRows = [];
+  let viewRows = [];
+  const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
+
+  // ====== init ======
+  function init(){
+    bindKPIFold();
+    setupViewport();
+    bindEditing();                // ← 新增：編輯對話框事件
+    setBodyLoading(true);
+    fetchData();
+  }
+
+  // ====== data ======
+  function fetchData(){
+    if (!(window.google && google.script && google.script.run)) {
+      if (!fetchData._try) fetchData._try = 0;
+      if (fetchData._try++ < 40) { setTimeout(fetchData, 250); return; }
+      failUI('載入失敗：Apps Script 物件未就緒');
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(rows=>{
+        allRows = Array.isArray(rows) ? rows : [];
+        viewRows = allRows.slice();
+        renderKPI(viewRows);
+        renderHead();
+        renderTable(viewRows);
+      })
+      .withFailureHandler(err=>{
+        console.error('[STK] load error:', err);
+        failUI((err && err.message) || '讀取失敗');
+      })
+      .getSTKRows();
+  }
+
+  // ====== KPI ======
+  function renderKPI(rows){
+    const sum = (key)=> rows.reduce((s,r)=> s + toNum(r[key]), 0);
+    const totalMV   = sum('N');   // 市場價值 ΣN
+    const totalCost = sum('K');   // 成本 ΣK
+    const totalUPL  = sum('J');   // 未實現損益 ΣJ
+    const totalPL   = sum('G');   // 損益(NT) ΣG
+    let w=0, wU=0;                // 以 N 加權的 ROI
+    rows.forEach(r=>{
+      const n = toNum(r.N);
+      const u = normalizeU(r.H);
+      if (n) { w += n; wU += (n * u); }
+    });
+    const roi = w ? (wU / w) : null;
+
+    setText('stkKpiMV',   totalMV,   1);
+    setText('stkKpiCost', totalCost, 1);
+    setText('stkKpiUPL',  totalUPL,  1);
+    setText('stkKpiPL',   totalPL,   1);
+    setPnlPill('stkKpiROI', roi);
+  }
+
+  // ====== head ======
+  function renderHead(){
+    if (!vs.thead) return;
+    vs.thead.innerHTML = `<tr>
+      <th class="txt">產品</th>               <!-- B -->
+      <th class="num col-fix-1">股數</th>     <!-- C -->
+      <th class="num col-fix-2">均價</th>     <!-- F -->
+      <th class="num col-fix-3">現價</th>     <!-- E，點擊可編輯 -->
+      <th class="num col-fix-4">市場價值</th> <!-- N -->
+      <th class="num">成本</th>               <!-- K -->
+      <th class="txt">未實現損益 / ROI</th>  <!-- J + H -->
+      <th class="num">股息</th>               <!-- R，點擊可編輯 -->
+      <th class="num">手續+稅</th>           <!-- Q -->
+      <th class="txt">市場</th>               <!-- T -->
+      <th class="txt">單位</th>               <!-- U -->
+      <th class="txt">買日</th>               <!-- L -->
+      <th class="txt">賣日</th>               <!-- M -->
+      <th class="txt">狀態</th>               <!-- A -->
+    </tr>`;
+  }
+
+  // ====== body (virtual) ======
+  function renderTable(rows){
+    if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH) + 'px';
+    if (vs.tbody)  { vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML=''; }
+    vs.last = [-1,-1];
+    renderVirtual();
+  }
+
+  function renderVirtual(){
+    if (!vs.viewport || !vs.tbody) return;
+    const rows = viewRows;
+    const top  = vs.viewport.scrollTop;
+    const h    = vs.viewport.clientHeight;
+    const start= Math.max(0, Math.floor(top / vs.rowH) - 10);
+    const need = Math.ceil(h / vs.rowH) + 20;
+    const end  = Math.min(rows.length, start + need);
+    if (vs.last[0]===start && vs.last[1]===end) return;
+    vs.last = [start, end];
+
+    const slice = rows.slice(start, end);
+    vs.tbody.style.transform = `translateY(${start * vs.rowH}px)`;
+    vs.tbody.innerHTML = slice.map(r=>{
+      const name = esc(r.B || '-');
+      const shares = fmtNum(r.C);
+      const avg = fmtMoney(r.F);
+      const cur = fmtMoney(r.E);
+      const mv  = fmtMoney(r.N);
+      const cost= fmtMoney(r.K);
+      const upl = fmtMoney(r.J);
+      const roi = normalizeU(r.H);
+      const uplRoi = `
+        <div class="pnl-cell">
+          <span class="num">${esc(upl)}</span>
+          ${roiChipHTML(roi)}
+        </div>`;
+      const divd= fmtMoney(r.R);
+      const fee = fmtMoney(r.Q);
+      const mkt = esc(r.T||'');
+      const lot = esc(r.U||'');
+      const buy = esc(fmtDate(r.L));
+      const sell= esc(fmtDate(r.M));
+      const sold= String(r.A||'').trim() ? '已賣出' : '-';
+
+      // 可編輯欄位加上 data-edit 與 data-key
+      return `<tr data-row="${Number(r.ROW||0)}">
+        <td class="txt">${name}</td>
+        <td class="num col-fix-1">${shares}</td>
+        <td class="num col-fix-2">${avg}</td>
+        <td class="num col-fix-3 cell-edit" data-edit="1" data-key="E" title="點擊編輯現價">${cur}</td>
+        <td class="num col-fix-4">${mv}</td>
+        <td class="num">${cost}</td>
+        <td class="txt">${uplRoi}</td>
+        <td class="num cell-edit" data-edit="1" data-key="R" title="點擊編輯股息">${divd}</td>
+        <td class="num">${fee}</td>
+        <td class="txt">${mkt}</td>
+        <td class="txt">${lot}</td>
+        <td class="txt">${buy}</td>
+        <td class="txt">${sell}</td>
+        <td class="txt">${sold}</td>
+      </tr>`;
+    }).join('');
+
+    if (!slice.length){
+      vs.tbody.style.transform = 'translateY(0px)';
+      vs.tbody.innerHTML = `<tr><td class="empty" colspan="14">目前沒有資料</td></tr>`;
+    }
+  }
+
+  // ====== editing (dialog + writeback) ======
+  function bindEditing(){
+    const tb = byId('stkBody');
+    if (!tb) return;
+    tb.addEventListener('click', (ev)=>{
+      const td = ev.target.closest('td[data-edit="1"]');
+      const tr = ev.target.closest('tr[data-row]');
+      if (!td || !tr) return;
+      const row = Number(tr.dataset.row);
+      const key = td.dataset.key;   // 'E' or 'R'
+      openEditDialog(row, key);
+    });
+
+    const form = byId('stkEditForm');
+    const dlg  = byId('stkEditDlg');
+    const btnSave = byId('stkEditSave');
+
+    if (form && dlg && btnSave){
+      form.addEventListener('submit', (e)=>{ e.preventDefault(); });
+      btnSave.addEventListener('click', ()=>{
+        const row = Number(byId('stkEditRow').value);
+        const price = toNum(byId('stkEditPrice').value);
+        const dividend = toNum(byId('stkEditDividend').value);
+        const dateStr = (byId('stkEditDate').value || todayISO());
+        saveEdits(row, price, dividend, dateStr, dlg);
+      });
+    }
+  }
+
+  function openEditDialog(row, focusKey){
+    const r = (allRows || []).find(x => Number(x.ROW) === Number(row));
+    if (!r) return;
+
+    byId('stkEditRow').value = row;
+    byId('stkEditName').textContent = r.B || '—';
+    byId('stkEditPrice').value = isFinite(+r.E) ? String(+r.E) : '';
+    byId('stkEditDividend').value = isFinite(+r.R) ? String(+r.R) : '';
+    byId('stkEditDate').value = guessDateForS(r.S);
+
+    const dlg = byId('stkEditDlg');
+    dlg?.showModal();
+
+    // 聚焦
+    setTimeout(()=>{
+      if (focusKey === 'E') byId('stkEditPrice')?.focus();
+      else if (focusKey === 'R') byId('stkEditDividend')?.focus();
+      else byId('stkEditPrice')?.focus();
+    }, 50);
+  }
+
+  function guessDateForS(S){
+    // 若 S 欄（更新日）空白，預設今天；若有值且可解析，沿用
+    const s = String(S||'').trim();
+    if (!s) return todayISO();
+    const d = new Date(s);
+    return isNaN(d) ? todayISO() : d.toISOString().slice(0,10);
+  }
+
+  function saveEdits(row, price, dividend, dateISO, dlg){
+    if (!(window.google && google.script && google.script.run)) return;
+
+    const payload = {
+      row: Number(row),
+      E: isFinite(price) ? price : null,
+      R: isFinite(dividend) ? dividend : null,
+      S: dateISO
+    };
+
+    // 樂觀更新：先改前端，成功後再校正
+    const idx = allRows.findIndex(x=>Number(x.ROW)===Number(row));
+    if (idx >= 0){
+      if (payload.E!=null) allRows[idx].E = payload.E;
+      if (payload.R!=null) allRows[idx].R = payload.R;
+      allRows[idx].S = payload.S;
+      // 可能影響 N/J/H 的計算來自試算表；先不在前端強算，存檔後重撈
+    }
+    viewRows = allRows.slice();
+    renderKPI(viewRows);
+    renderVirtual();
+
+    google.script.run
+      .withSuccessHandler((ok)=>{
+        // 成功後重抓一遍確保數字（N、J、H等公式欄）同步
+        fetchData();
+        dlg?.close();
+      })
+      .withFailureHandler((err)=>{
+        console.error('[STK] writeback error:', err);
+        alert('儲存失敗：' + ((err && err.message) || ''));
+      })
+      .setSTKPriceDividend(payload);
+  }
+
+  // ====== viewport / fold ======
+  function setupViewport(){
+    vs.viewport = byId('stkViewport');
+    vs.spacer   = byId('stkSpacer');
+    vs.thead    = byId('stkHead');
+    vs.tbody    = byId('stkBody');
+    if (!vs.viewport) return;
+    let raf=null;
+    vs.viewport.addEventListener('scroll', ()=>{
+      if (raf) return;
+      raf = requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
+    });
+  }
+  function bindKPIFold(){
+    const btn = byId('stkKpiToggle');
+    const wrap= byId('stkKPI');
+    if (btn && wrap){
+      btn.onclick = ()=>{
+        const on = wrap.dataset.collapsed === '1' ? '0' : '1';
+        wrap.dataset.collapsed = on;
+        btn.textContent = (on==='1') ? '展開統計' : '收合統計';
+      };
+    }
+  }
+
+  // ====== helpers ======
+  function byId(id){ return document.getElementById(id); }
+  function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m])); }
+  function toNum(v){
+    if (v == null || v === '') return NaN;
+    if (typeof v === 'number') return isFinite(v) ? v : NaN;
+    const s = String(v).replace(/[%\uFFE5\u00A5$￥]/g,'').replace(/[\s,]/g,'');
+    const x = parseFloat(s);
+    return isFinite(x) ? x : NaN;
+  }
+  function normalizeU(u){
+    const n = Number(u||0);
+    if (!isFinite(n)) return null;
+    return (Math.abs(n) <= 1) ? (n*100) : n;
+  }
+  function fmtMoney(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '—'; }
+  function fmtNum(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW') : '—'; }
+  function fmtDate(v){
+    try{
+      if (v instanceof Date) {
+        return new Date(v.getTime() - v.getTimezoneOffset()*60000).toISOString().slice(0,10);
+      }
+      const s = String(v||'').trim();
+      if (!s) return '';
+      const d = new Date(s);
+      return isNaN(d) ? s : d.toISOString().slice(0,10);
+    }catch(_){ return String(v||''); }
+  }
+  function setText(id, v, frac=1){
+    const el = byId(id);
+    if (!el) return;
+    let txt = '—';
+    if (v != null){
+      const n = Number(v);
+      txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac}) : String(v);
+    }
+    el.textContent = txt;
+    if (!el.classList.contains('mask-num')) el.classList.add('mask-num');
+    if (!el.dataset.maskStr) el.dataset.maskStr = '＊＊＊';
+  }
+  function setPnlPill(elOrId, v){
+    const el = (typeof elOrId==='string') ? byId(elOrId) : elOrId;
+    if (!el) return false;
+    el.innerHTML = roiChipHTML(v);
+    return true;
+  }
+  function roiChipHTML(v){
+    if (v == null || !isFinite(+v)) return '<span class="roi-badge zero">—</span>';
+    const n = Number(v);
+    const cls  = n>0 ? 'pos' : (n<0 ? 'neg' : 'zero');
+    const sign = n>0 ? '+' : (n<0 ? '−' : '');
+    const s = Math.abs(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1});
+    return `<span class="roi-badge ${cls}">${sign}${s}%</span>`;
+  }
+  function setBodyLoading(on){
+    const tb = byId('stkBody'); if (!tb) return;
+    tb.innerHTML = on
+      ? `<tr><td class="empty" colspan="14">載入中…</td></tr>`
+      : '';
+  }
+  function failUI(msg){
+    const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="14">發生錯誤：${esc(msg||'')}</td></tr>`;
+  }
+  function todayISO(){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  }
+
+  return { init };
+})();
+</script>

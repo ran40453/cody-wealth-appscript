@@ -1,3 +1,155 @@
 <section id="page-stk" class="page">
-  <div class="card"><h3 style="margin:0">股票總表（STK）</h3><div class="empty">尚未接資料</div></div>
+  <!-- 標題 / 動作列 -->
+  <div class="card card-hd">
+    <div class="row" style="align-items:center;gap:.5rem;">
+      <h3 style="margin:0;flex:1">股票總表（STK）</h3>
+      <button id="stkKpiToggle" class="kpi-toggle">收合統計</button>
+    </div>
+  </div>
+
+  <!-- KPI 區（沿用 ctbc 樣式與遮罩） -->
+  <div class="card" id="stkKPI" data-collapsed="0">
+    <div class="kpi-row">
+      <div class="kpi"><div class="k">市場價值</div><div class="v bold mask-num" id="stkKpiMV" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">成本</div><div class="v bold mask-num" id="stkKpiCost" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">未實現損益</div><div class="v bold mask-num" id="stkKpiUPL" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">損益(NT)</div><div class="v bold mask-num" id="stkKpiPL" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
+    </div>
+  </div>
+
+  <!-- 表格 viewport（虛擬清單） -->
+  <div class="card">
+    <div class="ctbc-scroll" id="stkViewport">
+      <table class="ctbc-table">
+        <thead id="stkHead"></thead>
+        <tbody id="stkBody">
+          <tr><td class="empty" colspan="14">載入中…</td></tr>
+        </tbody>
+      </table>
+      <div id="stkSpacer" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <!-- 編輯對話框：現價(E) / 股息(R)；寫回並回填更新日(S) -->
+  <dialog id="stkEditDlg" class="dlg">
+    <form method="dialog" id="stkEditForm" style="min-width:320px;max-width:420px">
+      <h4 style="margin:.25rem 0 1rem">編輯資料</h4>
+      <div class="form-row">
+        <label class="lbl">產品</label>
+        <div id="stkEditName" class="txt mono" style="opacity:.8">—</div>
+      </div>
+      <div class="form-row">
+        <label for="stkEditPrice" class="lbl">現價 (E)</label>
+        <input id="stkEditPrice" name="price" type="number" step="0.0001" inputmode="decimal" placeholder="輸入現價" />
+      </div>
+      <div class="form-row">
+        <label for="stkEditDividend" class="lbl">股息 (R)</label>
+        <input id="stkEditDividend" name="dividend" type="number" step="0.0001" inputmode="decimal" placeholder="輸入股息" />
+      </div>
+      <div class="form-row">
+        <label for="stkEditDate" class="lbl">更新日 (S)</label>
+        <input id="stkEditDate" name="date" type="date" />
+      </div>
+
+      <menu style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
+        <button value="cancel" type="reset" class="btn ghost">取消</button>
+        <button id="stkEditSave" value="default" class="btn">儲存</button>
+      </menu>
+      <input type="hidden" id="stkEditRow" />
+    </form>
+  </dialog>
+
+  <!-- 初始化 -->
+  <script src="./stk_js.html"></script>
+  <script>
+    // 若模組已載入則初始化
+    window.addEventListener('DOMContentLoaded', function(){
+      if (window.App &amp;&amp; App.modules &amp;&amp; App.modules.stk) {
+        App.modules.stk.init();
+      }
+    });
+  </script>
 </section>
+<section id="page-stk" class="page">
+  <!-- 標題 / 動作列 -->
+  <div class="card card-hd">
+    <div class="row" style="align-items:center;gap:.5rem;">
+      <h3 style="margin:0;flex:1">股票總表（STK）</h3>
+      <button id="stkKpiToggle" class="kpi-toggle">收合統計</button>
+    </div>
+  </div>
+
+  <!-- KPI 區（沿用 ctbc 樣式與遮罩） -->
+  <div class="card" id="stkKPI" data-collapsed="0">
+    <div class="kpi-row">
+      <div class="kpi"><div class="k">市場價值</div><div class="v bold mask-num" id="stkKpiMV" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">成本</div><div class="v bold mask-num" id="stkKpiCost" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">未實現損益</div><div class="v bold mask-num" id="stkKpiUPL" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">損益(NT)</div><div class="v bold mask-num" id="stkKpiPL" data-mask-str="＊＊＊">—</div></div>
+      <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
+    </div>
+  </div>
+
+  <!-- 表格 viewport（虛擬清單） -->
+  <div class="card">
+    <div class="ctbc-scroll" id="stkViewport">
+      <table class="ctbc-table">
+        <thead id="stkHead"></thead>
+        <tbody id="stkBody">
+          <tr><td class="empty" colspan="14">載入中…</td></tr>
+        </tbody>
+      </table>
+      <div id="stkSpacer" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <!-- 編輯對話框：現價(E) / 股息(R)；寫回並回填更新日(S) -->
+  <dialog id="stkEditDlg" class="dlg">
+    <form method="dialog" id="stkEditForm" style="min-width:320px;max-width:420px">
+      <h4 style="margin:.25rem 0 1rem">編輯資料</h4>
+      <div class="form-row">
+        <label class="lbl">產品</label>
+        <div id="stkEditName" class="txt mono" style="opacity:.8">—</div>
+      </div>
+      <div class="form-row">
+        <label for="stkEditPrice" class="lbl">現價 (E)</label>
+        <input id="stkEditPrice" name="price" type="number" step="0.0001" inputmode="decimal" placeholder="輸入現價" />
+      </div>
+      <div class="form-row">
+        <label for="stkEditDividend" class="lbl">股息 (R)</label>
+        <input id="stkEditDividend" name="dividend" type="number" step="0.0001" inputmode="decimal" placeholder="輸入股息" />
+      </div>
+      <div class="form-row">
+        <label for="stkEditDate" class="lbl">更新日 (S)</label>
+        <input id="stkEditDate" name="date" type="date" />
+      </div>
+
+      <menu style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem">
+        <button value="cancel" type="reset" class="btn ghost">取消</button>
+        <button id="stkEditSave" value="default" class="btn">儲存</button>
+      </menu>
+      <input type="hidden" id="stkEditRow" />
+    </form>
+  </dialog>
+</section>
+
+<!-- 初始化（index 已用 <?!= include('stk_js'); ?> 載入；這裡只做啟動） -->
+<script>
+  (function bootSTK(){
+    var tries = 0;
+    function tryInit(){
+      if (window.App && App.modules && App.modules.stk && typeof App.modules.stk.init === 'function'){
+        App.modules.stk.init();
+        return true;
+      }
+      return false;
+    }
+    if (tryInit()) return;
+    var timer = setInterval(function(){
+      if (tryInit() || (++tries > 40)){
+        clearInterval(timer);
+      }
+    }, 250);
+  })();
+</script>
