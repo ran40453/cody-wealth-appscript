@@ -9,11 +9,17 @@
         <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
       </div>
       <div class="kpi-toggle-wrap">
-        <button id="stkFilterToggle" class="kpi-toggle">只看未賣出：開</button>
-        <button id="stkKpiToggle" class="kpi-toggle">收合統計</button>
+        <button id="stkStatusToggle" class="kpi-toggle" aria-pressed="false">顯示目前持有</button>
       </div>
     </div>
 
+    <div id="stkMarketChips" class="chips"></div>
+      <table class="ctbc-table">
+        <thead id="stkHead"></thead>
+        <tbody id="stkBody"><tr><td class="empty" colspan="7">載入中…</td></tr></tbody>
+      </table>
+      <div id="stkSpacer" aria-hidden="true"></div>
+      
     <div class="ctbc-scroll" id="stkViewport">
       <table class="ctbc-table">
         <thead id="stkHead"></thead>

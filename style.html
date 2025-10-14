@@ -1948,4 +1948,52 @@ body.hdr-fab-open #hdrFabMenu{
 .dlg .lbl { width:7em; opacity:.8; }
 .dlg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 
+/* 市場 Chips（篩選） */
+#page-stk #stkMarketChips { display:flex; gap:8px; padding:8px 8px 6px; position: sticky; top: 0; background: var(--card,#fff); z-index: 2; }
+#page-stk #stkMarketChips .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid var(--divider, rgba(0,0,0,.12)); cursor:pointer; user-select:none; }
+#page-stk #stkMarketChips .chip.on { background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
+
+/* 表格排版固定（避免重疊/跑位） */
+#page-stk .ctbc-scroll { overflow:auto; }
+#page-stk .ctbc-table { table-layout: fixed; min-width: 980px; border-collapse: separate; border-spacing: 0; }
+#page-stk .ctbc-table th, #page-stk .ctbc-table td { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+#page-stk .ctbc-table th.txt, #page-stk .ctbc-table td.txt { max-width: 260px; }
+#page-stk .ctbc-table .col-fix-1 { width: 90px; }
+#page-stk .ctbc-table .col-fix-2 { width: 110px; }
+#page-stk .ctbc-table .col-fix-3 { width: 120px; }
+#page-stk .ctbc-table .col-fix-4 { width: 120px; }
+#page-stk .pnl-cell { display:inline-flex; align-items:center; gap:.5rem; }
+#page-stk .cell-edit { display:inline-block; padding:.2rem .5rem; border-radius:999px; border:1px solid var(--divider, rgba(0,0,0,.12)); background:var(--card,#fff); cursor:pointer; }
+
+/* iOS 風格的子清單卡片 */
+#page-stk .stk-detail td { padding:0; }
+#page-stk .detail-card { margin:8px; border-radius:12px; background:var(--card,#fff); border:1px solid var(--divider, rgba(0,0,0,.12)); overflow:hidden; }
+#page-stk .detail-section + .detail-section { border-top:1px solid var(--divider, rgba(0,0,0,.08)); }
+#page-stk .detail-item { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; }
+#page-stk .detail-item .label { color:var(--text-weak, #667085); }
+#page-stk .detail-item .value button.cell-edit { padding:.2rem .55rem; }
+
+/* 列可點（但不影響行內按鈕） */
+#page-stk tr.stk-row { cursor: pointer; }
+#page-stk tr.stk-row .cell-edit,
+#page-stk tr.stk-row .row-toggle,
+#page-stk tr.stk-row button,
+#page-stk tr.stk-row a,
+#page-stk tr.stk-row input,
+#page-stk tr.stk-row select,
+#page-stk tr.stk-row textarea { cursor: default; }
+
+/* Modal 置中避免被裁切 */
+#stkEditDlg { position: fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; padding:24px; background: rgba(0,0,0,.35); }
+#stkEditDlg .modal-content { max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto; background:var(--card,#fff); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+#stkEditDlg .modal-hd { position:sticky; top:0; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:inherit; border-bottom:1px solid var(--divider, rgba(0,0,0,.12)); }
+#stkEditDlg .modal-bd { padding:16px; }
+#stkEditDlg .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+#stkEditDlg .input { width:100%; padding:10px 12px; font-size:16px; }
+#stkEditDlg .btn-close { font-size:20px; line-height:1; border:none; background:transparent; cursor:pointer; }
+
+/* 狀態切換（單一按鈕） */
+#page-stk #stkStatusToggle { border-radius:999px; padding:6px 12px; border:1px solid var(--divider, rgba(0,0,0,.12)); }
+#page-stk #stkStatusToggle[aria-pressed="true"] { background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
+
   </style>

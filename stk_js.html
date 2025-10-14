@@ -14,14 +14,13 @@ App.modules.stk = (function(){
   let allRows = [];
   let viewRows = [];
   const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
-  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 7 };
+  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 7, markets: [], market: 'US' };
 
   // ===== Init =====
   function init(){
     setupViewport();
-    bindKPIFold();
-    bindFilterToggle();
     bindGlobalEditModal();
+    bindStatusToggle();
     setBodyLoading(true);
     fetchData();
   }
@@ -45,6 +44,12 @@ App.modules.stk = (function(){
     run
       .withSuccessHandler(rows=>{
         allRows = Array.isArray(rows) ? rows : [];
+        // collect markets
+        const set = new Set();
+        allRows.forEach(r=>{ const t = String(r.T||'').trim(); if (t) set.add(t); });
+        st.markets = Array.from(set);
+        if (!st.markets.includes(st.market) && st.markets.length) st.market = st.markets.includes('US') ? 'US' : st.markets[0];
+        renderMarketChips();
         applyFilter();
         renderKPI(viewRows);
         renderHead();
@@ -55,11 +60,27 @@ App.modules.stk = (function(){
   }
 
   function applyFilter(){
-    if (st.showOnlyOpen){
-      viewRows = allRows.filter(r => !String(r.A||'').trim());
-    }else{
-      viewRows = allRows.slice();
-    }
+    let rows = allRows.slice();
+    if (st.market) rows = rows.filter(r => String(r.T||'').trim() === st.market);
+    if (st.showOnlyOpen) rows = rows.filter(r => !String(r.A||'').trim());
+    viewRows = rows;
+  }
+
+  function renderMarketChips(){
+    const host = byId('stkMarketChips'); if (!host) return;
+    host.innerHTML = st.markets.map(m=>{
+      const on = (m===st.market) ? 'on' : '';
+      return `<div class="chip ${on}" data-market="${esc(m)}">${esc(m)}</div>`;
+    }).join('');
+    host.querySelectorAll('.chip').forEach(ch=>{
+      ch.onclick = ()=>{
+        st.market = String(ch.dataset.market||'');
+        renderMarketChips();
+        applyFilter();
+        renderKPI(viewRows);
+        renderTable(viewRows);
+      };
+    });
   }
 
   // ===== KPI =====
@@ -161,15 +182,21 @@ App.modules.stk = (function(){
 
       const detail = `<tr class="stk-detail" data-row="${rowId}">
         <td class="txt" colspan="${st.totalCols}">
-          <div class="detail-grid">
-            <div><b>市場價值(N)</b>：${fmtMoney(r.N)}</div>
-            <div><b>成本(K)</b>：${fmtMoney(r.K)}</div>
-            <div><b>股息(R)</b>：<button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button></div>
-            <div><b>ROI(H)</b>：${roiPillHTML(roi)}</div>
-            <div><b>買日(L)</b>：${fmtDate(r.L)}</div>
-            <div><b>賣日(M)</b>：${fmtDate(r.M)}</div>
-            <div><b>手續+稅(Q)</b>：${fmtMoney(r.Q)}</div>
-            <div><b>單位(U)</b>：${esc(r.U||'')}</div>
+          <div class="detail-card">
+            <div class="detail-section">
+              <div class="detail-item"><span class="label">市場價值 (N)</span><span class="value">${fmtMoney(r.N)}</span></div>
+              <div class="detail-item"><span class="label">成本 (K)</span><span class="value">${fmtMoney(r.K)}</span></div>
+              <div class="detail-item"><span class="label">股息 (R)</span><span class="value"><button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button></span></div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-item"><span class="label">ROI (H)</span><span class="value">${roiPillHTML(roi)}</span></div>
+              <div class="detail-item"><span class="label">買日 (L)</span><span class="value">${fmtDate(r.L)}</span></div>
+              <div class="detail-item"><span class="label">賣日 (M)</span><span class="value">${fmtDate(r.M)}</span></div>
+            </div>
+            <div class="detail-section">
+              <div class="detail-item"><span class="label">手續+稅 (Q)</span><span class="value">${fmtMoney(r.Q)}</span></div>
+              <div class="detail-item"><span class="label">單位 (U)</span><span class="value">${esc(r.U||'')}</span></div>
+            </div>
           </div>
         </td>
       </tr>`;
@@ -198,11 +225,14 @@ App.modules.stk = (function(){
     renderTable(viewRows);
   }
 
-  function bindFilterToggle(){
-    const btn = byId('stkFilterToggle');
+  function bindStatusToggle(){
+    const btn = byId('stkStatusToggle');
     if (!btn) return;
-    const syncLabel = ()=> btn.textContent = st.showOnlyOpen ? '只看未賣出：開' : '只看未賣出：關';
-    syncLabel();
+    const sync = ()=>{
+      btn.textContent = st.showOnlyOpen ? '顯示目前持有' : '已賣出';
+      btn.setAttribute('aria-pressed', String(!st.showOnlyOpen)); // pressed=true 表示顯示已賣出
+    };
+    sync();
     btn.onclick = ()=>{
       st.showOnlyOpen = !st.showOnlyOpen;
       st.expanded.clear();
@@ -210,7 +240,7 @@ App.modules.stk = (function(){
       renderKPI(viewRows);
       renderHead();
       renderTable(viewRows);
-      syncLabel();
+      sync();
     };
   }
 
@@ -332,17 +362,16 @@ App.modules.stk = (function(){
       if (raf) return;
       raf = requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
     });
-  }
-  function bindKPIFold(){
-    const btn = byId('stkKpiToggle');
-    const wrap= byId('stkKPI');
-    if (btn && wrap){
-      btn.onclick = ()=>{
-        const on = wrap.dataset.collapsed === '1' ? '0' : '1';
-        wrap.dataset.collapsed = on;
-        btn.textContent = (on==='1') ? '展開統計' : '收合統計';
-      };
-    }
+    vs.tbody?.addEventListener('click', (ev)=>{
+      const isInteractive = ev.target.closest('.cell-edit, .row-toggle, button, a, input, select, textarea');
+      if (isInteractive) return;
+      const tr = ev.target.closest('tr.stk-row');
+      if (!tr) return;
+      const rowId = Number(tr.dataset.row||0);
+      if (!rowId) return;
+      if (st.expanded.has(rowId)) st.expanded.delete(rowId); else st.expanded.add(rowId);
+      renderTable(viewRows);
+    });
   }
 
   // ===== Generic helpers =====
@@ -393,7 +422,7 @@ App.modules.stk = (function(){
   function setRoiPill(el, v){ if (el) el.innerHTML = roiPillHTML(v); }
   function setBodyLoading(on){
     const tb = byId('stkBody'); if (!tb) return;
-    tb.innerHTML = on ? `<tr><td class="empty" colspan="${st.totalCols}">載入中…</td></tr>` : '';
+    tb.innerHTML = on ? `<tr><td class="empty" colspan="7">載入中…</td></tr>` : '';
   }
   function failUI(msg){
     const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">發生錯誤：${esc(msg||'')}</td></tr>`;
