@@ -580,9 +580,9 @@ header .title-wrap{
 .sheet .handle{ display:none; }
 @media (max-width:480px){ .sheet{ width:88vw; min-width:88vw; } }
 
-# =========================================================
-#11 Popmenu（行動）
-# =========================================================
+/* =========================================================
+  #11 Popmenu（行動）
+   ========================================================= */
 #popmenus-root{ position:fixed; inset:0; pointer-events:none; z-index:var(--z-drawer); --pm-zoom:1; }
 .popmenu-overlay{ position:absolute; inset:0; background: color-mix(in oklab, var(--bg) 8%, transparent); backdrop-filter: blur(2px); pointer-events:auto; }
 .popmenu-overlay--top{ position: fixed; left: 0; right: 0; top: 0; background: color-mix(in oklab, var(--bg) 8%, transparent); backdrop-filter: blur(2px); pointer-events: auto; z-index: var(--z-popmenu-top); }
@@ -871,7 +871,7 @@ header .title-wrap{
 
 /* planned 行背景 */
 #page-input .tx-table tbody tr.row-planned td{ background: var(--tone-pos-bg); }
-}
+
 
 /* 虛擬清單：選取中的列（含深色） */
 #page-input .tx-table tbody tr.selected { background: #fff7d6; }
@@ -1577,7 +1577,7 @@ body.hdr-fab-open #hdrFabMenu{
     display: inline-flex;
     flex: 1 1 0;                    /* ← 平均分配 */
   }
-}
+  }
 
   /* =========================================================
      #21 Page Settings（頁面專屬；不影響他頁）
@@ -1938,8 +1938,7 @@ body.hdr-fab-open #hdrFabMenu{
       
 
     }
-
-
+  }
 
 /* =========================================================
    #22 STK
@@ -1948,6 +1947,5 @@ body.hdr-fab-open #hdrFabMenu{
 .dlg .form-row { display:flex; align-items:center; gap:.5rem; margin:.5rem 0; }
 .dlg .lbl { width:7em; opacity:.8; }
 .dlg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-
 
   </style>

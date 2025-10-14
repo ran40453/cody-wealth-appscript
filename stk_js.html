@@ -1,4 +1,3 @@
-<!-- stk_js.html -->
 <script>
 window.App = window.App || {};
 App.modules = App.modules || {};
@@ -6,21 +5,22 @@ App.modules = App.modules || {};
 App.modules.stk = (function(){
   // ===== Config（之後要擴充可編輯欄位就在這裡加）=====
   const EDITABLE_FIELDS = {
-    E: { key:'E', label:'現價', type:'number', decimals:3, min:0, updateDateCol:'S' },
-    R: { key:'R', label:'股息', type:'number', decimals:2, min:0, updateDateCol:'S' }
-    // 範例：之後想開 K(成本)、Q(手續+稅)… 只要加：
-    // ,K:{ key:'K', label:'成本', type:'number', decimals:1, min:0, updateDateCol:'S' }
+    E: { key:'E', label:'現價', type:'number', decimals:3, min:0 },
+    R: { key:'R', label:'股息', type:'number', decimals:2, min:0 }
+    // 之後若要指定更新日欄位，再加 updateDateCol:'<欄位字母>'
   };
 
   // ===== State =====
   let allRows = [];
   let viewRows = [];
   const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
+  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 7 };
 
   // ===== Init =====
   function init(){
     setupViewport();
     bindKPIFold();
+    bindFilterToggle();
     bindGlobalEditModal();
     setBodyLoading(true);
     fetchData();
@@ -28,22 +28,38 @@ App.modules.stk = (function(){
 
   // ===== Data =====
   function fetchData(){
-    if (!(window.google && google.script && google.script.run)) {
+    // 支援 GAS 內嵌與 iframe 場景：嘗試從 window 與 parent 取得 google.script.run
+    const run =
+      (window.google && google.script && google.script.run) ? google.script.run :
+      (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run :
+      null;
+
+    if (!run) {
+      // 等待 Apps Script 物件注入（多給幾次 & 間隔拉長）
       if (!fetchData._try) fetchData._try = 0;
-      if (fetchData._try++ < 40) { setTimeout(fetchData, 250); return; }
-      failUI('載入失敗：Apps Script 未就緒');
+      if (fetchData._try++ < 80) { setTimeout(fetchData, 250); return; }
+      failUI('載入失敗：找不到 Apps Script 執行環境（google.script.run）');
       return;
     }
-    google.script.run
+
+    run
       .withSuccessHandler(rows=>{
         allRows = Array.isArray(rows) ? rows : [];
-        viewRows = allRows.slice();
+        applyFilter();
         renderKPI(viewRows);
         renderHead();
         renderTable(viewRows);
       })
       .withFailureHandler(err=> failUI(err && err.message || '讀取失敗'))
       .getSTKRows();
+  }
+
+  function applyFilter(){
+    if (st.showOnlyOpen){
+      viewRows = allRows.filter(r => !String(r.A||'').trim());
+    }else{
+      viewRows = allRows.slice();
+    }
   }
 
   // ===== KPI =====
@@ -78,86 +94,124 @@ App.modules.stk = (function(){
       <th class="num col-fix-1">股數</th>     <!-- C -->
       <th class="num col-fix-2">均價</th>     <!-- F -->
       <th class="num col-fix-3">現價</th>     <!-- E (editable) -->
-      <th class="num col-fix-4">市場價值</th> <!-- N -->
-      <th class="num">成本</th>               <!-- K -->
       <th class="txt">未實現損益 / ROI</th>  <!-- J + H -->
-      <th class="num">股息</th>               <!-- R (editable) -->
-      <th class="num">手續+稅</th>           <!-- Q -->
-      <th class="txt">市場</th>               <!-- T -->
-      <th class="txt">單位</th>               <!-- U -->
-      <th class="txt">買日</th>               <!-- L -->
-      <th class="txt">賣日</th>               <!-- M -->
+      <th class="txt col-fix-4">市場</th>     <!-- T -->
       <th class="txt">狀態</th>               <!-- A -->
-      <th class="txt">更新日</th>             <!-- S -->
     </tr>`;
   }
 
   // ===== Body (virtual list) =====
   function renderTable(rows){
-    if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH) + 'px';
-    if (vs.tbody)  { vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML=''; }
+    // spacer 高度 = 主列高度 + 展開列高度
+    const expandedCount = Array.from(st.expanded).filter(rowId => rows.find(r=> Number(r.ROW)===Number(rowId))).length;
+    if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH + expandedCount * st.detailH) + 'px';
+    if (vs.tbody){ vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML=''; }
     vs.last = [-1,-1];
     renderVirtual();
   }
   function renderVirtual(){
     if (!vs.viewport || !vs.tbody) return;
+    const rows = viewRows;
     const top  = vs.viewport.scrollTop;
     const h    = vs.viewport.clientHeight;
+
     const start= Math.max(0, Math.floor(top / vs.rowH) - 10);
+    // 計算 start 之前的展開列數，修正 offset
+    let expandedBefore = 0;
+    for (let i=0; i<start; i++){
+      const rowId = Number(rows[i]?.ROW||0);
+      if (st.expanded.has(rowId)) expandedBefore++;
+    }
+    const offsetY = start * vs.rowH + expandedBefore * st.detailH;
+
     const need = Math.ceil(h / vs.rowH) + 20;
-    const end  = Math.min(viewRows.length, start + need);
+    const end  = Math.min(rows.length, start + need);
     if (vs.last[0]===start && vs.last[1]===end) return;
     vs.last = [start, end];
 
-    const slice = viewRows.slice(start, end);
-    vs.tbody.style.transform = `translateY(${start * vs.rowH}px)`;
-    vs.tbody.innerHTML = slice.map(r=>{
-      const roi = normalizePercent(r.H);
-      const mv  = fmtMoney(r.N);
-      const cost= fmtMoney(r.K);
-      const upl = fmtMoney(r.J);
+    const slice = rows.slice(start, end);
+    vs.tbody.style.transform = `translateY(${offsetY}px)`;
 
-      return `<tr data-row="${Number(r.ROW||0)}">
-        <td class="txt">${esc(r.B||'-')}</td>
+    vs.tbody.innerHTML = slice.map(r=>{
+      const rowId = Number(r.ROW||0);
+      const roi   = normalizePercent(r.H);
+      const upl   = fmtMoney(r.J);
+
+      const main = `<tr class="stk-row" data-row="${rowId}">
+        <td class="txt">
+          <button class="row-toggle" data-row="${rowId}" title="展開/收合">▸</button>
+          ${esc(r.B||'-')}
+        </td>
         <td class="num col-fix-1">${fmtInt(r.C)}</td>
         <td class="num col-fix-2">${fmtMoney(r.F)}</td>
-
         <td class="num col-fix-3">
           <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney(r.E)}</button>
         </td>
-
-        <td class="num col-fix-4">${mv}</td>
-        <td class="num">${cost}</td>
         <td class="txt">
           <div class="pnl-cell">
             <span class="num">${upl}</span>
             ${roiPillHTML(roi)}
           </div>
         </td>
-
-        <td class="num">
-          <button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button>
-        </td>
-
-        <td class="num">${fmtMoney(r.Q)}</td>
-        <td class="txt">${esc(r.T||'')}</td>
-        <td class="txt">${esc(r.U||'')}</td>
-        <td class="txt">${fmtDate(r.L)}</td>
-        <td class="txt">${fmtDate(r.M)}</td>
+        <td class="txt col-fix-4">${esc(r.T||'')}</td>
         <td class="txt">${String(r.A||'').trim()? '已賣出':'—'}</td>
-        <td class="txt">${fmtDate(r.S)}</td>
       </tr>`;
+
+      if (!st.expanded.has(rowId)) return main;
+
+      const detail = `<tr class="stk-detail" data-row="${rowId}">
+        <td class="txt" colspan="${st.totalCols}">
+          <div class="detail-grid">
+            <div><b>市場價值(N)</b>：${fmtMoney(r.N)}</div>
+            <div><b>成本(K)</b>：${fmtMoney(r.K)}</div>
+            <div><b>股息(R)</b>：<button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button></div>
+            <div><b>ROI(H)</b>：${roiPillHTML(roi)}</div>
+            <div><b>買日(L)</b>：${fmtDate(r.L)}</div>
+            <div><b>賣日(M)</b>：${fmtDate(r.M)}</div>
+            <div><b>手續+稅(Q)</b>：${fmtMoney(r.Q)}</div>
+            <div><b>單位(U)</b>：${esc(r.U||'')}</div>
+          </div>
+        </td>
+      </tr>`;
+      return main + detail;
     }).join('');
 
-    // 綁定本頁 slice 的編輯事件（事件代理）
+    // 綁定 slice 內事件
     vs.tbody.querySelectorAll('.cell-edit').forEach(btn=>{
       btn.addEventListener('click', onEditCellClick);
+    });
+    vs.tbody.querySelectorAll('.row-toggle').forEach(btn=>{
+      btn.addEventListener('click', onToggleRow);
     });
 
     if (!slice.length){
       vs.tbody.style.transform = 'translateY(0px)';
-      vs.tbody.innerHTML = `<tr><td class="empty" colspan="15">目前沒有資料</td></tr>`;
+      vs.tbody.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">目前沒有資料</td></tr>`;
     }
+  }
+
+  function onToggleRow(e){
+    const rowId = Number(e.currentTarget.dataset.row||0);
+    if (!rowId) return;
+    if (st.expanded.has(rowId)) st.expanded.delete(rowId);
+    else st.expanded.add(rowId);
+    renderTable(viewRows);
+  }
+
+  function bindFilterToggle(){
+    const btn = byId('stkFilterToggle');
+    if (!btn) return;
+    const syncLabel = ()=> btn.textContent = st.showOnlyOpen ? '只看未賣出：開' : '只看未賣出：關';
+    syncLabel();
+    btn.onclick = ()=>{
+      st.showOnlyOpen = !st.showOnlyOpen;
+      st.expanded.clear();
+      applyFilter();
+      renderKPI(viewRows);
+      renderHead();
+      renderTable(viewRows);
+      syncLabel();
+    };
   }
 
   // ===== Edit modal =====
@@ -166,11 +220,14 @@ App.modules.stk = (function(){
     const form= byId('stkEditForm');
     const input= byId('stkEditInput');
     const ok  = byId('stkEditOk');
-    const cancel = byId('stkEditCancel');
+    const cancelBtn = byId('stkEditCancel');
+    const closeBtn  = byId('stkEditClose');
 
     if (!dlg || !form) return;
 
-    cancel.onclick = () => closeEdit();
+    const close = ()=> closeEdit();
+    if (cancelBtn) cancelBtn.onclick = close;
+    if (closeBtn)  closeBtn.onclick  = close;
     ok.onclick = (e)=>{ e.preventDefault(); submitEdit(); };
     form.onsubmit = (e)=>{ e.preventDefault(); submitEdit(); };
     input.onkeydown = (e)=>{ if (e.key === 'Escape') closeEdit(); };
@@ -336,10 +393,10 @@ App.modules.stk = (function(){
   function setRoiPill(el, v){ if (el) el.innerHTML = roiPillHTML(v); }
   function setBodyLoading(on){
     const tb = byId('stkBody'); if (!tb) return;
-    tb.innerHTML = on ? `<tr><td class="empty" colspan="15">載入中…</td></tr>` : '';
+    tb.innerHTML = on ? `<tr><td class="empty" colspan="${st.totalCols}">載入中…</td></tr>` : '';
   }
   function failUI(msg){
-    const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="15">發生錯誤：${esc(msg||'')}</td></tr>`;
+    const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">發生錯誤：${esc(msg||'')}</td></tr>`;
   }
   function toggleBusy(on){
     const ok = byId('stkEditOk');
@@ -354,5 +411,13 @@ App.modules.stk = (function(){
   }
 
   return { init };
+})();
+
+;(function autoInitSTK(){
+  try{
+    const start = ()=> { if (App && App.modules && App.modules.stk && typeof App.modules.stk.init==='function') App.modules.stk.init(); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+    else start();
+  }catch(_){}
 })();
 </script>

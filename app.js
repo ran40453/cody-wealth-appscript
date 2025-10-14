@@ -1233,30 +1233,6 @@ function sanitize_(s) {
 }
 
 
-//** 讀取 STK A..V 欄（第1列表頭，從第2列開始資料） */
-function getSTKRows(){
-  const SHEET = 'STK';
-  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
-  if (!sh) return [];
-  const lastRow = sh.getLastRow();
-  const lastCol = sh.getLastColumn();
-  if (lastRow <= 1) return [];
-
-  const n = lastRow - 1;
-  const values = sh.getRange(2, 1, n, Math.min(22, lastCol)).getValues(); // 22 = V 欄
-  const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
-  const toStr = v => v instanceof Date ? Utilities.formatDate(v, tz, 'yyyy-MM-dd') : (v==null?'':String(v));
-
-  return values.map((r,i)=>({
-    ROW: i+2, // 真實列號
-    A:r[0],  B:r[1],  C:Number(r[2])||0,  D:Number(r[3])||0,  E:Number(r[4])||0,
-    F:Number(r[5])||0, G:Number(r[6])||0, H:Number(r[7]),    I:r[8],
-    J:Number(r[9])||0, K:Number(r[10])||0,
-    L:toStr(r[11]), M:toStr(r[12]), N:Number(r[13])||0,
-    O:Number(r[14])||0, P:Number(r[15])||0, Q:Number(r[16])||0,
-    R:Number(r[17])||0, S:toStr(r[18]), T:toStr(r[19]), U:toStr(r[20]), V:Number(r[21])
-  }));
-}
 
 /** === STK 讀取：A..V === */
 function getSTKRows(){
@@ -1283,6 +1259,22 @@ function getSTKRows(){
   }));
 
   function num(x){ x = Number(x); return isFinite(x)? x : 0; }
+}
+
+/** STK 偵錯：確認工作表/列數/欄數＋前 5 列樣本（顯示值） */
+function getSTKDebug(){
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName('STK');
+  if (!sh) return { sheet:false, lastRow:0, lastCol:0, hasData:false, sample:[] };
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  const hasData = lastRow > 1;
+  const rowsToRead = Math.min(5, Math.max(0, lastRow - 1));
+  const colsToRead = Math.min(22, lastCol);
+  const sample = rowsToRead>0 && colsToRead>0
+    ? sh.getRange(2, 1, rowsToRead, colsToRead).getDisplayValues()
+    : [];
+  return { sheet:true, lastRow, lastCol, hasData, sample };
 }
 
 /** === STK 單格寫入通用：可選擇順便寫「更新日」(S 欄) ===

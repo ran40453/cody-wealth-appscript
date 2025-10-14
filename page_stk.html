@@ -1,43 +1,52 @@
-<!-- page_stk.html（最小骨架） -->
-<div class="card" id="page-stk">
-  <div id="stkKPI" class="ctbc-kpiBar" data-collapsed="0">
-    <div class="kpi-row">
-      <div class="kpi"><div class="k">市場價值</div><div class="v bold" id="stkKpiMV">—</div></div>
-      <div class="kpi"><div class="k">成本</div><div class="v bold" id="stkKpiCost">—</div></div>
-      <div class="kpi"><div class="k">未實現損益</div><div class="v bold" id="stkKpiUPL">—</div></div>
-      <div class="kpi"><div class="k">損益(NT)</div><div class="v bold" id="stkKpiPL">—</div></div>
-      <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
-    </div>
-    <div class="kpi-toggle-wrap"><button id="stkKpiToggle" class="kpi-toggle">收合統計</button></div>
-  </div>
-
-  <div class="ctbc-scroll" id="stkViewport">
-    <table class="ctbc-table">
-      <thead id="stkHead"></thead>
-      <tbody id="stkBody"><tr><td class="empty" colspan="15">載入中…</td></tr></tbody>
-    </table>
-    <div id="stkSpacer" aria-hidden="true"></div>
-  </div>
-</div>
-
-<!-- 通用小窗：編輯現價/股息 -->
-<div class="modal" id="stkEditDlg" style="display:none">
-  <div class="modal-content">
-    <div class="modal-hd">
-      <div class="title" id="stkEditTitle">編輯</div>
-      <button class="btn-close" id="stkEditCancel" title="關閉">×</button>
-    </div>
-    <form id="stkEditForm" class="modal-bd">
-      <input id="stkEditInput" type="number" step="any" class="input" placeholder="輸入數值" autocomplete="off" />
-      <div class="modal-actions">
-        <button class="btn" id="stkEditCancel" type="button">取消</button>
-        <button class="btn primary" id="stkEditOk" type="submit">
-          <span id="stkEditOkTxt">儲存</span>
-          <span id="stkEditOkSpin" class="spinner" style="display:none"></span>
-        </button>
+<section id="page-stk" class="page show">
+  <div class="card">
+    <div id="stkKPI" class="ctbc-kpiBar" data-collapsed="0">
+      <div class="kpi-row">
+        <div class="kpi"><div class="k">市場價值</div><div class="v bold" id="stkKpiMV">—</div></div>
+        <div class="kpi"><div class="k">成本</div><div class="v bold" id="stkKpiCost">—</div></div>
+        <div class="kpi"><div class="k">未實現損益</div><div class="v bold" id="stkKpiUPL">—</div></div>
+        <div class="kpi"><div class="k">損益(NT)</div><div class="v bold" id="stkKpiPL">—</div></div>
+        <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
       </div>
-    </form>
-  </div>
-</div>
+      <div class="kpi-toggle-wrap">
+        <button id="stkFilterToggle" class="kpi-toggle">只看未賣出：開</button>
+        <button id="stkKpiToggle" class="kpi-toggle">收合統計</button>
+      </div>
+    </div>
 
-<script>App.modules.stk.init();</script>
+    <div class="ctbc-scroll" id="stkViewport">
+      <table class="ctbc-table">
+        <thead id="stkHead"></thead>
+        <tbody id="stkBody"><tr><td class="empty" colspan="7">載入中…</td></tr></tbody>
+      </table>
+      <div id="stkSpacer" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <!-- 通用小窗：編輯現價/股息 -->
+  <div class="modal" id="stkEditDlg" style="display:none">
+    <div class="modal-content">
+      <div class="modal-hd">
+        <div class="title" id="stkEditTitle">編輯</div>
+        <button class="btn-close" id="stkEditClose" title="關閉">×</button>
+      </div>
+      <form id="stkEditForm" class="modal-bd">
+        <input id="stkEditInput" type="number" step="any" class="input" placeholder="輸入數值" autocomplete="off" />
+        <div class="modal-actions">
+          <button class="btn" id="stkEditCancel" type="button">取消</button>
+          <button class="btn primary" id="stkEditOk" type="submit">
+            <span id="stkEditOkTxt">儲存</span>
+            <span id="stkEditOkSpin" class="spinner" style="display:none"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // 若你的 stk_js.html 不是全域自動載入，請確保此頁先引入，再 init。
+    if (window.App && App.modules && App.modules.stk && typeof App.modules.stk.init === 'function') {
+      App.modules.stk.init();
+    }
+  </script>
+</section>
