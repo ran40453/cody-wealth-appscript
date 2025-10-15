@@ -2075,4 +2075,45 @@ body.hdr-fab-open #hdrFabMenu{
 }
 #page-stk .icon-btn:hover{ filter:brightness(.98); }
 #page-stk .icon-btn:active{ transform: translateY(1px); }
+
+
+/* icon buttons – circular, consistent light/dark */
+#page-stk .icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px;            /* 圓形尺寸 */
+  border-radius:50%;                  /* 關鍵：圓形 */
+  border:1px solid var(--divider, rgba(0,0,0,.12));
+  background: var(--card,#fff);
+  cursor:pointer;
+  transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease;
+}
+#page-stk .icon-btn .material-symbols-outlined{
+  font-size:22px; line-height:1;
+}
+:root:not(.light) #page-stk .icon-btn{
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+}
+#page-stk .icon-btn:hover{ filter:brightness(.98); }
+#page-stk .icon-btn:active{ transform: translateY(1px) scale(0.98); }
+
+/* delete mode active */
+#page-stk .icon-btn.danger{
+  background:#ef4444; border-color:#ef4444; color:#fff;
+}
+#page-stk .icon-btn.danger .material-symbols-outlined{ color:#fff; }
+#page-stk .icon-btn.danger:hover{ filter:brightness(0.95); }
+#page-stk .icon-btn.danger:active{ transform: translateY(1px) scale(0.98); }
+
+#page-stk .kpi-actions-card{
+  display:flex; gap:8px; align-items:center; justify-content:flex-end;
+  padding:8px; border-radius:12px; background:var(--card,#fff);
+  border:1px solid var(--divider, rgba(0,0,0,.12));
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+:root:not(.light) #page-stk .kpi-actions-card{
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+}
+
   </style>
