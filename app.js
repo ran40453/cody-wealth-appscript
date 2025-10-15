@@ -1314,3 +1314,121 @@ function setSTKPrice(row, price){
 function setSTKDividend(row, divd){
   return setSTKValue(row, 'R', Number(divd) || 0, 'S');
 }
+
+/** 新增一列到 STK，未列欄位沿用上一列公式（若無上一列，僅寫入值） */
+function addSTKItem(item){
+  const SHEET = 'STK';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('找不到工作表：' + SHEET);
+
+  var needCols = 22; // A..V
+  if (sh.getMaxColumns() < needCols){
+    sh.insertColumnsAfter(sh.getMaxColumns(), needCols - sh.getMaxColumns());
+  }
+
+  var lastRow = sh.getLastRow();
+  var dataStart = 2;
+
+  // 插入新列在最後一列之後
+  var insertAfter = Math.max(1, lastRow);
+  sh.insertRowAfter(insertAfter);
+  var targetRow = insertAfter + 1;
+
+  // 若有模板列（上一列或第 2 列），先複製其格式/公式
+  var sourceRow = (lastRow >= dataStart) ? lastRow : dataStart;
+  if (sourceRow >= dataStart && sourceRow <= sh.getMaxRows()){
+    sh.getRange(sourceRow, 1, 1, needCols).copyTo(
+      sh.getRange(targetRow, 1, 1, needCols),
+      {contentsOnly:false}
+    );
+  }
+
+  // A 狀態清空（未賣出）、M 賣日清空
+  sh.getRange(targetRow, col('A')).setValue('');
+  sh.getRange(targetRow, col('M')).clearContent();
+
+  // 寫入主要欄位
+  if (item.B) sh.getRange(targetRow, col('B')).setValue(item.B);
+  if (item.C!=null) sh.getRange(targetRow, col('C')).setValue(Number(item.C)||0);
+  if (item.D!=null) sh.getRange(targetRow, col('D')).setValue(Number(item.D)||0);
+  if (item.T) sh.getRange(targetRow, col('T')).setValue(String(item.T));
+  if (item.R!=null) sh.getRange(targetRow, col('R')).setValue(Number(item.R)||0);
+  if (item.L) {
+    var tz = Session.getScriptTimeZone() || 'Asia/Taipei';
+    var d = new Date(item.L);
+    sh.getRange(targetRow, col('L')).setValue(Utilities.formatDate(d, tz, 'yyyy-MM-dd'));
+  }
+  if (item.U) sh.getRange(targetRow, col('U')).setValue(String(item.U));
+
+  // E 現價：強制改為指定公式（依列號帶入）
+  var r = targetRow;
+  var formula = '=IF(T'+r+'="US",IF(A'+r+'="已賣出","sold price",googlefinance(B'+r+',"PRICE")),IF(A'+r+'="已賣出","sold price",vlookup(B'+r+",'🔄️'!B:E,3,0)))";
+  sh.getRange(targetRow, col('E')).setFormula(formula);
+
+  return { row: targetRow };
+
+  function col(letter){
+    var s = String(letter||'').trim().toUpperCase(), n=0;
+    for (var i=0;i<s.length;i++){ var code = s.charCodeAt(i); if (code>=65 && code<=90) n = n*26 + (code-64); }
+    return n;
+  }
+}
+
+/** 依據賣出數量處理賣出；若部分賣出，會拆分一筆新列保留剩餘股數 */
+function splitSell(row, qty, price){
+  const SHEET = 'STK';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('找不到工作表：' + SHEET);
+  var r = Number(row);
+  if (!r || r<2) throw new Error('row 不合法');
+
+  var needCols = 22;
+  if (sh.getMaxColumns() < needCols){
+    sh.insertColumnsAfter(sh.getMaxColumns(), needCols - sh.getMaxColumns());
+  }
+
+  var currentQty = Number(sh.getRange(r, col('C')).getValue()) || 0;
+  if (qty > currentQty) throw new Error('股數不可大於現有股數');
+
+  // 全部賣出：標記 A=已賣出、E=賣價、M=今天
+  var tz = Session.getScriptTimeZone() || 'Asia/Taipei';
+  var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+  if (qty === currentQty){
+    sh.getRange(r, col('A')).setValue('已賣出');
+    sh.getRange(r, col('E')).setValue(Number(price)); // 固定賣價
+    sh.getRange(r, col('M')).setValue(today);
+    return { row:r, type:'full' };
+  }
+
+  // 部分賣出：原列改為賣出 qty；新列保留剩餘
+  var remain = currentQty - qty;
+
+  // 原列寫入賣出資訊
+  sh.getRange(r, col('A')).setValue('已賣出');
+  sh.getRange(r, col('C')).setValue(Number(qty));
+  sh.getRange(r, col('E')).setValue(Number(price));
+  sh.getRange(r, col('M')).setValue(today);
+
+  // 插入新列，複製原列格式/公式，再寫入剩餘股數，並清空賣出標記/賣日，現價改回公式
+  sh.insertRowAfter(r);
+  var nr = r+1;
+  sh.getRange(r, 1, 1, needCols).copyTo(sh.getRange(nr, 1, 1, needCols), {contentsOnly:false});
+
+  // 新列：未賣出、股數=remain、賣日清空
+  sh.getRange(nr, col('A')).setValue('');
+  sh.getRange(nr, col('C')).setValue(Number(remain));
+  sh.getRange(nr, col('M')).clearContent();
+
+  // 新列：現價公式
+  var formula = '=IF(T'+nr+'="US",IF(A'+nr+'="已賣出","sold price",googlefinance(B'+nr+',"PRICE")),IF(A'+nr+'="已賣出","sold price",vlookup(B'+nr+",'🔄️'!B:E,3,0)))";
+  sh.getRange(nr, col('E')).setFormula(formula);
+
+  return { row:r, remainRow:nr, type:'partial' };
+
+  function col(letter){
+    var s = String(letter||'').trim().toUpperCase(), n=0;
+    for (var i=0;i<s.length;i++){ var code = s.charCodeAt(i); if (code>=65 && code<=90) n = n*26 + (code-64); }
+    return n;
+  }
+}

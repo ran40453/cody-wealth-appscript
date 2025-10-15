@@ -1996,4 +1996,62 @@ body.hdr-fab-open #hdrFabMenu{
 #page-stk #stkStatusToggle { border-radius:999px; padding:6px 12px; border:1px solid var(--divider, rgba(0,0,0,.12)); }
 #page-stk #stkStatusToggle[aria-pressed="true"] { background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
 
+/* 新增一欄「買價」的固定寬度 */
+#page-stk .ctbc-table .col-fix-5 { width: 110px; }
+
+/* 新增窗的表單排版 */
+#stkAddDlg .form-row { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+#stkAddDlg .form-row label { font-size:12px; color:var(--text-weak,#667085); }
+#stkAddDlg .input { width:100%; padding:10px 12px; }
+
+
+/* 兩個跳窗都置中，蓋過虛擬清單 */
+#stkEditDlg, #stkAddDlg{
+  position: fixed !important; inset: 0 !important;
+  z-index: 2000 !important;               /* 高於 viewport/table */
+  display: none; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(0,0,0,.35);
+}
+
+/* Add 視窗骨架（Edit 已有） */
+#stkAddDlg .modal-content{
+  max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto;
+  background: var(--card,#fff); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+}
+#stkAddDlg .modal-hd{
+  position:sticky; top:0; display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; background:inherit; border-bottom:1px solid var(--divider, rgba(0,0,0,.12));
+}
+#stkAddDlg .modal-bd{ padding:16px; }
+#stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+
+/* 買價/現價按鈕（cell-edit）跟著主題變化 */
+#page-stk .cell-edit{
+  display:inline-block; padding:.2rem .5rem; border-radius:999px;
+  border:1px solid var(--divider, rgba(0,0,0,.12));
+  background: var(--card, #fff);
+}
+:root:not(.light) #page-stk .cell-edit{
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+}
+:root.light #page-stk .cell-edit{
+  background:#fff; border-color:#e5e7eb;
+}
+#page-stk .cell-edit:hover{ filter:brightness(.98); }
+#page-stk .cell-edit:active{ transform: translateY(1px); }
+
+/* 子清單卡片微陰影（更像 iOS） */
+#page-stk .detail-card{ box-shadow:0 6px 18px rgba(0,0,0,.12); }
+:root:not(.light) #page-stk .detail-card{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
+
+/* ==== STK detail: 3-column & animations ==== */
+#page-stk .detail-grid { display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px 16px; padding: 10px 8px; }
+#page-stk .stk-detail { transition: all .18s ease; }
+#page-stk .stk-detail .detail-card { transform-origin: top; transition: transform .14s ease, opacity .14s ease; }
+#page-stk .stk-detail.entering .detail-card { transform: scale(0.98); opacity: .0; }
+#page-stk .stk-detail.open .detail-card { transform: scale(1); opacity: 1; }
+/* pill 在暗色主題維持對比 */
+:root:not(.light) #page-stk .cell-edit { color: var(--text, #f2f2f2); }
+
   </style>

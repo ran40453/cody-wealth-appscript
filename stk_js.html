@@ -5,22 +5,24 @@ App.modules = App.modules || {};
 App.modules.stk = (function(){
   // ===== Config（之後要擴充可編輯欄位就在這裡加）=====
   const EDITABLE_FIELDS = {
-    E: { key:'E', label:'現價', type:'number', decimals:3, min:0 },
-    R: { key:'R', label:'股息', type:'number', decimals:2, min:0 }
-    // 之後若要指定更新日欄位，再加 updateDateCol:'<欄位字母>'
-  };
+  D: { key:'D', label:'買價', type:'number', decimals:3, min:0 },
+  E: { key:'E', label:'現價', type:'number', decimals:3, min:0 },
+  R: { key:'R', label:'股息', type:'number', decimals:3, min:0 },
+  A: { key:'A', label:'狀態', type:'select', options:[{v:'', t:'—'},{v:'已賣出', t:'已賣出'}] }
+};
 
   // ===== State =====
   let allRows = [];
   let viewRows = [];
   const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
-  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 7, markets: [], market: 'US' };
+  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 8, markets: [], market: 'US' };
 
   // ===== Init =====
   function init(){
     setupViewport();
     bindGlobalEditModal();
     bindStatusToggle();
+    bindAddFlow();              // <= 新增這行
     setBodyLoading(true);
     fetchData();
   }
@@ -109,17 +111,18 @@ App.modules.stk = (function(){
 
   // ===== Head =====
   function renderHead(){
-    if (!vs.thead) return;
-    vs.thead.innerHTML = `<tr>
-      <th class="txt">產品</th>               <!-- B -->
-      <th class="num col-fix-1">股數</th>     <!-- C -->
-      <th class="num col-fix-2">均價</th>     <!-- F -->
-      <th class="num col-fix-3">現價</th>     <!-- E (editable) -->
-      <th class="txt">未實現損益 / ROI</th>  <!-- J + H -->
-      <th class="txt col-fix-4">市場</th>     <!-- T -->
-      <th class="txt">狀態</th>               <!-- A -->
-    </tr>`;
-  }
+  if (!vs.thead) return;
+  vs.thead.innerHTML = `<tr>
+    <th class="txt">產品</th>               <!-- B -->
+    <th class="num col-fix-1">股數</th>     <!-- C -->
+    <th class="num col-fix-2">均價</th>     <!-- F -->
+    <th class="num col-fix-5">買價</th>     <!-- D (editable) -->
+    <th class="num col-fix-3">現價</th>     <!-- E (editable) -->
+    <th class="txt">未實現損益 / ROI</th>  <!-- J + H -->
+    <th class="txt col-fix-4">市場</th>     <!-- T -->
+    <th class="txt">狀態</th>               <!-- A -->
+  </tr>`;
+}
 
   // ===== Body (virtual list) =====
   function renderTable(rows){
@@ -165,6 +168,9 @@ App.modules.stk = (function(){
         </td>
         <td class="num col-fix-1">${fmtInt(r.C)}</td>
         <td class="num col-fix-2">${fmtMoney(r.F)}</td>
+        <td class="num col-fix-5">
+          <button class="cell-edit" data-col="D" title="點擊編輯買價">${fmtMoney(r.D)}</button>
+        </td>
         <td class="num col-fix-3">
           <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney(r.E)}</button>
         </td>
@@ -175,12 +181,14 @@ App.modules.stk = (function(){
           </div>
         </td>
         <td class="txt col-fix-4">${esc(r.T||'')}</td>
-        <td class="txt">${String(r.A||'').trim()? '已賣出':'—'}</td>
+        <td class="txt">
+          <button class="cell-edit" data-col="A" title="修改狀態">${String(r.A||'').trim()? '已賣出':'—'}</button>
+        </td>
       </tr>`;
 
       if (!st.expanded.has(rowId)) return main;
 
-      const detail = `<tr class="stk-detail" data-row="${rowId}">
+      const detail = `<tr class="stk-detail open" data-row="${rowId}">
         <td class="txt" colspan="${st.totalCols}">
           <div class="detail-card">
             <div class="detail-section">
@@ -215,15 +223,27 @@ App.modules.stk = (function(){
       vs.tbody.style.transform = 'translateY(0px)';
       vs.tbody.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">目前沒有資料</td></tr>`;
     }
+
+    if (st.anim) {
+      vs.tbody.querySelectorAll('tr.stk-detail').forEach(tr=>{
+        tr.classList.add('entering');
+        requestAnimationFrame(()=> tr.classList.remove('entering'));
+      });
+    }
   }
 
-  function onToggleRow(e){
-    const rowId = Number(e.currentTarget.dataset.row||0);
-    if (!rowId) return;
-    if (st.expanded.has(rowId)) st.expanded.delete(rowId);
-    else st.expanded.add(rowId);
-    renderTable(viewRows);
+  // caret 點擊
+function onToggleRow(e){
+  const rowId = Number(e.currentTarget.dataset.row||0);
+  if (!rowId) return;
+  if (st.expanded.has(rowId)) {
+    st.expanded.delete(rowId);
+  } else {
+    st.expanded.clear();
+    st.expanded.add(rowId);
   }
+  renderTable(viewRows);
+}
 
   function bindStatusToggle(){
     const btn = byId('stkStatusToggle');
@@ -297,9 +317,44 @@ App.modules.stk = (function(){
     byId('stkEditTitle').textContent = `編輯：${meta.title}`;
     const input = byId('stkEditInput');
     input.type = (meta.type==='number' ? 'number' : 'text');
+    if (meta.type==='select'){
+      const dlg = byId('stkEditDlg');
+      const oldSel = byId('stkEditSelect');
+      if (oldSel && oldSel.parentNode) oldSel.parentNode.removeChild(oldSel);
+      const pick = document.createElement('select');
+      pick.id = 'stkEditSelect';
+      pick.className = 'input';
+      pick.innerHTML = (meta.options||[]).map(o=> `<option value="${esc(o.v)}"${o.v===String(meta.value||'')?' selected':''}>${esc(o.t)}</option>`).join('');
+      if (meta.col === 'A') {
+        const wrap = document.createElement('div');
+        wrap.id = 'stkSellExtras';
+        wrap.innerHTML = `
+          <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div><label>股數</label><input id="stkSellQty" type="number" step="any" class="input" /></div>
+            <div><label>賣價</label><input id="stkSellPrice" type="number" step="any" class="input" /></div>
+          </div>`;
+        pick.parentNode.insertBefore(wrap, pick.nextSibling);
+        const r = allRows.find(x => Number(x.ROW)===meta.row) || {};
+        byId('stkSellQty').value = toNum(r.C);
+        byId('stkSellPrice').value = toNum(r.E);
+      }
+      const old = byId('stkEditInput');
+      if (old && old.parentNode){
+        old.style.display='none';
+        old.setAttribute('data-hidden','1');
+        old.parentNode.insertBefore(pick, old.nextSibling);
+      }
+    }else{
+      const oldSel = byId('stkEditSelect');
+      if (oldSel && oldSel.parentNode) oldSel.parentNode.removeChild(oldSel);
+      const old = byId('stkEditInput');
+      if (old) { old.style.display=''; old.removeAttribute('data-hidden'); }
+      const extra = byId('stkSellExtras');
+      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+    }
     input.step = (meta.type==='number' ? 'any' : undefined);
     input.value = (meta.value ?? '');
-    dlg.style.display = 'block';
+    dlg.style.display = 'flex';
     setTimeout(()=> input.focus(), 0);
   }
   function closeEdit(){
@@ -310,45 +365,133 @@ App.modules.stk = (function(){
   }
 
   function submitEdit(){
-    const dlg = byId('stkEditDlg');
-    if (!dlg) return;
-    const row = Number(dlg.dataset.row||0);
-    const col = String(dlg.dataset.col||'');
-    const decimals = Number(dlg.dataset.decimals||2);
-    const min = (dlg.dataset.min===''? null : Number(dlg.dataset.min));
-    const updateDateCol = dlg.dataset.updateDateCol || '';
-    const input = byId('stkEditInput');
-    let val = input.value;
+  const dlg = byId('stkEditDlg');
+  if (!dlg) return;
+  const row = Number(dlg.dataset.row||0);
+  const col = String(dlg.dataset.col||'');
+  const decimals = Number(dlg.dataset.decimals||2);
+  const min = (dlg.dataset.min===''? null : Number(dlg.dataset.min));
+  const updateDateCol = dlg.dataset.updateDateCol || '';
+  const sel = byId('stkEditSelect');
+  const input = byId('stkEditInput');
 
-    if (val==='' || val==null){
-      alert('請輸入數值');
+  // 狀態欄（A）
+  if (col === 'A' && sel){
+    const val = sel.value; // '' 或 '已賣出'
+    if (val === ''){
+      toggleBusy(true);
+      google.script.run
+        .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
+        .withFailureHandler(err=>{ toggleBusy(false); alert('更新失敗：'+(err&&err.message||'')); })
+        .setSTKValue(row, 'A', '', null);
       return;
     }
-    let num = toNum(val);
-    if (min!=null && num < min){
-      alert(`數值不可小於 ${min}`);
-      return;
-    }
+    const qty = toNum(byId('stkSellQty')?.value);
+    const price = toNum(byId('stkSellPrice')?.value);
+    const orig = allRows.find(x=> Number(x.ROW)===row) || {};
+    const currentQty = toNum(orig.C);
+    if (!qty || qty<=0){ alert('請輸入賣出股數'); return; }
+    if (qty > currentQty){ alert('股數不可大於現有股數'); return; }
+    if (!isFinite(price) || price<=0){ alert('請輸入賣出價格'); return; }
 
-    // 後端 API：setSTKValue(row, col, value, updateDateCol)
     toggleBusy(true);
     google.script.run
-      .withSuccessHandler(ok=>{
-        toggleBusy(false);
-        closeEdit();
-        // 更新前端快取
-        const r = allRows.find(x=> Number(x.ROW)===row);
-        if (r){ r[col] = round(num, decimals); if (updateDateCol) r[updateDateCol] = todayISO(); }
-        // 重新算 KPI & 局部重繪：這裡偷懶直接重繪虛擬片段
-        renderKPI(viewRows);
-        renderVirtual();
-      })
-      .withFailureHandler(err=>{
-        toggleBusy(false);
-        alert('寫入失敗：' + (err && err.message || ''));
-      })
-      .setSTKValue(row, col, round(num, decimals), updateDateCol || null);
+      .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
+      .withFailureHandler(err=>{ toggleBusy(false); alert('賣出處理失敗：'+(err&&err.message||'')); })
+      .splitSell(row, qty, price);
+    return;
   }
+
+  // 其他欄位（D/E/R）照舊
+  let val = input ? input.value : '';
+  if (val==='' || val==null){ alert('請輸入數值'); return; }
+  let num = toNum(val);
+  if (min!=null && num < min){ alert(`數值不可小於 ${min}`); return; }
+
+  toggleBusy(true);
+  google.script.run
+    .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
+    .withFailureHandler(err=>{ toggleBusy(false); alert('寫入失敗：' + (err && err.message || '')); })
+    .setSTKValue(row, col, round(num, decimals), updateDateCol || null);
+}
+
+
+  function bindAddFlow(){
+    const open = byId('stkAddBtn');
+    const dlg  = byId('stkAddDlg');
+    const form = byId('stkAddForm');
+    const close= byId('stkAddClose');
+    const cancel= byId('stkAddCancel');
+    const ok   = byId('stkAddOk');
+    if (!open || !dlg || !form) return;
+
+    const fillMarkets = ()=>{
+      const sel = byId('stkAddMarket'); if (!sel) return;
+      sel.innerHTML = st.markets.map(m=> `<option value="${esc(m)}"${m===st.market?' selected':''}>${esc(m)}</option>`).join('');
+    };
+    const today = ()=> new Date().toISOString().slice(0,10);
+
+    open.onclick = ()=>{
+      fillMarkets();
+      byId('stkAddName').value = '';
+      byId('stkAddShares').value = '';
+      byId('stkAddBuy').value = '';
+      byId('stkAddDiv').value = '0.0';
+      byId('stkAddDate').value = today();
+      byId('stkAddUnit').value = '零股';
+      dlg.style.display = 'flex';  // 搭配 CSS 置中
+    };
+    const closeDlg = ()=> dlg.style.display='none';
+    if (close) close.onclick = closeDlg;
+    if (cancel) cancel.onclick = closeDlg;
+
+    form.onsubmit = (e)=>{
+      e.preventDefault();
+      const item = {
+        B: byId('stkAddName').value.trim(),
+        C: Number(byId('stkAddShares').value||0),
+        D: Number(byId('stkAddBuy').value||0),
+        T: byId('stkAddMarket').value,
+        R: Number(byId('stkAddDiv').value||0),
+        L: byId('stkAddDate').value,
+        U: byId('stkAddUnit').value
+      };
+      if (!item.B || !item.C || !item.D){ alert('請填寫 產品 / 股數 / 買價'); return; }
+      // Optimistic UI: 先在清單前端插入一筆暫時列（等待後端寫入與回填公式）
+      const pending = {
+        ROW: 0, A:'', B:item.B, C:item.C, D:item.D, E:'', F:'', G:'', H:'', I:'', J:'', K:'', L:item.L, M:'', N:'', O:'', P:'', Q:'', R:item.R, S:'', T:item.T, U:item.U, V:''
+      };
+      // 僅當前市場符合時顯示（避免切市場時看到不相關資料）
+      if (!st.market || st.market === item.T){
+        viewRows = [pending, ...viewRows];
+        renderTable(viewRows);
+      }
+      toggleAddBusy(true);
+      google.script.run
+        .withSuccessHandler(_=>{
+          toggleAddBusy(false);
+          closeDlg();
+          fetchData();
+        })
+        .withFailureHandler(err=>{
+          toggleAddBusy(false);
+          alert('新增失敗：' + (err && err.message || ''));
+        })
+        .addSTKItem(item);
+    };
+  }
+function toggleAddBusy(on){
+  const ok = byId('stkAddOk');
+  const txt= byId('stkAddOkTxt');
+  const sp = byId('stkAddOkSpin');
+  if (!ok) return;
+  ok.disabled = !!on;
+  if (txt && sp){
+    txt.style.display = on ? 'none' : 'inline';
+    sp.style.display  = on ? 'inline-block' : 'none';
+  }
+}
+
 
   // ===== UI helpers =====
   function setupViewport(){
@@ -362,6 +505,7 @@ App.modules.stk = (function(){
       if (raf) return;
       raf = requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
     });
+    // 點整列
     vs.tbody?.addEventListener('click', (ev)=>{
       const isInteractive = ev.target.closest('.cell-edit, .row-toggle, button, a, input, select, textarea');
       if (isInteractive) return;
@@ -369,7 +513,13 @@ App.modules.stk = (function(){
       if (!tr) return;
       const rowId = Number(tr.dataset.row||0);
       if (!rowId) return;
-      if (st.expanded.has(rowId)) st.expanded.delete(rowId); else st.expanded.add(rowId);
+
+      if (st.expanded.has(rowId)) {
+        st.expanded.delete(rowId);
+      } else {
+        st.expanded.clear();
+        st.expanded.add(rowId);
+      }
       renderTable(viewRows);
     });
   }
@@ -422,7 +572,7 @@ App.modules.stk = (function(){
   function setRoiPill(el, v){ if (el) el.innerHTML = roiPillHTML(v); }
   function setBodyLoading(on){
     const tb = byId('stkBody'); if (!tb) return;
-    tb.innerHTML = on ? `<tr><td class="empty" colspan="7">載入中…</td></tr>` : '';
+    tb.innerHTML = on ? `<tr><td class="empty" colspan="${st.totalCols}">載入中…</td></tr>` : '';
   }
   function failUI(msg){
     const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">發生錯誤：${esc(msg||'')}</td></tr>`;

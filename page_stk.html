@@ -10,20 +10,21 @@
       </div>
       <div class="kpi-toggle-wrap">
         <button id="stkStatusToggle" class="kpi-toggle" aria-pressed="false">顯示目前持有</button>
+        <button id="stkAddBtn" class="kpi-toggle">新增</button>
       </div>
     </div>
 
     <div id="stkMarketChips" class="chips"></div>
       <table class="ctbc-table">
         <thead id="stkHead"></thead>
-        <tbody id="stkBody"><tr><td class="empty" colspan="7">載入中…</td></tr></tbody>
+        <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
       </table>
       <div id="stkSpacer" aria-hidden="true"></div>
       
     <div class="ctbc-scroll" id="stkViewport">
       <table class="ctbc-table">
         <thead id="stkHead"></thead>
-        <tbody id="stkBody"><tr><td class="empty" colspan="7">載入中…</td></tr></tbody>
+        <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
       </table>
       <div id="stkSpacer" aria-hidden="true"></div>
     </div>
@@ -43,6 +44,56 @@
           <button class="btn primary" id="stkEditOk" type="submit">
             <span id="stkEditOkTxt">儲存</span>
             <span id="stkEditOkSpin" class="spinner" style="display:none"></span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 新增項目 Modal -->
+  <div class="modal" id="stkAddDlg" style="display:none">
+    <div class="modal-content">
+      <div class="modal-hd">
+        <div class="title">新增部位</div>
+        <button class="btn-close" id="stkAddClose" title="關閉">×</button>
+      </div>
+      <form id="stkAddForm" class="modal-bd">
+        <div class="form-row">
+          <label>產品</label>
+          <input id="stkAddName" class="input" placeholder="輸入產品名稱" required />
+        </div>
+        <div class="form-row">
+          <label>股數</label>
+          <input id="stkAddShares" type="number" step="any" class="input" placeholder="0" required />
+        </div>
+        <div class="form-row">
+          <label>買價</label>
+          <input id="stkAddBuy" type="number" step="any" class="input" placeholder="0.0" required />
+        </div>
+        <div class="form-row">
+          <label>市場</label>
+          <select id="stkAddMarket" class="input"></select>
+        </div>
+        <div class="form-row">
+          <label>股息</label>
+          <input id="stkAddDiv" type="number" step="any" class="input" value="0.0" />
+        </div>
+        <div class="form-row">
+          <label>買日</label>
+          <input id="stkAddDate" type="date" class="input" />
+        </div>
+        <div class="form-row">
+          <label>單位</label>
+          <select id="stkAddUnit" class="input">
+            <option value="零股" selected>零股</option>
+            <option value="整股">整股</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" id="stkAddCancel" type="button">取消</button>
+          <button class="btn primary" id="stkAddOk" type="submit">
+            <span id="stkAddOkTxt">新增</span>
+            <span id="stkAddOkSpin" class="spinner" style="display:none"></span>
           </button>
         </div>
       </form>
