@@ -7,30 +7,26 @@
         <div class="kpi"><div class="k">未實現損益</div><div class="v bold" id="stkKpiUPL">—</div></div>
         <div class="kpi"><div class="k">損益(NT)</div><div class="v bold" id="stkKpiPL">—</div></div>
         <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
-      </div>
-      <div class="kpi-toggle-wrap">
-        <button id="stkStatusToggle" class="icon-btn" aria-pressed="false" title="持有">
-          <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
-        </button>
-        <button id="stkAddBtn" class="icon-btn" title="新增">
-          <span class="material-symbols-outlined" aria-hidden="true">add</span>
-        </button>
+        <div class="kpi-actions-card">
+          <button id="stkStatusToggle" class="icon-btn" aria-pressed="false" title="持有">
+            <span class="material-symbols-outlined" aria-hidden="true">inventory_2</span>
+          </button>
+          <button id="stkAddBtn" class="icon-btn" title="新增">
+            <span class="material-symbols-outlined" aria-hidden="true">add</span>
+          </button>
+          <button id="stkDeleteModeBtn" class="icon-btn" title="刪除模式" aria-pressed="false">
+            <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <div id="stkMarketChips" class="chips"></div>
-      <table class="ctbc-table">
-        <thead id="stkHead"></thead>
-        <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
-      </table>
-      <div id="stkSpacer" aria-hidden="true"></div>
-      
+    <div id="stkMarketChips" class="chips"></div>      
     <div class="ctbc-scroll" id="stkViewport">
       <table class="ctbc-table">
         <thead id="stkHead"></thead>
         <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
       </table>
-      <div id="stkSpacer" aria-hidden="true"></div>
     </div>
   </div>
 

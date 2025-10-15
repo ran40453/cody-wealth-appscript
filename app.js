@@ -1344,7 +1344,7 @@ function addSTKItem(item){
   }
 
   // A 狀態清空（未賣出）、M 賣日清空
-  sh.getRange(targetRow, col('A')).setValue('');
+  sh.getRange(targetRow, col('A')).setValue(false);
   sh.getRange(targetRow, col('M')).clearContent();
 
   // 寫入主要欄位
@@ -1362,7 +1362,7 @@ function addSTKItem(item){
 
   // E 現價：強制改為指定公式（依列號帶入）
   var r = targetRow;
-  var formula = '=IF(T'+r+'="US",IF(A'+r+'="已賣出","sold price",googlefinance(B'+r+',"PRICE")),IF(A'+r+'="已賣出","sold price",vlookup(B'+r+",'🔄️'!B:E,3,0)))";
+  var formula = '=IF(T'+r+'="US",IF(A'+r+'=TRUE,"sold price",googlefinance(B'+r+',"PRICE")),IF(A'+r+'=TRUE,"sold price",vlookup(B'+r+",'🔄️'!B:E,3,0)))";
   sh.getRange(targetRow, col('E')).setFormula(formula);
 
   return { row: targetRow };
@@ -1395,7 +1395,7 @@ function splitSell(row, qty, price){
   var today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
 
   if (qty === currentQty){
-    sh.getRange(r, col('A')).setValue('已賣出');
+    sh.getRange(r, col('A')).setValue(true);
     sh.getRange(r, col('E')).setValue(Number(price)); // 固定賣價
     sh.getRange(r, col('M')).setValue(today);
     return { row:r, type:'full' };
@@ -1405,7 +1405,7 @@ function splitSell(row, qty, price){
   var remain = currentQty - qty;
 
   // 原列寫入賣出資訊
-  sh.getRange(r, col('A')).setValue('已賣出');
+  sh.getRange(r, col('A')).setValue(true);
   sh.getRange(r, col('C')).setValue(Number(qty));
   sh.getRange(r, col('E')).setValue(Number(price));
   sh.getRange(r, col('M')).setValue(today);
@@ -1416,12 +1416,12 @@ function splitSell(row, qty, price){
   sh.getRange(r, 1, 1, needCols).copyTo(sh.getRange(nr, 1, 1, needCols), {contentsOnly:false});
 
   // 新列：未賣出、股數=remain、賣日清空
-  sh.getRange(nr, col('A')).setValue('');
+  sh.getRange(nr, col('A')).setValue(false);
   sh.getRange(nr, col('C')).setValue(Number(remain));
   sh.getRange(nr, col('M')).clearContent();
 
   // 新列：現價公式
-  var formula = '=IF(T'+nr+'="US",IF(A'+nr+'="已賣出","sold price",googlefinance(B'+nr+',"PRICE")),IF(A'+nr+'="已賣出","sold price",vlookup(B'+nr+",'🔄️'!B:E,3,0)))";
+  var formula = '=IF(T'+nr+'="US",IF(A'+nr+'=TRUE,"sold price",googlefinance(B'+nr+',"PRICE")),IF(A'+nr+'=TRUE,"sold price",vlookup(B'+nr+",'🔄️'!B:E,3,0)))";
   sh.getRange(nr, col('E')).setFormula(formula);
 
   return { row:r, remainRow:nr, type:'partial' };
@@ -1431,4 +1431,15 @@ function splitSell(row, qty, price){
     for (var i=0;i<s.length;i++){ var code = s.charCodeAt(i); if (code>=65 && code<=90) n = n*26 + (code-64); }
     return n;
   }
+}
+/** 刪除 STK 指定列（含表頭起算），row>=2 */
+function deleteSTKRow(row){
+  const SHEET = 'STK';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('找不到工作表：' + SHEET);
+  const last = sh.getLastRow();
+  const r = Number(row);
+  if (!r || r < 2 || r > last) throw new Error('列號超出範圍');
+  sh.deleteRow(r);
+  return { ok:true, row:r };
 }

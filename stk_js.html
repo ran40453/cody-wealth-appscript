@@ -15,7 +15,7 @@ App.modules.stk = (function(){
   let allRows = [];
   let viewRows = [];
   const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
-  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 8, markets: [], market: 'US' };
+  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 8, markets: [], market: 'US',deleteMode: false, };
 
   // ===== Init =====
   function init(){
@@ -25,6 +25,7 @@ App.modules.stk = (function(){
     bindAddFlow();              // <= 新增這行
     setBodyLoading(true);
     fetchData();
+    bindDeleteMode();
   }
 
   // ===== Data =====
@@ -65,15 +66,9 @@ App.modules.stk = (function(){
   function applyFilter(){
     let rows = allRows.slice();
     if (st.market) rows = rows.filter(r => String(r.T||'').trim() === st.market);
-    if (st.showOnlyOpen){
-      // 僅顯示「持有」（A 空白）
-      rows = rows.filter(r => !String(r.A||'').trim());
-    }else{
-      // 僅顯示「已賣出」（A 有字）
-      rows = rows.filter(r => !!String(r.A||'').trim());
-    }
+    rows = st.showOnlyOpen ? rows.filter(r => !isSoldRow(r))
+                          : rows.filter(r =>  isSoldRow(r));
     viewRows = rows;
-    // 確保清掉占位列
     setBodyLoading(false);
   }
 
@@ -193,7 +188,7 @@ App.modules.stk = (function(){
         </td>
         <td class="txt col-fix-4">${esc(r.T||'')}</td>
         <td class="txt">
-          <button class="cell-edit" data-col="A" title="修改狀態">${String(r.A||'').trim()? '已賣出':'—'}</button>
+          <button class="cell-edit" data-col="A" title="修改狀態">${ isSoldRow(r) ? '已賣出' : '—' }</button>
         </td>
       </tr>`;
 
@@ -254,6 +249,21 @@ function onToggleRow(e){
   }
   renderTable(viewRows);
 }
+
+
+  function bindDeleteMode(){
+    const btn = document.getElementById('stkDeleteModeBtn');
+    if (!btn) return;
+    const sync = ()=>{
+      btn.setAttribute('aria-pressed', st.deleteMode ? 'true' : 'false');
+      btn.classList.toggle('danger', st.deleteMode);
+      const icon = btn.querySelector('.material-symbols-outlined');
+      if (icon) icon.textContent = st.deleteMode ? 'delete_forever' : 'delete';
+      btn.title = st.deleteMode ? '退出刪除' : '刪除模式';
+    };
+    btn.onclick = ()=>{ st.deleteMode = !st.deleteMode; sync(); };
+    sync();
+  }  
 
   function bindStatusToggle(){
     const btn = byId('stkStatusToggle');
@@ -509,8 +519,10 @@ function onToggleRow(e){
       if (!item.B || !item.C || !item.D){ alert('請填寫 產品 / 股數 / 買價'); return; }
       // Optimistic UI: 先在清單前端插入一筆暫時列（等待後端寫入與回填公式）
       const pending = {
-        ROW: 0, A:'', B:item.B, C:item.C, D:item.D, E:'', F:'', G:'', H:'', I:'', J:'', K:'', L:item.L, M:'', N:'', O:'', P:'', Q:'', R:item.R, S:'', T:item.T, U:item.U, V:''
-      };
+        ROW: 0, A:false, B:item.B, C:item.C, D:item.D, E:'', F:'', G:'', H:'', I:'', J:'', K:'',
+          L:item.L, M:'', N:'', O:'', P:'', Q:'', R:item.R, S:'', T:item.T, U:item.U, V:''
+        };
+      
       // 僅當前市場符合時顯示（避免切市場時看到不相關資料）
       if (!st.market || st.market === item.T){
         viewRows = [pending, ...viewRows];
@@ -564,6 +576,32 @@ function toggleAddBusy(on){
       const rowId = Number(tr.dataset.row||0);
       if (!rowId) return;
 
+      // 刪除模式：點列即刪除，不進入展開/收合
+      if (st.deleteMode){
+        const r = allRows.find(x=> Number(x.ROW)===rowId);
+        if (r){
+          const name = String(r.B||'');
+          const ok = confirm(`要刪除「${name}」這筆資料嗎？\n（第 ${rowId} 列）`);
+          if (ok){
+            toggleBusy(true);
+            const run =
+              (window.google && google.script && google.script.run) ? google.script.run :
+              (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run :
+              null;
+            if (run){
+              run
+                .withSuccessHandler(()=>{ toggleBusy(false); fetchData(); })
+                .withFailureHandler(err=>{ toggleBusy(false); alert('刪除失敗：'+(err&&err.message||'')); })
+                .deleteSTKRow(rowId);
+            }else{
+              toggleBusy(false);
+              alert('刪除失敗：找不到 Apps Script 執行環境');
+            }
+          }
+        }
+        return; // 刪除模式下不做展開/收合
+      }
+
       if (st.expanded.has(rowId)) {
         st.expanded.delete(rowId);
       } else {
@@ -593,6 +631,12 @@ function toggleAddBusy(on){
   }
   function fmtMoney(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '—'; }
   function fmtInt(v){ return isFinite(+v) ? Math.round(+v).toLocaleString('zh-Hant-TW') : '—'; }
+  function isSoldRow(r){
+    const a = r && r.A;
+    if (typeof a === 'boolean') return a;
+    const s = String(a||'').trim().toLowerCase();
+    return (s === 'true' || s === '已賣出');
+  }
   function fmtDate(v){
     try{
       if (v instanceof Date) {
