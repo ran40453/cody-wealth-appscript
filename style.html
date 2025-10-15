@@ -1941,179 +1941,101 @@ body.hdr-fab-open #hdrFabMenu{
   }
 
 /* =========================================================
-   #22 STK
+   #22 page STK (scoped, no duplicates; light/dark ok)
    ========================================================= */
-.ctbc-table td.editable { cursor: pointer; text-decoration: underline dotted; }
-.dlg .form-row { display:flex; align-items:center; gap:.5rem; margin:.5rem 0; }
-.dlg .lbl { width:7em; opacity:.8; }
-.dlg .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 
-/* 市場 Chips（篩選） */
-#page-stk #stkMarketChips { display:flex; gap:8px; padding:8px 8px 6px; position: sticky; top: 0; background: var(--card,#fff); z-index: 2; }
-#page-stk #stkMarketChips .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid var(--divider, rgba(0,0,0,.12)); cursor:pointer; user-select:none; }
-#page-stk #stkMarketChips .chip.on { background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
+/* --- Base helpers (scoped) --- */
+#page-stk .ctbc-table td.editable{ cursor:pointer; text-decoration: underline dotted; }
+#page-stk .dlg .form-row{ display:flex; align-items:center; gap:.5rem; margin:.5rem 0; }
+#page-stk .dlg .lbl{ width:7em; opacity:.8; }
+#page-stk .dlg .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 
-/* 表格排版固定（避免重疊/跑位） */
-#page-stk .ctbc-scroll { overflow:auto; }
-#page-stk .ctbc-table { table-layout: fixed; min-width: 980px; border-collapse: separate; border-spacing: 0; }
-#page-stk .ctbc-table th, #page-stk .ctbc-table td { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
-#page-stk .ctbc-table th.txt, #page-stk .ctbc-table td.txt { max-width: 260px; }
-#page-stk .ctbc-table .col-fix-1 { width: 90px; }
-#page-stk .ctbc-table .col-fix-2 { width: 110px; }
-#page-stk .ctbc-table .col-fix-3 { width: 120px; }
-#page-stk .ctbc-table .col-fix-4 { width: 120px; }
-#page-stk .pnl-cell { display:inline-flex; align-items:center; gap:.5rem; }
-#page-stk .cell-edit { display:inline-block; padding:.2rem .5rem; border-radius:999px; border:1px solid var(--divider, rgba(0,0,0,.12)); background:var(--card,#fff); cursor:pointer; }
+/* --- Market chips: 2x size, centered in its bar --- */
+#page-stk #stkMarketChips{ display:flex; flex-wrap:wrap; gap:16px; padding:10px 8px; position:sticky; top:0; z-index:2; align-items:center; justify-content:center; background: var(--card,#fff); }
+#page-stk #stkMarketChips .chip{ display:inline-flex; align-items:center; justify-content:center; gap:10px; font-size: calc(13px * 2); padding: 12px 22px; border-radius:999px; border:1px solid color-mix(in oklab, var(--tint) 25%, transparent); background: color-mix(in oklab, var(--surface) 82%, transparent); color: var(--text); font-weight:800; }
+#page-stk #stkMarketChips .chip.on{ background: var(--tint) !important; border-color: var(--tint) !important; color:#fff !important; }
 
-/* iOS 風格的子清單卡片 */
-#page-stk .stk-detail td { padding:0; }
-#page-stk .detail-card { margin:8px; border-radius:12px; background:var(--card,#fff); border:1px solid var(--divider, rgba(0,0,0,.12)); overflow:hidden; }
-#page-stk .detail-section + .detail-section { border-top:1px solid var(--divider, rgba(0,0,0,.08)); }
-#page-stk .detail-item { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; }
-#page-stk .detail-item .label { color:var(--text-weak, #667085); }
-#page-stk .detail-item .value button.cell-edit { padding:.2rem .55rem; }
+/* --- Table layout: fixed widths, no overlap --- */
+#page-stk .ctbc-scroll{ overflow:auto; }
+#page-stk .ctbc-table{ table-layout:fixed; min-width:980px; border-collapse:separate; border-spacing:0; }
+#page-stk .ctbc-table th, #page-stk .ctbc-table td{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+#page-stk .ctbc-table th.txt, #page-stk .ctbc-table td.txt{ max-width:260px; }
+#page-stk .ctbc-table .col-fix-1{ width:90px; }
+#page-stk .ctbc-table .col-fix-2{ width:110px; }
+#page-stk .ctbc-table .col-fix-3{ width:120px; }
+#page-stk .ctbc-table .col-fix-4{ width:120px; }
+#page-stk .ctbc-table .col-fix-5{ width:110px; } /* 買價 */
+#page-stk .pnl-cell{ display:inline-flex; align-items:center; gap:.5rem; }
 
-/* 列可點（但不影響行內按鈕） */
-#page-stk tr.stk-row { cursor: pointer; }
+/* 全部內容置中（僅 STK viewport） */
+#page-stk #stkViewport .ctbc-table thead th,
+#page-stk #stkViewport .ctbc-table tbody td{ text-align:center !important; }
+
+/* 亮色主題：表頭統一淺灰 */
+#page-stk{ --stk-head-light: #f3f4f6; }
+:root.light #page-stk #stkViewport .ctbc-table thead th{ background: var(--stk-head-light) !important; }
+:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-1,
+:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-2,
+:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-3,
+:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-4,
+:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-5{ background: var(--stk-head-light) !important; }
+
+/* --- iOS-like detail card (3-column grid) --- */
+#page-stk .stk-detail td{ padding:0; }
+#page-stk .detail-card{ margin:8px; border-radius:12px; background:var(--card,#fff); border:1px solid var(--divider, rgba(0,0,0,.12)); overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,.12); }
+:root:not(.light) #page-stk .detail-card{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
+#page-stk .detail-section + .detail-section{ border-top:1px solid var(--divider, rgba(0,0,0,.08)); }
+#page-stk .detail-item{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; }
+#page-stk .detail-item .label{ color:var(--text-weak,#667085); }
+#page-stk .detail-item .value button.cell-edit{ padding:.2rem .55rem; }
+#page-stk .detail-grid{ display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px 16px; padding:10px 8px; }
+#page-stk .stk-detail{ transition: all .18s ease; }
+#page-stk .stk-detail .detail-card{ transform-origin: top; transition: transform .14s ease, opacity .14s ease; }
+#page-stk .stk-detail.entering .detail-card{ transform: scale(0.98); opacity: 0; }
+#page-stk .stk-detail.open .detail-card{ transform: scale(1); opacity: 1; }
+
+/* --- Row click behavior (do not steal pointer for inner controls) --- */
+#page-stk tr.stk-row{ cursor:pointer; }
 #page-stk tr.stk-row .cell-edit,
 #page-stk tr.stk-row .row-toggle,
 #page-stk tr.stk-row button,
 #page-stk tr.stk-row a,
 #page-stk tr.stk-row input,
 #page-stk tr.stk-row select,
-#page-stk tr.stk-row textarea { cursor: default; }
+#page-stk tr.stk-row textarea{ cursor:default; }
+/* 移除 row-toggle icon 欄位（僅留產品名稱） */
+#page-stk .row-toggle, #page-stk .row-toggle .material-symbols-outlined{ display:none !important; }
 
-/* Modal 置中避免被裁切 */
-#stkEditDlg { position: fixed; inset:0; z-index:9999; display:none; align-items:center; justify-content:center; padding:24px; background: rgba(0,0,0,.35); }
-#stkEditDlg .modal-content { max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto; background:var(--card,#fff); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-#stkEditDlg .modal-hd { position:sticky; top:0; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:inherit; border-bottom:1px solid var(--divider, rgba(0,0,0,.12)); }
-#stkEditDlg .modal-bd { padding:16px; }
-#stkEditDlg .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
-#stkEditDlg .input { width:100%; padding:10px 12px; font-size:16px; }
-#stkEditDlg .btn-close { font-size:20px; line-height:1; border:none; background:transparent; cursor:pointer; }
-
-/* 狀態切換（單一按鈕） */
-#page-stk #stkStatusToggle { border-radius:999px; padding:6px 12px; border:1px solid var(--divider, rgba(0,0,0,.12)); }
-#page-stk #stkStatusToggle[aria-pressed="true"] { background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
-
-/* 新增一欄「買價」的固定寬度 */
-#page-stk .ctbc-table .col-fix-5 { width: 110px; }
-
-/* 新增窗的表單排版 */
-#stkAddDlg .form-row { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
-#stkAddDlg .form-row label { font-size:12px; color:var(--text-weak,#667085); }
-#stkAddDlg .input { width:100%; padding:10px 12px; }
-
-
-/* 兩個跳窗都置中，蓋過虛擬清單 */
-#stkEditDlg, #stkAddDlg{
-  position: fixed !important; inset: 0 !important;
-  z-index: 2000 !important;               /* 高於 viewport/table */
-  display: none; align-items: center; justify-content: center;
-  padding: 24px; background: rgba(0,0,0,.35);
-}
-
-/* Add 視窗骨架（Edit 已有） */
-#stkAddDlg .modal-content{
-  max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto;
-  background: var(--card,#fff); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25);
-}
-#stkAddDlg .modal-hd{
-  position:sticky; top:0; display:flex; align-items:center; justify-content:space-between;
-  padding:12px 16px; background:inherit; border-bottom:1px solid var(--divider, rgba(0,0,0,.12));
-}
-#stkAddDlg .modal-bd{ padding:16px; }
-#stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
-
-/* 買價/現價按鈕（cell-edit）跟著主題變化 */
-#page-stk .cell-edit{
-  display:inline-block; padding:.2rem .5rem; border-radius:999px;
-  border:1px solid var(--divider, rgba(0,0,0,.12));
-  background: var(--card, #fff);
-}
-:root:not(.light) #page-stk .cell-edit{
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
-}
-:root.light #page-stk .cell-edit{
-  background:#fff; border-color:#e5e7eb;
-}
+/* --- Pills (buy/price) follow theme --- */
+#page-stk .cell-edit{ display:inline-block; padding:.2rem .5rem; border-radius:999px; border:1px solid var(--divider, rgba(0,0,0,.12)); background: var(--card,#fff); color:inherit; }
+:root:not(.light) #page-stk .cell-edit{ background: color-mix(in oklab, var(--card) 92%, transparent); border-color: color-mix(in oklab, var(--tint) 20%, transparent); color: var(--text, #f2f2f2); }
+:root.light #page-stk .cell-edit{ background:#fff; border-color:#e5e7eb; }
 #page-stk .cell-edit:hover{ filter:brightness(.98); }
 #page-stk .cell-edit:active{ transform: translateY(1px); }
 
-/* 子清單卡片微陰影（更像 iOS） */
-#page-stk .detail-card{ box-shadow:0 6px 18px rgba(0,0,0,.12); }
-:root:not(.light) #page-stk .detail-card{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
-
-/* ==== STK detail: 3-column & animations ==== */
-#page-stk .detail-grid { display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px 16px; padding: 10px 8px; }
-#page-stk .stk-detail { transition: all .18s ease; }
-#page-stk .stk-detail .detail-card { transform-origin: top; transition: transform .14s ease, opacity .14s ease; }
-#page-stk .stk-detail.entering .detail-card { transform: scale(0.98); opacity: .0; }
-#page-stk .stk-detail.open .detail-card { transform: scale(1); opacity: 1; }
-/* pill 在暗色主題維持對比 */
-:root:not(.light) #page-stk .cell-edit { color: var(--text, #f2f2f2); }
-#page-stk #stkMarketChips .chip.on{
-  background: var(--primary, #3b82f6) !important;
-  color: #fff !important;
-  border-color: var(--primary, #3b82f6) !important;
-}
-
-#page-stk .kpi-toggle-wrap{
-  display:flex; gap:8px; align-items:center; justify-content:flex-end;
-}
-#page-stk .icon-btn{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:36px; height:36px; border-radius:10px;
-  border:1px solid var(--divider, rgba(0,0,0,.12));
-  background: var(--card,#fff); cursor:pointer;
-}
-#page-stk .icon-btn .material-symbols-outlined{ font-size:20px; line-height:1; }
-:root:not(.light) #page-stk .icon-btn{
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
-}
-#page-stk .icon-btn:hover{ filter:brightness(.98); }
-#page-stk .icon-btn:active{ transform: translateY(1px); }
-
-
-/* icon buttons – circular, consistent light/dark */
-#page-stk .icon-btn{
-  display:inline-flex; align-items:center; justify-content:center;
-  width:40px; height:40px;            /* 圓形尺寸 */
-  border-radius:50%;                  /* 關鍵：圓形 */
-  border:1px solid var(--divider, rgba(0,0,0,.12));
-  background: var(--card,#fff);
-  cursor:pointer;
-  transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease;
-}
-#page-stk .icon-btn .material-symbols-outlined{
-  font-size:22px; line-height:1;
-}
-:root:not(.light) #page-stk .icon-btn{
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
-}
+/* --- KPI actions mini-card (icons x2, dark readable) --- */
+#page-stk .kpi-actions-card{ display:flex; gap:10px; align-items:center; justify-content:flex-end; padding:8px; border-radius:12px; background:var(--card,#fff); border:1px solid var(--divider, rgba(0,0,0,.12)); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+:root:not(.light) #page-stk .kpi-actions-card{ background: color-mix(in oklab, var(--card) 92%, transparent); border-color: color-mix(in oklab, var(--tint) 20%, transparent); }
+#page-stk .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; border:1px solid var(--divider, rgba(0,0,0,.12)); background: var(--card,#fff); color: var(--text); cursor:pointer; transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease; }
+#page-stk .icon-btn .material-symbols-outlined{ font-size:44px; line-height:1; }
+:root:not(.light) #page-stk .icon-btn{ background: color-mix(in oklab, var(--card) 88%, transparent); border-color: color-mix(in oklab, var(--tint) 24%, transparent); color: var(--text); }
 #page-stk .icon-btn:hover{ filter:brightness(.98); }
 #page-stk .icon-btn:active{ transform: translateY(1px) scale(0.98); }
+#page-stk .icon-btn.danger{ background:#ef4444 !important; border-color:#ef4444 !important; color:#fff !important; }
+#page-stk .icon-btn.danger .material-symbols-outlined{ color:#fff !important; }
 
-/* delete mode active */
-#page-stk .icon-btn.danger{
-  background:#ef4444; border-color:#ef4444; color:#fff;
-}
-#page-stk .icon-btn.danger .material-symbols-outlined{ color:#fff; }
-#page-stk .icon-btn.danger:hover{ filter:brightness(0.95); }
-#page-stk .icon-btn.danger:active{ transform: translateY(1px) scale(0.98); }
+/* --- Single-button status toggle (kept for compatibility) --- */
+#page-stk #stkStatusToggle{ border-radius:999px; padding:6px 12px; border:1px solid var(--divider, rgba(0,0,0,.12)); }
+#page-stk #stkStatusToggle[aria-pressed="true"]{ background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
 
-#page-stk .kpi-actions-card{
-  display:flex; gap:8px; align-items:center; justify-content:flex-end;
-  padding:8px; border-radius:12px; background:var(--card,#fff);
-  border:1px solid var(--divider, rgba(0,0,0,.12));
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-:root:not(.light) #page-stk .kpi-actions-card{
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
-}
-
-  </style>
+/* --- Modals: center on screen and above viewport/table --- */
+#stkEditDlg, #stkAddDlg{ position: fixed !important; inset:0 !important; z-index:2000 !important; display:none; align-items:center; justify-content:center; padding:24px; background: rgba(0,0,0,.35); }
+#stkEditDlg .modal-content, #stkAddDlg .modal-content{ max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto; background:var(--card,#fff); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+#stkEditDlg .modal-hd, #stkAddDlg .modal-hd{ position:sticky; top:0; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:inherit; border-bottom:1px solid var(--divider, rgba(0,0,0,.12)); }
+#stkEditDlg .modal-bd, #stkAddDlg .modal-bd{ padding:16px; }
+#stkEditDlg .modal-actions, #stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+#stkEditDlg .input, #stkAddDlg .input{ width:100%; padding:10px 12px; font-size:16px; }
+#stkEditDlg .btn-close{ font-size:20px; line-height:1; border:none; background:transparent; cursor:pointer; }
+#stkAddDlg .form-row{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+#stkAddDlg .form-row label{ font-size:12px; color:var(--text-weak,#667085); }
+</style>
