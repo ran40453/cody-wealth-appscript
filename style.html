@@ -2053,5 +2053,26 @@ body.hdr-fab-open #hdrFabMenu{
 #page-stk .stk-detail.open .detail-card { transform: scale(1); opacity: 1; }
 /* pill 在暗色主題維持對比 */
 :root:not(.light) #page-stk .cell-edit { color: var(--text, #f2f2f2); }
+#page-stk #stkMarketChips .chip.on{
+  background: var(--primary, #3b82f6) !important;
+  color: #fff !important;
+  border-color: var(--primary, #3b82f6) !important;
+}
 
+#page-stk .kpi-toggle-wrap{
+  display:flex; gap:8px; align-items:center; justify-content:flex-end;
+}
+#page-stk .icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:36px; border-radius:10px;
+  border:1px solid var(--divider, rgba(0,0,0,.12));
+  background: var(--card,#fff); cursor:pointer;
+}
+#page-stk .icon-btn .material-symbols-outlined{ font-size:20px; line-height:1; }
+:root:not(.light) #page-stk .icon-btn{
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+}
+#page-stk .icon-btn:hover{ filter:brightness(.98); }
+#page-stk .icon-btn:active{ transform: translateY(1px); }
   </style>

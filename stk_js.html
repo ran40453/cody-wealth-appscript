@@ -46,11 +46,12 @@ App.modules.stk = (function(){
     run
       .withSuccessHandler(rows=>{
         allRows = Array.isArray(rows) ? rows : [];
-        // collect markets
         const set = new Set();
         allRows.forEach(r=>{ const t = String(r.T||'').trim(); if (t) set.add(t); });
         st.markets = Array.from(set);
         if (!st.markets.includes(st.market) && st.markets.length) st.market = st.markets.includes('US') ? 'US' : st.markets[0];
+
+        setBodyLoading(false);             // ← 清掉占位列
         renderMarketChips();
         applyFilter();
         renderKPI(viewRows);
@@ -64,8 +65,16 @@ App.modules.stk = (function(){
   function applyFilter(){
     let rows = allRows.slice();
     if (st.market) rows = rows.filter(r => String(r.T||'').trim() === st.market);
-    if (st.showOnlyOpen) rows = rows.filter(r => !String(r.A||'').trim());
+    if (st.showOnlyOpen){
+      // 僅顯示「持有」（A 空白）
+      rows = rows.filter(r => !String(r.A||'').trim());
+    }else{
+      // 僅顯示「已賣出」（A 有字）
+      rows = rows.filter(r => !!String(r.A||'').trim());
+    }
     viewRows = rows;
+    // 確保清掉占位列
+    setBodyLoading(false);
   }
 
   function renderMarketChips(){
@@ -126,6 +135,7 @@ App.modules.stk = (function(){
 
   // ===== Body (virtual list) =====
   function renderTable(rows){
+    setBodyLoading(false);
     // spacer 高度 = 主列高度 + 展開列高度
     const expandedCount = Array.from(st.expanded).filter(rowId => rows.find(r=> Number(r.ROW)===Number(rowId))).length;
     if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH + expandedCount * st.detailH) + 'px';
@@ -155,7 +165,8 @@ App.modules.stk = (function(){
 
     const slice = rows.slice(start, end);
     vs.tbody.style.transform = `translateY(${offsetY}px)`;
-
+    // 移除可能殘留的占位列（避免「載入中…」卡在底部）
+    vs.tbody.querySelectorAll('.empty').forEach(el=> el.remove());
     vs.tbody.innerHTML = slice.map(r=>{
       const rowId = Number(r.ROW||0);
       const roi   = normalizePercent(r.H);
@@ -191,19 +202,18 @@ App.modules.stk = (function(){
       const detail = `<tr class="stk-detail open" data-row="${rowId}">
         <td class="txt" colspan="${st.totalCols}">
           <div class="detail-card">
-            <div class="detail-section">
+            <div class="detail-grid">
               <div class="detail-item"><span class="label">市場價值 (N)</span><span class="value">${fmtMoney(r.N)}</span></div>
               <div class="detail-item"><span class="label">成本 (K)</span><span class="value">${fmtMoney(r.K)}</span></div>
               <div class="detail-item"><span class="label">股息 (R)</span><span class="value"><button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button></span></div>
-            </div>
-            <div class="detail-section">
+
               <div class="detail-item"><span class="label">ROI (H)</span><span class="value">${roiPillHTML(roi)}</span></div>
               <div class="detail-item"><span class="label">買日 (L)</span><span class="value">${fmtDate(r.L)}</span></div>
               <div class="detail-item"><span class="label">賣日 (M)</span><span class="value">${fmtDate(r.M)}</span></div>
-            </div>
-            <div class="detail-section">
+
               <div class="detail-item"><span class="label">手續+稅 (Q)</span><span class="value">${fmtMoney(r.Q)}</span></div>
               <div class="detail-item"><span class="label">單位 (U)</span><span class="value">${esc(r.U||'')}</span></div>
+              <div class="detail-item"><span class="label">市場 (T)</span><span class="value">${esc(r.T||'')}</span></div>
             </div>
           </div>
         </td>
@@ -249,8 +259,11 @@ function onToggleRow(e){
     const btn = byId('stkStatusToggle');
     if (!btn) return;
     const sync = ()=>{
-      btn.textContent = st.showOnlyOpen ? '顯示目前持有' : '已賣出';
-      btn.setAttribute('aria-pressed', String(!st.showOnlyOpen)); // pressed=true 表示顯示已賣出
+      const icon = btn.querySelector('.material-symbols-outlined');
+      // true = 顯示「持有」，false = 顯示「已賣出」
+      if (icon) icon.textContent = st.showOnlyOpen ? 'inventory_2' : 'sell';
+      btn.title = st.showOnlyOpen ? '持有' : '已賣出';
+      btn.setAttribute('aria-pressed', st.showOnlyOpen ? 'false' : 'true');
     };
     sync();
     btn.onclick = ()=>{
@@ -294,12 +307,13 @@ function onToggleRow(e){
 
     const r = allRows.find(x => Number(x.ROW)===row);
     const current = r ? r[col] : '';
+    const passVal = (field.type === 'select') ? String(current||'') : toNum(current);
 
     openEdit({
       row, col,
       title: field.label,
       type: field.type,
-      value: toNum(current),
+      value: passVal,
       decimals: field.decimals ?? 2,
       min: field.min ?? null,
       updateDateCol: field.updateDateCol || null
@@ -315,54 +329,89 @@ function onToggleRow(e){
     dlg.dataset.min = (meta.min==null ? '' : String(meta.min));
     dlg.dataset.updateDateCol = meta.updateDateCol || '';
     byId('stkEditTitle').textContent = `編輯：${meta.title}`;
+
+    // —— 先清理舊的元件（避免重複累積）
+    ['stkEditSelect','stkSellExtras','stkStatusSeg'].forEach(id=>{
+      const el = byId(id); if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+
     const input = byId('stkEditInput');
     input.type = (meta.type==='number' ? 'number' : 'text');
-    if (meta.type==='select'){
-      const dlg = byId('stkEditDlg');
+    input.step = (meta.type==='number' ? 'any' : undefined);
+    input.value = (meta.value ?? '');
+    input.style.display = '';
+    input.removeAttribute('data-hidden');
+
+    // A 欄（狀態）改用 segmented control
+    if (meta.col === 'A'){
+      // 隱藏文字/數值輸入框
+      input.style.display = 'none';
+      input.setAttribute('data-hidden','1');
+
+      // 建立 segmented control（持有 / 已賣出）
+      const seg = document.createElement('div');
+      seg.id = 'stkStatusSeg';
+      seg.className = 'seg';
+      const val = String(meta.value||'');
+      seg.innerHTML = `
+        <input type="radio" id="stkStatusOpen"  name="stkStatus" value="" ${val===''?'checked':''}>
+        <label for="stkStatusOpen">持有</label>
+        <input type="radio" id="stkStatusSold" name="stkStatus" value="已賣出" ${val==='已賣出'?'checked':''}>
+        <label for="stkStatusSold">已賣出</label>
+      `;
+      input.parentNode.insertBefore(seg, input.nextSibling);
+
+      // 追加賣出表單（股數、賣價）
+      const wrap = document.createElement('div');
+      wrap.id = 'stkSellExtras';
+      wrap.innerHTML = `
+        <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div><label>股數</label><input id="stkSellQty" type="number" step="any" class="input" /></div>
+          <div><label>賣價</label><input id="stkSellPrice" type="number" step="any" class="input" /></div>
+        </div>`;
+      seg.parentNode.insertBefore(wrap, seg.nextSibling);
+
+      // 預設填上本列數值
+      const r0 = allRows.find(x => Number(x.ROW)===meta.row) || {};
+      const qtyEl = byId('stkSellQty'); const priceEl = byId('stkSellPrice');
+      if (qtyEl) qtyEl.value = toNum(r0.C);
+      if (priceEl) priceEl.value = toNum(r0.E);
+
+      // 只有選「已賣出」才顯示賣出表單
+      const syncExtras = ()=>{ const sold = document.getElementById('stkStatusSold').checked; wrap.style.display = sold ? '' : 'none'; };
+      seg.addEventListener('change', syncExtras);
+      syncExtras();
+    }
+    // 其他 select 欄位（若之後有用到），保留原邏輯
+    else if (meta.type==='select'){
       const oldSel = byId('stkEditSelect');
       if (oldSel && oldSel.parentNode) oldSel.parentNode.removeChild(oldSel);
       const pick = document.createElement('select');
       pick.id = 'stkEditSelect';
       pick.className = 'input';
       pick.innerHTML = (meta.options||[]).map(o=> `<option value="${esc(o.v)}"${o.v===String(meta.value||'')?' selected':''}>${esc(o.t)}</option>`).join('');
-      if (meta.col === 'A') {
-        const wrap = document.createElement('div');
-        wrap.id = 'stkSellExtras';
-        wrap.innerHTML = `
-          <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-            <div><label>股數</label><input id="stkSellQty" type="number" step="any" class="input" /></div>
-            <div><label>賣價</label><input id="stkSellPrice" type="number" step="any" class="input" /></div>
-          </div>`;
-        pick.parentNode.insertBefore(wrap, pick.nextSibling);
-        const r = allRows.find(x => Number(x.ROW)===meta.row) || {};
-        byId('stkSellQty').value = toNum(r.C);
-        byId('stkSellPrice').value = toNum(r.E);
-      }
-      const old = byId('stkEditInput');
-      if (old && old.parentNode){
-        old.style.display='none';
-        old.setAttribute('data-hidden','1');
-        old.parentNode.insertBefore(pick, old.nextSibling);
-      }
-    }else{
-      const oldSel = byId('stkEditSelect');
-      if (oldSel && oldSel.parentNode) oldSel.parentNode.removeChild(oldSel);
-      const old = byId('stkEditInput');
-      if (old) { old.style.display=''; old.removeAttribute('data-hidden'); }
-      const extra = byId('stkSellExtras');
-      if (extra && extra.parentNode) extra.parentNode.removeChild(extra);
+      input.style.display='none';
+      input.setAttribute('data-hidden','1');
+      input.parentNode.insertBefore(pick, input.nextSibling);
     }
-    input.step = (meta.type==='number' ? 'any' : undefined);
-    input.value = (meta.value ?? '');
+
     dlg.style.display = 'flex';
     setTimeout(()=> input.focus(), 0);
   }
+
   function closeEdit(){
-    const dlg = byId('stkEditDlg');
-    if (!dlg) return;
-    dlg.style.display = 'none';
-    dlg.dataset.row = dlg.dataset.col = dlg.dataset.decimals = dlg.dataset.min = dlg.dataset.updateDateCol = '';
-  }
+  const dlg = byId('stkEditDlg');
+  if (!dlg) return;
+  dlg.style.display = 'none';
+  dlg.dataset.row = dlg.dataset.col = dlg.dataset.decimals = dlg.dataset.min = dlg.dataset.updateDateCol = '';
+
+  // 清理彈窗內動態插入的元件
+  ['stkSellExtras','stkStatusSeg','stkEditSelect'].forEach(id=>{
+    const el = byId(id); if (el && el.parentNode) el.parentNode.removeChild(el);
+  });
+  const input = byId('stkEditInput');
+  if (input){ input.style.display=''; input.removeAttribute('data-hidden'); }
+}
 
   function submitEdit(){
   const dlg = byId('stkEditDlg');
@@ -376,9 +425,10 @@ function onToggleRow(e){
   const input = byId('stkEditInput');
 
   // 狀態欄（A）
-  if (col === 'A' && sel){
-    const val = sel.value; // '' 或 '已賣出'
-    if (val === ''){
+  if (col === 'A'){
+    const checked = document.querySelector('input[name="stkStatus"]:checked');
+    const val = checked ? checked.value : '';
+    if (val === '') {
       toggleBusy(true);
       google.script.run
         .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
