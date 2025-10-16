@@ -654,18 +654,18 @@ function getDatabaseRows(opt) {
 
   var ss = SpreadsheetApp.getActive();
   var sh = ss.getSheetByName(RECORD_SHEET_NAME);
-  if (!sh) return { headers: [], rows: [], from: 0, to: 0, total: 0, allHeaders: [] };
+  if (!sh) return { headers: [], rows: [], from: 0, to: 0, total: 0, allHeaders: [], lastUsedRow: 2 };
 
   var lastRow = sh.getLastRow();
   var lastCol = sh.getLastColumn();
-  if (lastRow < 2 || lastCol < 1) return { headers: [], rows: [], from: 0, to: 0, total: 0, allHeaders: [] };
+  if (lastRow < 2 || lastCol < 1) return { headers: [], rows: [], from: 0, to: 0, total: 0, allHeaders: [], lastUsedRow: 2 };
 
   // 表頭在第 2 列
   var headers = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
   var dataStart = 3;
 
   if (lastRow < dataStart) {
-    return { headers: headers, rows: [], from: 0, to: 0, total: 0, allHeaders: headers };
+    return { headers, rows:[], from:0, to:0, total:0, allHeaders:headers, lastUsedRow: dataStart - 1 };
   }
 
   // 一次性把第3列到最後列都抓出來（顯示值），後面用陣列處理，避免逐列 getRange 造成「無此範圍」
@@ -683,8 +683,12 @@ function getDatabaseRows(opt) {
     endIdx--;
   }
   if (endIdx < 0) {
-    return { headers: headers, rows: [], from: 0, to: 0, total: 0, allHeaders: headers };
+    return { headers, rows:[], from:0, to:0, total:0, allHeaders:headers, lastUsedRow: dataStart - 1 };
   }
+
+  var dataStart = 3; // 資料從第 3 列開始（如果你原本就有這個常數，保持一致即可）
+  
+  var lastUsedRow = dataStart + endIdx; // 真實試算表最後一列（有顯示值）
 
   // 有效資料塊
   var data = block.slice(0, endIdx + 1);
@@ -698,7 +702,7 @@ function getDatabaseRows(opt) {
   var to   = Math.min(offset + limit, total);
   var rows = ordered.slice(from, to);
 
-  return { headers: headers, rows: rows, from: from, to: to, total: total, allHeaders: headers };
+  return { headers, rows, from, to, total, allHeaders:headers, lastUsedRow };
 }
 
 /** 左側最新資料卡：用欄位字母定位 + 同時取值(getValues)與顯示(getDisplayValues) */
@@ -1117,6 +1121,282 @@ function getPolicyControlsRange(){
 
 
 /**====================record=========================*/
+
+
+/**
+ * 依「試算表實際列號」回傳該列所有欄位明細（不涉入排序/索引推算）
+ * @param {number} rowNumber  真實列號（≥3）
+ * @return {Array<{label:string,value:any,col_index:number}>}
+ */
+function getRecordDetailsByRowNumber(rowNumber){
+  var ss = SpreadsheetApp.getActive();
+  // 盡可能精準取到 Record 分頁；RECORD_SHEET_NAME 未設定時用 'record'，再退到目前啟用分頁
+  var sh = ss.getSheetByName(typeof RECORD_SHEET_NAME==='string' && RECORD_SHEET_NAME ? RECORD_SHEET_NAME : 'record') || ss.getActiveSheet();
+  if (!sh) return [];
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var r = Number(rowNumber||0);
+  if (!r || r < 3 || r > lastRow || lastCol < 1) return [];
+
+  // 表頭第 1、2 列（顯示字串）→ 合併成 label
+  var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
+
+  // 目標列：回傳原始值（保留型別：數字/日期）
+  var rowVals = sh.getRange(r, 1, 1, lastCol).getValues()[0] || [];
+
+  function combineLabel(a,b){
+    a = String(a||'').trim();
+    b = String(b||'').trim();
+    if (a && b && a!==b) return a + ' (' + b + ')';
+    return a || b || '';
+  }
+
+  var out = new Array(lastCol);
+  for (var c = 1; c <= lastCol; c++){
+    var label = combineLabel(hdr1[c-1], hdr2[c-1]);
+    if (!label && c === 1) label = '日期';
+    out[c-1] = { label: label, value: rowVals[c-1], col_index: c-1 };
+  }
+  return out;
+}
+
+
+/**
+ * 依日期回傳 record 的「當日各欄位明細」（供前端子清單使用）
+ * @param {string} dateText  前端點擊主列帶過來的日期字串（預期 yyyy-MM-dd）
+ * @return {Array<{label:string,value:any,col_index:number}>}
+ */
+
+
+function getRecordDetailsByDate(dateText){
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(RECORD_SHEET_NAME || 'record');
+  if (!sh) return [];
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 3 || lastCol < 1) return [];
+
+  // 表頭：第 1 列（帳戶/銀行）、第 2 列（幣別/子分類）
+  var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
+
+  // 想要比對的日期（允許 "yyyy-MM-dd" 或與 A 欄顯示字串一致；另外用 yyyymmdd 兜底）
+  var wantDate = null;
+  try {
+    if (dateText) {
+      var tryD = new Date(dateText);
+      if (!isNaN(tryD.getTime())) wantDate = tryD;
+    }
+  } catch(e) {}
+  var tz = ss.getSpreadsheetTimeZone() || 'Asia/Taipei';
+
+  function sameYMD(d1, d2){
+    return d1 && d2 && d1.getFullYear()===d2.getFullYear() && d1.getMonth()===d2.getMonth() && d1.getDate()===d2.getDate();
+  }
+  function ymdDigits(s){
+    s = String(s||'');
+    var only = s.replace(/\D+/g,''); // 只留數字
+    if (only.length >= 8) return only.slice(0,8); // yyyymmdd
+    return only;
+  }
+  var wantYMD = ymdDigits(dateText);
+
+  // 新增：dateToYMD 及 wantDate 正規化
+  function dateToYMD(d){
+    if (!(d instanceof Date) || isNaN(d.getTime())) return '';
+    var y = d.getFullYear();
+    var m = String(d.getMonth()+1).padStart(2,'0');
+    var da= String(d.getDate()).padStart(2,'0');
+    return '' + y + m + da;
+  }
+  // 若 wantDate 尚未解析成功，但拿得到 8 碼數字，手動建 Date 物件
+  if (!wantDate && wantYMD && wantYMD.length===8){
+    var yy = Number(wantYMD.slice(0,4));
+    var mm = Number(wantYMD.slice(4,6));
+    var dd = Number(wantYMD.slice(6,8));
+    var tmp = new Date(yy, mm-1, dd);
+    if (!isNaN(tmp.getTime())) wantDate = tmp;
+  }
+
+  function combineLabel(a,b){
+    a = String(a||'').trim();
+    b = String(b||'').trim();
+    if (a && b && a!==b) return a + ' (' + b + ')';
+    return a || b || '';
+  }
+
+  // 一次抓 A 欄：原始值 + 顯示字串（第3列起）
+  var nData = lastRow - 2;
+  var aVals = sh.getRange(3, 1, nData, 1).getValues();         // Date 或原值
+  var aDisp = sh.getRange(3, 1, nData, 1).getDisplayValues();   // 顯示字串
+  var bDisp = sh.getRange(3, 2, nData, 1).getDisplayValues();   // 月份（可能是 2025-10 / 25-10 / 2025/10）
+
+  // 尋找目標列 index（0-based 相對於第3列）
+  var idx = -1;
+  for (var i=0; i<nData; i++){
+    var v = aVals[i][0];
+    var s = aDisp[i][0];
+
+    // 1) 以 Date 物件直接比對年月日
+    if (wantDate && v instanceof Date && sameYMD(v, wantDate)) { idx = i; break; }
+
+    // 2) 以顯示字串全等比對
+    if (String(s||'').trim() === String(dateText||'').trim()) { idx = i; break; }
+
+    // 3) 以純數字 yyyymmdd 比對：同時檢查 顯示字串 與 原始 Date 轉 yyyymmdd
+    if (wantYMD){
+      var dispY = ymdDigits(s);
+      if (dispY && dispY === wantYMD) { idx = i; break; }
+      if (v instanceof Date){
+        var valY = dateToYMD(v);
+        if (valY && valY === wantYMD) { idx = i; break; }
+      }
+    }
+    // 4) Fallback：A 欄只有 M/D、B 欄提供年/月 → 組合成 yyyymmdd 再比對
+    if (wantYMD && bDisp && bDisp[i] && (s||'')){
+      var bStr = String(bDisp[i][0]||'');     // 例如 '2025-10'、'25/10'
+      var y4 = (bStr.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
+      var y2 = (!y4 && (bStr.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
+      var YY = y4 ? y4 : (y2 ? ((Number(y2)<70?'20':'19') + y2) : '');
+
+      // 從 A 欄顯示字串取出月/日
+      var mdDigits = String(s||'').replace(/\D+/g,''); // '10/16' -> '1016'  ,  '9/2' -> '92'
+      var MM = '', DD='';
+      if (mdDigits.length>=3){
+        if (mdDigits.length===3){ MM = mdDigits.slice(0,1); DD = mdDigits.slice(1); }
+        else { MM = mdDigits.slice(0,2); DD = mdDigits.slice(2); }
+      }
+      if (MM) MM = String(MM).padStart(2,'0');
+      if (DD) DD = String(DD).padStart(2,'0');
+
+      if (YY && MM && DD){
+        var ymdJoin = '' + YY + MM + DD;
+        if (ymdJoin === wantYMD){ idx = i; break; }
+      }
+    }
+  }
+  if (idx < 0) return [];
+
+  var targetRow = 3 + idx; // 真實列號
+
+  // 取該列的原始值（保留數字/日期型別給前端格式化）
+  var rowVals = sh.getRange(targetRow, 1, 1, lastCol).getValues()[0] || [];
+
+  // 輸出為 {label, value, col_index}
+  var out = new Array(lastCol);
+  for (var c = 1; c <= lastCol; c++){
+    var label = combineLabel(hdr1[c-1], hdr2[c-1]);
+    if (!label && c === 1) label = '日期'; // A 欄無表頭時給預設
+    out[c-1] = { label: label, value: rowVals[c-1], col_index: c-1 };
+  }
+  return out;
+}
+
+/**
+ * 依「試算表實際列號」回傳該列所有欄位明細（不涉入排序/索引推算）
+ * @param {number} rowNumber  真實列號（≥3）
+ */
+function getRecordDetailsByRowNumber(rowNumber){
+  var sh = SpreadsheetApp.getActive().getSheetByName(RECORD_SHEET_NAME || 'record');
+  if (!sh) return [];
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  var r = Number(rowNumber||0);
+  if (!r || r < 3 || r > lastRow || lastCol < 1) return [];
+
+  var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var rowVals = sh.getRange(r, 1, 1, lastCol).getValues()[0] || [];
+
+  function combineLabel(a,b){
+    a = String(a||'').trim();
+    b = String(b||'').trim();
+    if (a && b && a!==b) return a + ' (' + b + ')';
+    return a || b || '';
+  }
+  var out = new Array(lastCol);
+  for (var c = 1; c <= lastCol; c++){
+    var label = combineLabel(hdr1[c-1], hdr2[c-1]);
+    if (!label && c === 1) label = '日期';
+    out[c-1] = { label: label, value: rowVals[c-1], col_index: c-1 };
+  }
+  return out;
+}
+
+
+/**
+ * 依前端虛擬清單的列索引回傳該列「所有欄位明細」
+ * @param {number} rowIndexFromTop 0-based，0 表最新（對應實際表第 3 列）
+ * @return {Array<{label:string,value:any,col_index:number}>}
+ */
+function getRecordDetailsByRowIndex(rowIndexFromTop){
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(typeof RECORD_SHEET_NAME==='string' ? RECORD_SHEET_NAME : 'record');
+  if (!sh) return [];
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 3 || lastCol < 1) return [];
+
+  // 掃描尾端：忽略尾端「全空白顯示」的骨架列，對齊前端 total
+  function isBlankDisplayRow(r){
+    var disp = sh.getRange(r, 1, 1, lastCol).getDisplayValues()[0];
+    for (var i=0;i<disp.length;i++){ if (String(disp[i]||'').trim()!=='') return false; }
+    return true;
+  }
+  var lastUsed = lastRow;
+  while (lastUsed >= 3 && isBlankDisplayRow(lastUsed)) lastUsed--;
+  if (lastUsed < 3) return [];
+
+  // 表頭（第 1、2 列）
+  var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
+
+  // 以「最新在上」解讀的索引（0 → lastUsed）
+  var i = Math.max(0, Number(rowIndexFromTop||0));
+  var nData = lastUsed - 2; // 真正有效資料筆數
+  if (i >= nData) return [];
+
+  // 兩種映射方案：A=最新在上（0→lastUsed），B=最舊在上（0→3）
+  var targetA = lastUsed - i;
+  var targetB = 3 + i;
+  if (targetA < 3 || targetA > lastUsed) targetA = -1;
+  if (targetB < 3 || targetB > lastUsed) targetB = -1;
+
+  function rowHasAnyValue(r){
+    var disp = sh.getRange(r, 1, 1, lastCol).getDisplayValues()[0];
+    for (var k=0;k<disp.length;k++){ if (String(disp[k]||'').trim()!=='') return true; }
+    return false;
+  }
+
+  // 優先用 A（最新在上）；如果空或越界，再試 B
+  var targetRow = -1;
+  if (targetA !== -1 && rowHasAnyValue(targetA)) targetRow = targetA;
+  else if (targetB !== -1 && rowHasAnyValue(targetB)) targetRow = targetB;
+  else targetRow = (targetA !== -1 ? targetA : targetB);
+  if (targetRow === -1) return [];
+
+  // 取該列原始值
+  var rowVals = sh.getRange(targetRow, 1, 1, lastCol).getValues()[0] || [];
+
+  function combineLabel(a,b){
+    a = String(a||'').trim();
+    b = String(b||'').trim();
+    if (a && b && a!==b) return a + ' (' + b + ')';
+    return a || b || '';
+  }
+
+  var out = new Array(lastCol);
+  for (var c = 1; c <= lastCol; c++){
+    var label = combineLabel(hdr1[c-1], hdr2[c-1]);
+    if (!label && c === 1) label = '日期';
+    out[c-1] = { label: label, value: rowVals[c-1], col_index: c-1 };
+  }
+  return out;
+}
 
 /** 前端按鈕用：呼叫「凍結最後一列 + 新增骨架」 */
 function runRecordAddRow(){

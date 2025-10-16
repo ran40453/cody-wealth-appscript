@@ -5,8 +5,8 @@ App.modules = App.modules || {};
 App.modules.stk = (function(){
   // ===== Config（之後要擴充可編輯欄位就在這裡加）=====
   const EDITABLE_FIELDS = {
-  D: { key:'D', label:'買價', type:'number', decimals:3, min:0 },
-  E: { key:'E', label:'現價', type:'number', decimals:3, min:0 },
+  D: { key:'D', label:'買價', type:'number', decimals:2, min:0 },
+  E: { key:'E', label:'現價', type:'number', decimals:2, min:0 },
   R: { key:'R', label:'股息', type:'number', decimals:3, min:0 },
   A: { key:'A', label:'狀態', type:'select', options:[{v:'', t:'—'},{v:'已賣出', t:'已賣出'}] }
 };
@@ -165,7 +165,7 @@ App.modules.stk = (function(){
     vs.tbody.innerHTML = slice.map(r=>{
       const rowId = Number(r.ROW||0);
       const roi   = normalizePercent(r.H);
-      const upl   = fmtMoney(r.J);
+      const upl   = fmtMoney(r.G);   // 新
 
       const main = `<tr class="stk-row" data-row="${rowId}">
         <td class="txt">
@@ -173,12 +173,12 @@ App.modules.stk = (function(){
           ${esc(r.B||'-')}
         </td>
         <td class="num col-fix-1">${fmtInt(r.C)}</td>
-        <td class="num col-fix-2">${fmtMoney(r.F)}</td>
+        <td class="num col-fix-2">${fmtMoney2(r.F)}</td>
         <td class="num col-fix-5">
-          <button class="cell-edit" data-col="D" title="點擊編輯買價">${fmtMoney(r.D)}</button>
+          <button class="cell-edit" data-col="D" title="點擊編輯買價">${fmtMoney2(r.D)}</button>
         </td>
         <td class="num col-fix-3">
-          <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney(r.E)}</button>
+          <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney2(r.E)}</button>
         </td>
         <td class="txt">
           <div class="pnl-cell">
@@ -520,9 +520,8 @@ function onToggleRow(e){
       // Optimistic UI: 先在清單前端插入一筆暫時列（等待後端寫入與回填公式）
       const pending = {
         ROW: 0, A:false, B:item.B, C:item.C, D:item.D, E:'', F:'', G:'', H:'', I:'', J:'', K:'',
-          L:item.L, M:'', N:'', O:'', P:'', Q:'', R:item.R, S:'', T:item.T, U:item.U, V:''
-        };
-      
+        L:item.L, M:'', N:'', O:'', P:'', Q:'', R:item.R, S:'', T:item.T, U:item.U, V:''
+      };
       // 僅當前市場符合時顯示（避免切市場時看到不相關資料）
       if (!st.market || st.market === item.T){
         viewRows = [pending, ...viewRows];
@@ -576,32 +575,6 @@ function toggleAddBusy(on){
       const rowId = Number(tr.dataset.row||0);
       if (!rowId) return;
 
-      // 刪除模式：點列即刪除，不進入展開/收合
-      if (st.deleteMode){
-        const r = allRows.find(x=> Number(x.ROW)===rowId);
-        if (r){
-          const name = String(r.B||'');
-          const ok = confirm(`要刪除「${name}」這筆資料嗎？\n（第 ${rowId} 列）`);
-          if (ok){
-            toggleBusy(true);
-            const run =
-              (window.google && google.script && google.script.run) ? google.script.run :
-              (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run :
-              null;
-            if (run){
-              run
-                .withSuccessHandler(()=>{ toggleBusy(false); fetchData(); })
-                .withFailureHandler(err=>{ toggleBusy(false); alert('刪除失敗：'+(err&&err.message||'')); })
-                .deleteSTKRow(rowId);
-            }else{
-              toggleBusy(false);
-              alert('刪除失敗：找不到 Apps Script 執行環境');
-            }
-          }
-        }
-        return; // 刪除模式下不做展開/收合
-      }
-
       if (st.expanded.has(rowId)) {
         st.expanded.delete(rowId);
       } else {
@@ -625,11 +598,22 @@ function toggleAddBusy(on){
   function round(n, dec=2){ const f = Math.pow(10, dec); return Math.round(n * f) / f; }
   function todayISO(){ return new Date().toISOString().slice(0,10); }
   function normalizePercent(u){
+    // 來源可能是：
+    //  1) 分數：0.014 -> 1.4%
+    //  2) 比率：1.5 -> 150%，5.5 -> 550%
+    //  3) 直接百分數：55 -> 55%，550 -> 550%
     const n = Number(u||0);
     if (!isFinite(n)) return null;
-    return (Math.abs(n) <= 1) ? (n*100) : n; // 0.12 => 12%
+    const a = Math.abs(n);
+    if (a === 0) return 0;
+    if (a <= 1) return n * 100;  // 0.014 -> 1.4
+    if (a < 10) return n * 100;  // 1.5 -> 150, 5.5 -> 550
+    return n;                    // 55/550 -> 當作百分數
   }
+
   function fmtMoney(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '—'; }
+  function fmtMoneyN(v, n){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:n, maximumFractionDigits:n}) : '—'; }
+  function fmtMoney2(v){ return fmtMoneyN(v, 2); }
   function fmtInt(v){ return isFinite(+v) ? Math.round(+v).toLocaleString('zh-Hant-TW') : '—'; }
   function isSoldRow(r){
     const a = r && r.A;

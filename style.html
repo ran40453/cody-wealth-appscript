@@ -517,6 +517,13 @@ header .title-wrap{
 .db-latest .kv:last-child{ border-bottom:none; }
 .db-latest .k{ color:var(--muted); }
 .db-latest .v{ font-weight:900; font-variant-numeric:tabular-nums; }
+/* Database: 子清單三欄排版（沿用現有色票，盡量不新增樣式） */
+.db-table tr.db-detail-row td{ padding: 8px 10px; background: inherit; }
+.db-detail-grid{ display:grid; grid-template-columns: repeat(3, minmax(160px,1fr)); gap: 8px 12px; }
+.db-detail-item{ display:flex; align-items:center; justify-content:space-between; gap:8px; border-bottom:1px dashed color-mix(in oklab, var(--tint) 10%, transparent); padding: 4px 0; }
+.db-detail-item .lbl{ font-weight:600; opacity:.85; }
+.db-detail-item .val{ font-variant-numeric: tabular-nums; }
+@media (max-width: 1024px){ .db-detail-grid{ grid-template-columns: repeat(2, 1fr); } }
 
 /* [T1] 通用版本（保留） */
 /* ── P/L 今日損益膠囊（綠漲紅跌） ───────────────────────── */
@@ -2011,18 +2018,7 @@ body.hdr-fab-open #hdrFabMenu{
 :root:not(.light) #page-stk .cell-edit{ background: color-mix(in oklab, var(--card) 92%, transparent); border-color: color-mix(in oklab, var(--tint) 20%, transparent); color: var(--text, #f2f2f2); }
 :root.light #page-stk .cell-edit{ background:#fff; border-color:#e5e7eb; }
 #page-stk .cell-edit:hover{ filter:brightness(.98); }
-#page-stk .cell-edit:active{ transform: translateY(1px); }
-
-/* --- KPI actions mini-card (icons x2, dark readable) --- */
-#page-stk .kpi-actions-card{ display:flex; gap:10px; align-items:center; justify-content:flex-end; padding:8px; border-radius:12px; background:var(--card,#fff); border:1px solid var(--divider, rgba(0,0,0,.12)); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-:root:not(.light) #page-stk .kpi-actions-card{ background: color-mix(in oklab, var(--card) 92%, transparent); border-color: color-mix(in oklab, var(--tint) 20%, transparent); }
-#page-stk .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:48px; height:48px; border-radius:50%; border:1px solid var(--divider, rgba(0,0,0,.12)); background: var(--card,#fff); color: var(--text); cursor:pointer; transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease; }
-#page-stk .icon-btn .material-symbols-outlined{ font-size:44px; line-height:1; }
-:root:not(.light) #page-stk .icon-btn{ background: color-mix(in oklab, var(--card) 88%, transparent); border-color: color-mix(in oklab, var(--tint) 24%, transparent); color: var(--text); }
-#page-stk .icon-btn:hover{ filter:brightness(.98); }
-#page-stk .icon-btn:active{ transform: translateY(1px) scale(0.98); }
-#page-stk .icon-btn.danger{ background:#ef4444 !important; border-color:#ef4444 !important; color:#fff !important; }
-#page-stk .icon-btn.danger .material-symbols-outlined{ color:#fff !important; }
+#page-stk .cell-edit:active{ transform: translateY(1px); }]
 
 /* --- Single-button status toggle (kept for compatibility) --- */
 #page-stk #stkStatusToggle{ border-radius:999px; padding:6px 12px; border:1px solid var(--divider, rgba(0,0,0,.12)); }
@@ -2038,4 +2034,75 @@ body.hdr-fab-open #hdrFabMenu{
 #stkEditDlg .btn-close{ font-size:20px; line-height:1; border:none; background:transparent; cursor:pointer; }
 #stkAddDlg .form-row{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
 #stkAddDlg .form-row label{ font-size:12px; color:var(--text-weak,#667085); }
+
+/* page-stk：KPI 小卡圓形按鈕（防拉伸、防覆寫） */
+#page-stk .icon-btn{
+  display: inline-flex; align-items: center; justify-content: center;
+  box-sizing: border-box;         /* 邊框算進去，避免尺寸外擴 */
+  inline-size: 48px; block-size: 48px;
+  width: 48px; height: 48px;      /* 備援，確保任何情況都是 48x48 */
+  aspect-ratio: 1 / 1;            /* 強制正方形 */
+  flex: 0 0 48px;                 /* 阻止 flex 把它拉長或壓扁 */
+  padding: 0; margin: 0;          /* 不要讓 padding 造成視覺橢圓 */
+  border-radius: 50% !important;  /* 一律畫圓，避免舊規則干擾 */
+  border: 1px solid var(--divider, rgba(0,0,0,.12));
+  background: var(--card,#fff); color: var(--text);
+  cursor: pointer;
+  transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease;
+}
+#page-stk .icon-btn .material-symbols-outlined{
+  font-size: 44px; line-height: 1;
+}
+:root:not(.light) #page-stk .icon-btn{
+  background: color-mix(in oklab, var(--card) 88%, transparent);
+  border-color: color-mix(in oklab, var(--tint) 24%, transparent);
+  color: var(--text);
+}
+#page-stk .icon-btn:hover{ filter: brightness(.98); }
+#page-stk .icon-btn:active{ transform: translateY(1px) scale(.98); }
+
+
+#page-stk .kpi-actions-card{
+  display:flex; flex-wrap:nowrap; gap:10px; align-items:center; justify-content:flex-end;
+  padding:8px; border-radius:12px; background:var(--card,#fff);
+  border:1px solid var(--divider, rgba(0,0,0,.12));
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+:root:not(.light) #page-stk .kpi-actions-card{
+  background: color-mix(in oklab, var(--card) 92%, transparent);
+  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+}
+
+
+/* 刪除模式紅底（兩主題皆可見） */
+#page-stk .icon-btn.danger{
+  background:#ef4444; border-color:#ef4444; color:#fff;
+}
+#page-stk .icon-btn.danger .material-symbols-outlined{ color:#fff; }
+
+
+/* KPI 列排版，避免重疊 */
+#page-stk .kpi-row{
+  display:flex;
+  flex-wrap:wrap;              /* 空間不足會換到下一行 */
+  align-items:stretch;
+  gap:12px;
+}
+#page-stk .kpi-row .kpi{
+  flex:1 1 160px;              /* 每張 KPI 至少 160px，等比例縮放 */
+  min-width:160px;
+}
+#page-stk .kpi-actions-card{
+  margin-left:auto;            /* 推到最右側 */
+  flex:0 0 auto;
+  position:static;             /* 確保不是 absolute，避免壓住 KPI */
+}
+@media (max-width: 768px){
+  #page-stk .kpi-actions-card{
+    width:100%;                /* 手機時整行顯示，避免擠壓 */
+    order:99;                  /* 放在 KPI 後面 */
+  }
+}
+
+
 </style>
