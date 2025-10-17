@@ -53,11 +53,12 @@ App.modules.stk = (function(){
         if (!st.markets.includes(st.market) && st.markets.length) st.market = st.markets.includes('US') ? 'US' : st.markets[0];
 
         setBodyLoading(false);             // ← 清掉占位列
-        renderMarketChips();
+        // renderMarketChips(); // removed per instructions
         applyFilter();
         renderKPI(viewRows);
         renderHead();
         renderTable(viewRows);
+        renderMarketsCard();
       })
       .withFailureHandler(err=> failUI(err && err.message || '讀取失敗'))
       .getSTKRows();
@@ -94,7 +95,6 @@ App.modules.stk = (function(){
     const sum = k => rows.reduce((s,r)=> s + toNum(r[k]), 0);
     const totalMV   = sum('N'); // 市場價值
     const totalCost = sum('K'); // 成本
-    const totalUPL  = sum('J'); // 未實現損益
     const totalPL   = sum('G'); // 損益(NT)
 
     // 加權 ROI（用 N 權重）
@@ -108,9 +108,11 @@ App.modules.stk = (function(){
 
     setNum('stkKpiMV',   totalMV,   1);
     setNum('stkKpiCost', totalCost, 1);
-    setNum('stkKpiUPL',  totalUPL,  1);
     setNum('stkKpiPL',   totalPL,   1);
     setRoiPill(byId('stkKpiROI'), roi);
+    
+    const actions = document.getElementById('stkActions');
+    if (actions) actions.style.display = 'flex';
   }
 
   // ===== Head =====
@@ -122,7 +124,7 @@ App.modules.stk = (function(){
     <th class="num col-fix-2">均價</th>     <!-- F -->
     <th class="num col-fix-5">買價</th>     <!-- D (editable) -->
     <th class="num col-fix-3">現價</th>     <!-- E (editable) -->
-    <th class="txt">未實現損益 / ROI</th>  <!-- J + H -->
+    <th class="txt pnl-col-hd">未實現損益 / ROI</th>  <!-- G + H -->
     <th class="txt col-fix-4">市場</th>     <!-- T -->
     <th class="txt">狀態</th>               <!-- A -->
   </tr>`;
@@ -168,10 +170,7 @@ App.modules.stk = (function(){
       const upl   = fmtMoney(r.G);   // 新
 
       const main = `<tr class="stk-row" data-row="${rowId}">
-        <td class="txt">
-          <button class="row-toggle" data-row="${rowId}" title="展開/收合">▸</button>
-          ${esc(r.B||'-')}
-        </td>
+        <td class="txt">${esc(r.B||'-')}</td>
         <td class="num col-fix-1">${fmtInt(r.C)}</td>
         <td class="num col-fix-2">${fmtMoney2(r.F)}</td>
         <td class="num col-fix-5">
@@ -180,7 +179,7 @@ App.modules.stk = (function(){
         <td class="num col-fix-3">
           <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney2(r.E)}</button>
         </td>
-        <td class="txt">
+        <td class="txt pnl-col">
           <div class="pnl-cell">
             <span class="num">${upl}</span>
             ${roiPillHTML(roi)}
@@ -219,9 +218,6 @@ App.modules.stk = (function(){
     // 綁定 slice 內事件
     vs.tbody.querySelectorAll('.cell-edit').forEach(btn=>{
       btn.addEventListener('click', onEditCellClick);
-    });
-    vs.tbody.querySelectorAll('.row-toggle').forEach(btn=>{
-      btn.addEventListener('click', onToggleRow);
     });
 
     if (!slice.length){
@@ -283,6 +279,7 @@ function onToggleRow(e){
       renderKPI(viewRows);
       renderHead();
       renderTable(viewRows);
+      renderMarketsCard();
       sync();
     };
   }
@@ -378,10 +375,20 @@ function onToggleRow(e){
         <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div><label>股數</label><input id="stkSellQty" type="number" step="any" class="input" /></div>
           <div><label>賣價</label><input id="stkSellPrice" type="number" step="any" class="input" /></div>
+        </div>
+        <div style="margin-top:10px;">
+          <label>賣出日期</label>
+          <input id="stkSellDate" type="date" class="input" />
         </div>`;
       seg.parentNode.insertBefore(wrap, seg.nextSibling);
 
       // 預設填上本列數值
+      const dateEl = byId('stkSellDate');
+      if (dateEl){
+        const now = new Date();
+        const iso = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        dateEl.value = iso;
+      }
       const r0 = allRows.find(x => Number(x.ROW)===meta.row) || {};
       const qtyEl = byId('stkSellQty'); const priceEl = byId('stkSellPrice');
       if (qtyEl) qtyEl.value = toNum(r0.C);
@@ -453,13 +460,28 @@ function onToggleRow(e){
     if (!qty || qty<=0){ alert('請輸入賣出股數'); return; }
     if (qty > currentQty){ alert('股數不可大於現有股數'); return; }
     if (!isFinite(price) || price<=0){ alert('請輸入賣出價格'); return; }
+    const sellDate = (byId('stkSellDate') && byId('stkSellDate').value) || '';
 
     toggleBusy(true);
-    google.script.run
-      .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
-      .withFailureHandler(err=>{ toggleBusy(false); alert('賣出處理失敗：'+(err&&err.message||'')); })
-      .splitSell(row, qty, price);
-    return;
+      const run = (window.google && google.script && google.script.run) ? google.script.run
+                : (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run
+                : null;
+      if (!run){ toggleBusy(false); alert('更新失敗：找不到 Apps Script 執行環境'); return; }
+
+      run
+        .withSuccessHandler(()=>{
+          if (sellDate){
+            run
+              .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
+              .withFailureHandler(err=>{ toggleBusy(false); alert('回填賣出日期失敗：'+(err&&err.message||'')); })
+              .setSTKValue(row, 'M', sellDate, null);
+          }else{
+            toggleBusy(false); closeEdit(); fetchData();
+          }
+        })
+        .withFailureHandler(err=>{ toggleBusy(false); alert('賣出處理失敗：'+(err&&err.message||'')); })
+        .splitSell(row, qty, price);
+      return;
   }
 
   // 其他欄位（D/E/R）照舊
@@ -583,6 +605,27 @@ function toggleAddBusy(on){
       }
       renderTable(viewRows);
     });
+    // Mobile-friendly: pointerup 也可展開/收合（避開按鈕與輸入）
+    vs.tbody?.addEventListener('pointerup', (ev)=>{
+        if (ev.pointerType && ev.pointerType!=='touch' && ev.pointerType!=='pen') return;
+        const t = ev.target; if (!t) return;
+        if (t.closest('button, .icon-btn, .cell-edit, a, input, select, textarea')) return;
+        const tr = t.closest('tr.stk-row'); if (!tr) return;
+        const rowId = Number(tr.dataset.row||0); if (!rowId) return;
+        if (st.expanded.has(rowId)) { st.expanded.delete(rowId); }
+        else { st.expanded.clear(); st.expanded.add(rowId); }
+        renderTable(viewRows);
+    }, {passive:true});
+    // iOS/部分瀏覽器：用 touchend 再補一次開合（避開互動元件）
+    vs.tbody?.addEventListener('touchend', (ev)=>{
+      const t = ev.target; if (!t) return;
+      if (t.closest('button, .icon-btn, .cell-edit, a, input, select, textarea')) return;
+      const tr = t.closest('tr.stk-row'); if (!tr) return;
+      const rowId = Number(tr.dataset.row||0); if (!rowId) return;
+      if (st.expanded.has(rowId)) { st.expanded.delete(rowId); }
+      else { st.expanded.clear(); st.expanded.add(rowId); }
+      renderTable(viewRows);
+    }, {passive:true});
   }
 
   // ===== Generic helpers =====
@@ -665,6 +708,73 @@ function toggleAddBusy(on){
       txt.style.display = on ? 'none' : 'inline';
       sp.style.display  = on ? 'inline-block' : 'none';
     }
+  }
+
+  // === Market aggregation and renderer ===
+  function computeByMarket(rows){
+    const by = new Map();
+    rows.forEach(r=>{
+      const t = String(r.T||'').trim() || '-';
+      const mv = toNum(r.N);
+      const pl = toNum(r.G);
+      const cost = toNum(r.K);
+      const roiRow = normalizePercent(r.H);     // 跟 KPI 同步：先把 H 正規化成百分比
+      const cur = by.get(t) || { T:t, MV:0, PL:0, Cost:0, w:0, wU:0 };
+      cur.MV += mv; cur.PL += pl; cur.Cost += cost;
+      if (isFinite(roiRow) && mv){ cur.w += mv; cur.wU += (mv * roiRow); }
+      by.set(t, cur);
+    });
+    return Array.from(by.values());
+  }
+
+  function renderMarketsCard(){
+    const targets = [ document.getElementById('stkMarketsList'), document.getElementById('ctbcMarketsList') ].filter(Boolean);
+    if (!targets.length) return; // 沒有任何容器就跳過
+
+    // 與主清單一致的過濾（持有/已賣出）
+    let rows = allRows.slice();
+    rows = st.showOnlyOpen ? rows.filter(r=> !isSoldRow(r)) : rows.filter(r=> isSoldRow(r));
+
+    const items = computeByMarket(rows);
+    const order = { US:0, TW:1, VN:2, CTBC:3 };
+    items.sort((a,b)=> (order[a.T] ?? 9) - (order[b.T] ?? 9));
+
+    const html = items.map(o=>{
+      const roiPct = o.w ? (o.wU / o.w) : 0;   // 市值加權 ROI（%）
+      const roiHTML = roiPillHTML(roiPct);
+      const active = (String(st.market||'') === String(o.T));
+      return `<div class="mkt-row${active?' active':''}" data-mkt="${esc(o.T)}">
+        <div class="mkt-name">${esc(o.T||'-')}</div>
+        <div class="mkt-mv">${fmtMoney(o.MV)}</div>
+        <div class="sub">
+          <div class="pl">${fmtMoney(o.PL)}</div>
+          <div class="roi">${roiHTML}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    targets.forEach(box=>{
+      box.innerHTML = html || '<div class="empty">沒有資料</div>';
+      box.querySelectorAll('.mkt-row').forEach(el=>{
+        el.addEventListener('click', ()=>{
+          const m = el.getAttribute('data-mkt');
+          st.market = m;                 // 切換市場
+          st.expanded.clear();
+          applyFilter();
+          renderKPI(viewRows);
+          renderHead();
+          renderTable(viewRows);
+          // 如果從儀表板點，帶你切至 STK 頁
+          try{ if (typeof go==='function') go('stk'); }catch(_){}
+          // 重新高亮所有容器中的相同市場
+          targets.forEach(t=>{
+            t.querySelectorAll('.mkt-row').forEach(row=>{
+              row.classList.toggle('active', row.getAttribute('data-mkt')===m);
+            });
+          });
+        });
+      });
+    });
   }
 
   return { init };

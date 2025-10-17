@@ -1,33 +1,44 @@
 <section id="page-stk" class="page show">
-  <div class="card">
-    <div id="stkKPI" class="ctbc-kpiBar" data-collapsed="0">
-      <div class="kpi-row">
-        <div class="kpi"><div class="k">市場價值</div><div class="v bold" id="stkKpiMV">—</div></div>
-        <div class="kpi"><div class="k">成本</div><div class="v bold" id="stkKpiCost">—</div></div>
-        <div class="kpi"><div class="k">未實現損益</div><div class="v bold" id="stkKpiUPL">—</div></div>
-        <div class="kpi"><div class="k">損益(NT)</div><div class="v bold" id="stkKpiPL">—</div></div>
-        <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
-        <div id="stkActions" class="kpi-actions-card">
-          <button id="stkStatusToggle" class="icon-btn" title="持有／已賣出">
-            <span class="material-symbols-outlined">inventory_2</span>
-          </button>
-          <button id="stkAddBtn" class="icon-btn" title="新增">
-            <span class="material-symbols-outlined">add</span>
-          </button>
-          <button id="stkDeleteModeBtn" class="icon-btn" title="刪除模式" aria-pressed="false">
-            <span class="material-symbols-outlined">delete</span>
-          </button>
-        </div>
+  <div class="stk-layout">
+
+    <!-- 左側：市場總覽卡（替代 stkMarketChips） -->
+    <div class="card" id="stkMarketsCard">
+      <div class="card-hd"><div class="title">市場總覽</div></div>
+      <div class="card-bd">
+        <div id="stkMarketsList" class="list"></div>
       </div>
     </div>
 
-    <div id="stkMarketChips" class="chips"></div>      
-    <div class="ctbc-scroll" id="stkViewport">
-      <table class="ctbc-table">
-        <thead id="stkHead"></thead>
-        <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
-      </table>
+    <!-- 右側：既有 STK 主卡 -->
+    <div class="card" id="stkMainCard">
+      <div id="stkKPI" class="ctbc-kpiBar" data-collapsed="0">
+        <div class="kpi-row">
+          <div class="kpi"><div class="k">市場價值</div><div class="v bold" id="stkKpiMV">—</div></div>
+          <div class="kpi"><div class="k">成本</div><div class="v bold" id="stkKpiCost">—</div></div>
+          <div class="kpi"><div class="k">損益(NT)</div><div class="v bold" id="stkKpiPL">—</div></div>
+          <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
+          <div id="stkActions" class="kpi-actions-card">
+            <button id="stkStatusToggle" class="icon-btn" title="持有／已賣出">
+              <span class="material-symbols-outlined">inventory_2</span>
+            </button>
+            <button id="stkAddBtn" class="icon-btn" title="新增">
+              <span class="material-symbols-outlined">add</span>
+            </button>
+            <button id="stkDeleteModeBtn" class="icon-btn" title="刪除模式" aria-pressed="false">
+              <span class="material-symbols-outlined">delete</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="ctbc-scroll" id="stkViewport">
+        <table class="ctbc-table">
+          <thead id="stkHead"></thead>
+          <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
+        </table>
+      </div>
     </div>
+
   </div>
 
   <!-- 通用小窗：編輯現價/股息 -->

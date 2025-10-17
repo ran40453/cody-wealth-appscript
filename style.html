@@ -1591,6 +1591,48 @@ body.hdr-fab-open #hdrFabMenu{
      說明：此區只作用於 #page-settings；使用共用骨架（kv-grid/kv-duo）與 tone 色票。
      ========================================================= */
   @layer pages{
+    /* ==============================
+       STK-specific fixes and overrides
+       ============================== */
+    /* Modal overlay：暗色＋模糊（兩個跳窗共用） */
+    #stkEditDlg, #stkAddDlg{
+      position: fixed; inset:0; z-index:2000;
+      display:none; align-items:center; justify-content:center;
+      padding:24px;
+      background: rgba(0,0,0,.42);      /* 更深一點，無論明暗主題皆一致 */
+      backdrop-filter: blur(6px);        /* 模糊背景 */
+    }
+    #stkEditDlg .modal-content, #stkAddDlg .modal-content{
+      max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto;
+      background: var(--card); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    #stkEditDlg .modal-hd, #stkAddDlg .modal-hd{ position:sticky; top:0; padding:12px 16px; background:inherit; border-bottom:1px solid var(--hairline); }
+    #stkEditDlg .modal-bd, #stkAddDlg .modal-bd{ padding:16px; }
+    #stkEditDlg .modal-actions, #stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+
+    /* pnl-cell 在同格內改為上下兩行顯示（並允許列高自動） */
+    /* 只在 STK 頁把表格列高交給內容撐開 */
+    #page-stk .ctbc-table thead th,
+    #page-stk .ctbc-table tbody td{ height:auto; }
+
+    /* 未實現損益/ROI 這一格允許自動換行，不裁切 */
+    #page-stk .ctbc-table td.pnl-col{ white-space: normal; overflow: visible; }
+
+    /* pnl-cell 直向排列：第一行「金額」，第二行「ROI 膠囊」 */
+    #page-stk .pnl-cell{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; width:100%; }
+    #page-stk .pnl-cell .num{ align-self:flex-end; }
+    #page-stk .pnl-cell .roi-badge{ align-self:flex-end; }
+
+    /* KPI 間距一致 */
+    #page-stk .kpi-row{
+      display:grid;
+      grid-template-columns: repeat(6, minmax(0,1fr));  /* 5 KPI + actions = 6 等分 */
+      align-items:stretch; justify-items:center; gap:12px;
+      white-space: nowrap;                               /* 維持單列 */
+    }
+    #page-stk .kpi-row > *{ margin:0 !important; }
+    #page-stk .kpi{ flex:1 1 160px; min-width:160px; padding:8px 10px; border-radius:10px; background:var(--kpi-pane-bg); border:1px dashed var(--ctbc-border); }
+    #page-stk .kpi .k{ color:#64748b; font-size:13px; }
     /* 版面骨架：桌機雙欄，手機單欄 */
     #page-settings .settings-layout{
       display:grid; gap: var(--space);
@@ -1948,161 +1990,159 @@ body.hdr-fab-open #hdrFabMenu{
   }
 
 /* =========================================================
-   #22 page STK (scoped, no duplicates; light/dark ok)
+   #22 page STK  — 專屬樣式（收斂到共用色票/結構；不疊加覆蓋）
    ========================================================= */
-
-/* --- Base helpers (scoped) --- */
-#page-stk .ctbc-table td.editable{ cursor:pointer; text-decoration: underline dotted; }
-#page-stk .dlg .form-row{ display:flex; align-items:center; gap:.5rem; margin:.5rem 0; }
-#page-stk .dlg .lbl{ width:7em; opacity:.8; }
-#page-stk .dlg .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-
-/* --- Market chips: 2x size, centered in its bar --- */
-#page-stk #stkMarketChips{ display:flex; flex-wrap:wrap; gap:16px; padding:10px 8px; position:sticky; top:0; z-index:2; align-items:center; justify-content:center; background: var(--card,#fff); }
-#page-stk #stkMarketChips .chip{ display:inline-flex; align-items:center; justify-content:center; gap:10px; font-size: calc(13px * 2); padding: 12px 22px; border-radius:999px; border:1px solid color-mix(in oklab, var(--tint) 25%, transparent); background: color-mix(in oklab, var(--surface) 82%, transparent); color: var(--text); font-weight:800; }
-#page-stk #stkMarketChips .chip.on{ background: var(--tint) !important; border-color: var(--tint) !important; color:#fff !important; }
-
-/* --- Table layout: fixed widths, no overlap --- */
-#page-stk .ctbc-scroll{ overflow:auto; }
-#page-stk .ctbc-table{ table-layout:fixed; min-width:980px; border-collapse:separate; border-spacing:0; }
-#page-stk .ctbc-table th, #page-stk .ctbc-table td{ white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
-#page-stk .ctbc-table th.txt, #page-stk .ctbc-table td.txt{ max-width:260px; }
-#page-stk .ctbc-table .col-fix-1{ width:90px; }
-#page-stk .ctbc-table .col-fix-2{ width:110px; }
-#page-stk .ctbc-table .col-fix-3{ width:120px; }
-#page-stk .ctbc-table .col-fix-4{ width:120px; }
-#page-stk .ctbc-table .col-fix-5{ width:110px; } /* 買價 */
-#page-stk .pnl-cell{ display:inline-flex; align-items:center; gap:.5rem; }
-
-/* 全部內容置中（僅 STK viewport） */
-#page-stk #stkViewport .ctbc-table thead th,
-#page-stk #stkViewport .ctbc-table tbody td{ text-align:center !important; }
-
-/* 亮色主題：表頭統一淺灰 */
-#page-stk{ --stk-head-light: #f3f4f6; }
-:root.light #page-stk #stkViewport .ctbc-table thead th{ background: var(--stk-head-light) !important; }
-:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-1,
-:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-2,
-:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-3,
-:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-4,
-:root.light #page-stk #stkViewport .ctbc-table thead th.col-fix-5{ background: var(--stk-head-light) !important; }
-
-/* --- iOS-like detail card (3-column grid) --- */
-#page-stk .stk-detail td{ padding:0; }
-#page-stk .detail-card{ margin:8px; border-radius:12px; background:var(--card,#fff); border:1px solid var(--divider, rgba(0,0,0,.12)); overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,.12); }
-:root:not(.light) #page-stk .detail-card{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
-#page-stk .detail-section + .detail-section{ border-top:1px solid var(--divider, rgba(0,0,0,.08)); }
-#page-stk .detail-item{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; }
-#page-stk .detail-item .label{ color:var(--text-weak,#667085); }
-#page-stk .detail-item .value button.cell-edit{ padding:.2rem .55rem; }
-#page-stk .detail-grid{ display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px 16px; padding:10px 8px; }
-#page-stk .stk-detail{ transition: all .18s ease; }
-#page-stk .stk-detail .detail-card{ transform-origin: top; transition: transform .14s ease, opacity .14s ease; }
-#page-stk .stk-detail.entering .detail-card{ transform: scale(0.98); opacity: 0; }
-#page-stk .stk-detail.open .detail-card{ transform: scale(1); opacity: 1; }
-
-/* --- Row click behavior (do not steal pointer for inner controls) --- */
-#page-stk tr.stk-row{ cursor:pointer; }
-#page-stk tr.stk-row .cell-edit,
-#page-stk tr.stk-row .row-toggle,
-#page-stk tr.stk-row button,
-#page-stk tr.stk-row a,
-#page-stk tr.stk-row input,
-#page-stk tr.stk-row select,
-#page-stk tr.stk-row textarea{ cursor:default; }
-/* 移除 row-toggle icon 欄位（僅留產品名稱） */
-#page-stk .row-toggle, #page-stk .row-toggle .material-symbols-outlined{ display:none !important; }
-
-/* --- Pills (buy/price) follow theme --- */
-#page-stk .cell-edit{ display:inline-block; padding:.2rem .5rem; border-radius:999px; border:1px solid var(--divider, rgba(0,0,0,.12)); background: var(--card,#fff); color:inherit; }
-:root:not(.light) #page-stk .cell-edit{ background: color-mix(in oklab, var(--card) 92%, transparent); border-color: color-mix(in oklab, var(--tint) 20%, transparent); color: var(--text, #f2f2f2); }
-:root.light #page-stk .cell-edit{ background:#fff; border-color:#e5e7eb; }
-#page-stk .cell-edit:hover{ filter:brightness(.98); }
-#page-stk .cell-edit:active{ transform: translateY(1px); }]
-
-/* --- Single-button status toggle (kept for compatibility) --- */
-#page-stk #stkStatusToggle{ border-radius:999px; padding:6px 12px; border:1px solid var(--divider, rgba(0,0,0,.12)); }
-#page-stk #stkStatusToggle[aria-pressed="true"]{ background: var(--primary-weak, rgba(0,0,0,.06)); border-color: var(--primary, #3b82f6); }
-
-/* --- Modals: center on screen and above viewport/table --- */
-#stkEditDlg, #stkAddDlg{ position: fixed !important; inset:0 !important; z-index:2000 !important; display:none; align-items:center; justify-content:center; padding:24px; background: rgba(0,0,0,.35); }
-#stkEditDlg .modal-content, #stkAddDlg .modal-content{ max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto; background:var(--card,#fff); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-#stkEditDlg .modal-hd, #stkAddDlg .modal-hd{ position:sticky; top:0; display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:inherit; border-bottom:1px solid var(--divider, rgba(0,0,0,.12)); }
-#stkEditDlg .modal-bd, #stkAddDlg .modal-bd{ padding:16px; }
-#stkEditDlg .modal-actions, #stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
-#stkEditDlg .input, #stkAddDlg .input{ width:100%; padding:10px 12px; font-size:16px; }
-#stkEditDlg .btn-close{ font-size:20px; line-height:1; border:none; background:transparent; cursor:pointer; }
-#stkAddDlg .form-row{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
-#stkAddDlg .form-row label{ font-size:12px; color:var(--text-weak,#667085); }
-
-/* page-stk：KPI 小卡圓形按鈕（防拉伸、防覆寫） */
-#page-stk .icon-btn{
-  display: inline-flex; align-items: center; justify-content: center;
-  box-sizing: border-box;         /* 邊框算進去，避免尺寸外擴 */
-  inline-size: 48px; block-size: 48px;
-  width: 48px; height: 48px;      /* 備援，確保任何情況都是 48x48 */
-  aspect-ratio: 1 / 1;            /* 強制正方形 */
-  flex: 0 0 48px;                 /* 阻止 flex 把它拉長或壓扁 */
-  padding: 0; margin: 0;          /* 不要讓 padding 造成視覺橢圓 */
-  border-radius: 50% !important;  /* 一律畫圓，避免舊規則干擾 */
-  border: 1px solid var(--divider, rgba(0,0,0,.12));
-  background: var(--card,#fff); color: var(--text);
-  cursor: pointer;
-  transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease;
-}
-#page-stk .icon-btn .material-symbols-outlined{
-  font-size: 44px; line-height: 1;
-}
-:root:not(.light) #page-stk .icon-btn{
-  background: color-mix(in oklab, var(--card) 88%, transparent);
-  border-color: color-mix(in oklab, var(--tint) 24%, transparent);
-  color: var(--text);
-}
-#page-stk .icon-btn:hover{ filter: brightness(.98); }
-#page-stk .icon-btn:active{ transform: translateY(1px) scale(.98); }
-
-
-#page-stk .kpi-actions-card{
-  display:flex; flex-wrap:nowrap; gap:10px; align-items:center; justify-content:flex-end;
-  padding:8px; border-radius:12px; background:var(--card,#fff);
-  border:1px solid var(--divider, rgba(0,0,0,.12));
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-}
-:root:not(.light) #page-stk .kpi-actions-card{
-  background: color-mix(in oklab, var(--card) 92%, transparent);
-  border-color: color-mix(in oklab, var(--tint) 20%, transparent);
-}
-
-
-/* 刪除模式紅底（兩主題皆可見） */
-#page-stk .icon-btn.danger{
-  background:#ef4444; border-color:#ef4444; color:#fff;
-}
-#page-stk .icon-btn.danger .material-symbols-outlined{ color:#fff; }
-
-
-/* KPI 列排版，避免重疊 */
-#page-stk .kpi-row{
-  display:flex;
-  flex-wrap:wrap;              /* 空間不足會換到下一行 */
-  align-items:stretch;
-  gap:12px;
-}
-#page-stk .kpi-row .kpi{
-  flex:1 1 160px;              /* 每張 KPI 至少 160px，等比例縮放 */
-  min-width:160px;
-}
-#page-stk .kpi-actions-card{
-  margin-left:auto;            /* 推到最右側 */
-  flex:0 0 auto;
-  position:static;             /* 確保不是 absolute，避免壓住 KPI */
-}
-@media (max-width: 768px){
-  #page-stk .kpi-actions-card{
-    width:100%;                /* 手機時整行顯示，避免擠壓 */
-    order:99;                  /* 放在 KPI 後面 */
+@layer pages{
+  /* 版面：左側市場總覽 + 右側主卡 */
+  #page-stk .stk-layout{ display:grid; grid-template-columns: 210px 1fr; gap:16px; }
+  @media (max-width:1024px){
+    #page-stk .stk-layout{ grid-template-columns:1fr; }
+    #page-stk #stkMarketsCard{ order:-1; }
   }
-}
 
+  /* KPI 列排版：五等分 tile，右側 actions 卡靠右 */
+  #page-stk .kpi-row{ display:grid; grid-template-columns: repeat(5, minmax(0,1fr)) auto; align-items:stretch; gap:12px; }
+  #page-stk .kpi-row .kpi{
+  width:100%; min-width:0;
+  padding:8px 10px; border-radius:10px; background:var(--kpi-pane-bg);
+  border:1px dashed var(--ctbc-border);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;}
+  #page-stk .kpi-actions-card{
+    width:100%; min-width:0; margin:0; padding:8px;
+    border-radius:12px; background: var(--card); border:1px solid var(--hairline); box-shadow: var(--card-shadow);
+    display:flex; gap:10px; align-items:center; justify-content:center;  /* 三顆 icon 置中並排 */
+    flex-wrap:nowrap; white-space:nowrap;                                  /* 不換行 */
+  }
+  @media (max-width:1024px){
+    #page-stk .kpi-row{ grid-template-columns: 1fr; }
+    #page-stk .kpi-actions-card{ grid-column: 1; width:100%; order:99; }
+  }
+  #page-stk .ctbc-table{ width:100%; table-layout:fixed; }
+  @media (max-width:1024px){
+    #page-stk{ font-size: 2em; }
+  }
+  /* 只放寬 未實現損益/ROI 這一欄，避免被鄰欄遮住 */
+  #page-stk .ctbc-table td.pnl-col{ overflow: visible; }
+  #page-stk .ctbc-table th.pnl-col-hd{ position: sticky; top: 0; }
+  #page-stk .pnl-cell{ position: relative; z-index: 1; }
+
+
+  @media (max-width:768px){ #page-stk .kpi-actions-card{ width:100%; order:99; } }
+
+  /* 行動與桌機一致的圓形 icon 按鈕（防拉伸） */
+  #page-stk .icon-btn{
+    display:inline-flex; align-items:center; justify-content:center;
+    box-sizing:border-box;
+    inline-size:48px; block-size:48px; width:48px; height:48px;
+    aspect-ratio:1/1; flex:0 0 48px; padding:0; margin:0;
+    border-radius:50%;
+    border:1px solid var(--hairline);
+    background: var(--card); color: var(--text);
+    cursor:pointer;
+    transition: filter .15s ease, transform .1s ease, background-color .15s ease, border-color .15s ease;
+  }
+  #page-stk .icon-btn .material-symbols-outlined{ font-size:44px; line-height:1; }
+  :root[data-theme="dark"] #page-stk .icon-btn{
+    background: color-mix(in oklab, var(--card) 88%, transparent);
+    border-color: color-mix(in oklab, var(--tint) 24%, transparent);
+  }
+  #page-stk .icon-btn:hover{ filter:brightness(.98); }
+  #page-stk .icon-btn:active{ transform: translateY(1px) scale(.98); }
+  #page-stk .icon-btn.danger{ background: var(--danger); border-color: var(--danger); color:#fff; }
+
+  /* 左側：市場總覽卡（取代 chips） */
+  #page-stk #stkMarketsCard .card-hd{ padding:12px 16px; border-bottom:1px solid var(--hairline); }
+  #page-stk #stkMarketsCard .card-bd{ overflow:visible; }  /* 讓 active 邊框不被裁切 */
+  #page-stk #stkMarketsList .mkt-row{
+    display:flex; flex-direction:column; gap:6px;
+    width:100%; box-sizing:border-box; padding:10px 12px; border-radius:10px; cursor:pointer;
+    border:1px solid transparent; background:transparent;
+  }
+  #page-stk #stkMarketsList .mkt-row:hover{ background: color-mix(in oklab, var(--surface) 86%, transparent); }
+  #page-stk #stkMarketsList .mkt-row.active{
+    background: var(--primary-weak, rgba(0,0,0,.06));
+    border-color: var(--primary, #3b82f6);
+  }
+  #page-stk #stkMarketsList .mkt-name{ font-weight:800; }
+  #page-stk #stkMarketsList .mkt-mv{ font-variant-numeric: tabular-nums; }
+  #page-stk #stkMarketsList .sub{
+    grid-column:1 / -1; display:flex; justify-content:space-between; align-items:center; color: var(--muted);
+  }
+  #page-stk #stkMarketsList .sub .roi :where(.roi-badge,.pnl-pill){ margin-left:8px; }
+
+  /* 表格與 viewport（置中、表頭淺灰一致） */
+  #page-stk .ctbc-scroll{
+    position:relative; overflow:auto;
+    border:1px solid var(--ctbc-border); border-radius:10px; background:var(--card);
+  }
+  #page-stk .ctbc-table{
+    width: 100%;            /* ← 重要：不要再用 max(100%,980px) 或 min-width */
+    border-collapse:separate; border-spacing:0; table-layout: fixed;
+  }
+  #page-stk .ctbc-table thead th{
+    position:sticky; top:0; text-align:center;
+    background:#f3f4f6;
+    box-shadow: 0 1px 0 var(--ctbc-border), 0 6px 6px -6px var(--ctbc-shadow);
+    z-index: var(--z-thead);
+  }
+  :root[data-theme="dark"] #page-stk .ctbc-table thead th{
+    background: color-mix(in oklab, var(--card) 92%, #000 0%);
+  }
+  #page-stk .ctbc-table thead th, #page-stk .ctbc-table tbody td{
+    padding:8px 10px; min-width:var(--ctbc-fixed-col-w); height:var(--ctbc-row-h);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; border-bottom:1px solid var(--ctbc-border);
+    text-align:center;
+  }
+  #page-stk .ctbc-table tbody tr:nth-child(even) td{ background: color-mix(in oklab, var(--card) 96%, #fff 4%); }
+  :root[data-theme="dark"] #page-stk .ctbc-table tbody td{ background: var(--card); }
+
+  /* iOS 風格子清單卡（3 欄栅格 + 動畫） */
+  #page-stk .stk-detail td{ padding:0; }
+  #page-stk .detail-card{
+    margin:8px; border-radius:12px; background:var(--card); border:1px solid var(--hairline); overflow:hidden;
+    box-shadow:0 6px 18px rgba(0,0,0,.12);
+  }
+  :root[data-theme="dark"] #page-stk .detail-card{ box-shadow:0 10px 26px rgba(0,0,0,.35); }
+  #page-stk .detail-grid{ display:grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap:8px 16px; padding:10px 8px; }
+  #page-stk .detail-item{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid color-mix(in oklab, var(--hairline) 60%, transparent); }
+  #page-stk .detail-item .label{ color: var(--muted); }
+  #page-stk .stk-detail{ transition: all .18s ease; }
+  #page-stk .stk-detail .detail-card{ transform-origin: top; transition: transform .14s ease, opacity .14s ease; }
+  #page-stk .stk-detail.entering .detail-card{ transform: scale(.98); opacity:0; }
+  #page-stk .stk-detail.open .detail-card{ transform: scale(1); opacity:1; }
+
+  /* 編輯膠囊（買價/現價/股息）隨主題變化 */
+  #page-stk .cell-edit{
+    display:inline-block; padding:.2rem .5rem; border-radius:999px;
+    border:1px solid var(--hairline); background: var(--card);
+    color: var(--text);         /* 確保亮暗都有對比 */
+  }
+  :root[data-theme="dark"] #page-stk .cell-edit{
+    background: color-mix(in oklab, var(--card) 92%, transparent);
+    border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+    color: var(--text);         /* 關鍵：暗色文字也要亮 */
+  }
+  #page-stk .cell-edit:hover{ filter:brightness(.98); }
+  #page-stk .cell-edit:active{ transform: translateY(1px); }
+
+  /* Modal：永遠置中、壓過虛擬清單 */
+  #stkEditDlg,#stkAddDlg{
+    position: fixed; inset:0; z-index:2000;
+    display:none; align-items:center; justify-content:center;
+    padding:24px;
+    background: rgba(0,0,0,.35);
+    backdrop-filter: blur(6px);   /* ← 模糊背景 */
+  }
+  #stkEditDlg .modal-content,#stkAddDlg .modal-content{
+    max-width:520px; width:min(92vw,520px); max-height:80vh; overflow:auto;
+    background:var(--card); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+  #stkEditDlg .modal-hd,#stkAddDlg .modal-hd{
+    position:sticky; top:0; display:flex; align-items:center; justify-content:space-between;
+    padding:12px 16px; background:inherit; border-bottom:1px solid var(--hairline);
+  }
+  #stkEditDlg .modal-bd,#stkAddDlg .modal-bd{ padding:16px; }
+  #stkEditDlg .modal-actions,#stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
+}
 
 </style>
