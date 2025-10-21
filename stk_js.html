@@ -739,7 +739,15 @@ function toggleAddBusy(on){
     const order = { US:0, TW:1, VN:2, CTBC:3 };
     items.sort((a,b)=> (order[a.T] ?? 9) - (order[b.T] ?? 9));
 
-    const html = items.map(o=>{
+    // 累計所有市場市值（依當前持有/已賣出篩選），供 dashmain 監聽使用
+    const totalMarketsMV = items.reduce((s,o)=> s + (Number(o.MV)||0), 0);
+    window.__stkMarketsMV__ = totalMarketsMV;
+    try {
+      window.dispatchEvent(new CustomEvent('stk:marketsMV', { detail: { mv: totalMarketsMV } }));
+    } catch(_) {}
+
+    // --- build two flavors: STK (with PL) & Dashboard (w/o PL) ---
+    const htmlForSTK = items.map(o=>{
       const roiPct = o.w ? (o.wU / o.w) : 0;   // 市值加權 ROI（%）
       const roiHTML = roiPillHTML(roiPct);
       const active = (String(st.market||'') === String(o.T));
@@ -753,9 +761,26 @@ function toggleAddBusy(on){
       </div>`;
     }).join('');
 
+    const htmlForDash = items.map(o=>{
+      const roiPct = o.w ? (o.wU / o.w) : 0;
+      const roiHTML = roiPillHTML(roiPct);
+      return `<div class="kpi-item" data-mkt="${esc(o.T)}">
+        <div class="k">${esc(o.T||'-')}</div>
+        <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+          <span class="money capsule">${fmtMoney(o.MV)}</span>
+          ${roiHTML}
+        </div>
+      </div>`;
+    }).join('');
+
+    // --- render into each available target ---
     targets.forEach(box=>{
-      box.innerHTML = html || '<div class="empty">沒有資料</div>';
-      box.querySelectorAll('.mkt-row').forEach(el=>{
+      const isDash = (box.id === 'ctbcMarketsList');
+      box.innerHTML = (isDash ? htmlForDash : htmlForSTK) || (isDash ? '' : '<div class="empty">沒有資料</div>');
+
+      const rows = isDash ? box.querySelectorAll('.kpi-item[data-mkt]')
+                          : box.querySelectorAll('.mkt-row[data-mkt]');
+      rows.forEach(el=>{
         el.addEventListener('click', ()=>{
           const m = el.getAttribute('data-mkt');
           st.market = m;                 // 切換市場
@@ -764,14 +789,18 @@ function toggleAddBusy(on){
           renderKPI(viewRows);
           renderHead();
           renderTable(viewRows);
-          // 如果從儀表板點，帶你切至 STK 頁
-          try{ if (typeof go==='function') go('stk'); }catch(_){}
-          // 重新高亮所有容器中的相同市場
-          targets.forEach(t=>{
-            t.querySelectorAll('.mkt-row').forEach(row=>{
-              row.classList.toggle('active', row.getAttribute('data-mkt')===m);
+          // 若從儀表板點擊，嘗試切頁到 STK
+          try{ if (typeof go==='function') go('stk'); }catch(_){/* no-op */}
+          // 重新高亮 STK 端的市場選中狀態
+          if (!isDash){
+            targets.forEach(t=>{
+              if (t.id!== 'ctbcMarketsList'){
+                t.querySelectorAll('[data-mkt]').forEach(row=>{
+                  row.classList.toggle('active', row.getAttribute('data-mkt')===m);
+                });
+              }
             });
-          });
+          }
         });
       });
     });

@@ -435,32 +435,48 @@ function renderBalanceCard(activeAccount){
   }
 
   const sectionHTML = (title, items) => {
-    const titleHTML = `<div class="section-title"><span class="tx-chip">${title}</span></div>`;
-    const rowsHTML = items.length
-      ? items.map(({account, balance}) => {
-          const cls = balance < 0 ? 'neg' : 'pos';
-          const txt = Math.round(Number(balance)||0).toLocaleString('zh-Hant-TW');
-          return `<div class="bal-row">
-                    <span class="name">${esc(account)}</span>
-                    <span class="bal-chip ${cls} mask-num" data-mask-str="＊＊＊">${txt}</span>
-                  </div>`;
-        }).join('')
-      : `<div class="bal-row empty">（無資料）</div>`;
+    // 分類：中信置頂 + 其餘（顯示順序用既有 items）
+    const isCtbc = (s) => String(s || '').includes('中信'); // 僅以「包含中信」判斷，避免模糊比對
+    const tops = (items || []).filter(x => isCtbc(x.account));
+    const rest = (items || []).filter(x => !isCtbc(x.account));
 
-    const total = items.reduce((t,x)=>t+(Number(x.balance)||0),0);
+    const titleHTML = `<div class="section-title"><span class="tx-chip">${title}</span></div>`;
+
+    const rowHTML = ({account, balance}) => {
+      const cls = balance < 0 ? 'neg' : 'pos';
+      const txt = Math.round(Number(balance) || 0).toLocaleString('zh-Hant-TW');
+      return `<div class="bal-row">
+                <span class="name">${esc(account)}</span>
+                <span class="bal-chip ${cls} mask-num" data-mask-str="＊＊＊">${txt}</span>
+              </div>`;
+    };
+
+    let rowsHTML = '';
+    if (tops.length) {
+      rowsHTML += tops.map(rowHTML).join('');
+      rowsHTML += `<hr class="bal-divider">`;  // 與其他帳號分隔
+    }
+    rowsHTML += (rest.length ? rest.map(rowHTML).join('') : (tops.length ? '' : `<div class="bal-row empty">（無資料）</div>`));
+
+    // 合計：扣除「中信」
+    const totalItems = (items || []).filter(x => !isCtbc(x.account));
+    const total = totalItems.reduce((t, x) => t + (Number(x.balance) || 0), 0);
     const totalTxt = Math.round(total).toLocaleString('zh-Hant-TW');
     const totalHTML = `<div class="bal-row total"><span class="name">合計</span><span class="bal-chip total mask-num" data-mask-str="＊＊＊">${totalTxt}</span></div>`;
+
     return titleHTML + rowsHTML + totalHTML;
   };
 
   const postedHTML  = sectionHTML('Posted', posted);
   const plannedHTML = sectionHTML('Planned', planned);
 
-  const sumPosted  = posted.reduce((t,x)=>t+(Number(x.balance)||0),0);
-  const sumPlanned = planned.reduce((t,x)=>t+(Number(x.balance)||0),0);
+  // 總計也排除「中信」
+  const notCtbc = (s) => String(s || '').includes('中信') === false;
+  const sumPosted  = posted.filter(x => notCtbc(x.account)).reduce((t,x)=>t+(Number(x.balance)||0),0);
+  const sumPlanned = planned.filter(x => notCtbc(x.account)).reduce((t,x)=>t+(Number(x.balance)||0),0);
   const grand      = Math.round(sumPosted + sumPlanned).toLocaleString('zh-Hant-TW');
 
-  const grandHTML = `<hr class="bal-divider"><div class="grand-total-wrap"><span class="bal-chip total mask-num" data-mask-str="＊＊＊">${grand}</span></div>`;
+  const grandHTML = `<hr class="bal-divider"><div class="grand-total-wrap"><span class="grand-label">餘額</span><span class="bal-chip total mask-num" data-mask-str="＊＊＊">${grand}</span></div>`;
 
   cardEl.innerHTML = `<div class="bal-sec">${postedHTML}</div><div class="bal-sec">${plannedHTML}</div>${grandHTML}`;
 }

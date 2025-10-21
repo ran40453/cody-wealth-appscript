@@ -1,5 +1,38 @@
 <script>
 (function(){
+  // —— CTBC Header Total（基金 USD 轉台幣 + 市場台幣 MV）——
+  const __ctbcHeader = { fundUSD: 0, fxUSDTWD: NaN, marketsTWD: 0 };
+  function fmt0(n){ return isFinite(+n) ? Number(n).toLocaleString('zh-Hant-TW',{maximumFractionDigits:0}) : '—'; }
+  function updateCtbcHeaderTotal(){
+    const pill = document.getElementById('ctRetPill');
+    if (!pill) return;
+    const fx = Number(__ctbcHeader.fxUSDTWD);
+    const mk = Number(__ctbcHeader.marketsTWD)||0;
+    const usd= Number(__ctbcHeader.fundUSD)||0;
+    if (!isFinite(fx) || fx<=0){ pill.classList.add('money','capsule'); pill.textContent = '—'; return; }
+    const totalTWD = usd * fx + mk;
+    pill.classList.add('money','capsule');
+    pill.textContent = fmt0(totalTWD);
+  }
+  function fetchFxUSDTWD(){
+    const run = window.google?.script?.run; if (!run) return;
+    const setFx = v=>{ const n=Number(v); __ctbcHeader.fxUSDTWD = (isFinite(n)&&n>0)?n:32; updateCtbcHeaderTotal(); };
+    // 先嘗試 getUSDTWD()，失敗再嘗試 getFxRate('USD','TWD')
+    try{
+      run.withSuccessHandler(setFx)
+         .withFailureHandler(()=>{
+           try{ run.withSuccessHandler(setFx).withFailureHandler(()=>setFx(null)).getFxRate('USD','TWD'); }
+           catch(e){ setFx(null); }
+         })
+         .getUSDTWD();
+    }catch(e){ setFx(null); }
+  }
+  // 接收 STK 市場總市值（台幣）
+  window.addEventListener('stk:marketsMV', e=>{
+    __ctbcHeader.marketsTWD = Number(e?.detail?.mv||0);
+    updateCtbcHeaderTotal();
+  });
+
   // —— 小工具 ——
   function fmt(n, frac=0){
     const num = Number(n);
@@ -94,7 +127,12 @@
     setText('accSumPill', 0, 0);
     return;
   }
-  wrap.innerHTML = rows.map(r=>{
+  // 依名稱包含「中信」分組，讓中信置頂
+  const isCtbc = (s) => String(s || '').includes('中信');
+  const tops = (rows || []).filter(r => isCtbc(r.account));
+  const rest = (rows || []).filter(r => !isCtbc(r.account));
+
+  function rowHTML(r){
     const acc = r.account || '';
     const now = numOr(r.now).toLocaleString('zh-Hant-TW');
     return `
@@ -102,10 +140,18 @@
         <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${acc}</span>
         <span class="v mask-num" style="min-width:120px;justify-content:flex-end;" data-mask-str="＊＊＊">${now}</span>
       </div>`;
-  }).join('');
+  }
 
-  // ★ 計算帳戶「現有餘額」總和並更新 pill
-  const sum = rows.reduce((s,r)=> s + numOr(r.now), 0);
+  let html = '';
+  if (tops.length){
+    html += tops.map(rowHTML).join('');
+    if (rest.length) html += `<hr class="bal-divider">`; // 只有在其他帳戶存在時才顯示分隔線
+  }
+  html += rest.map(rowHTML).join('');
+  wrap.innerHTML = html;
+
+  // ★ 計算帳戶「現有餘額」總和並更新 pill（排除「中信」）
+  const sum = rest.reduce((s,r)=> s + numOr(r.now), 0);
   setText('accSumPill', sum, 0);
 }
 
@@ -173,40 +219,9 @@
     renderPlannedList(cf.plannedTop);
 
     // D. CTBC KPI（Dash 顯示）
-    const ct = (data.ctbc && data.ctbc.allUSD) || {value:0,pnl:0,ret:0,interest:0};
-    setText('ctVal', ct.value, 1);
-    setText('ctPnl', ct.pnl,   1);
-
-    // 先給一個保底 ROI：
-    // 1) 若 page_ctbc 暫存有當前 chips 匯總，用它；
-    // 2) 否則用 allUSD 的 pnl/value；
-    let roiForDash = NaN;
-    if (typeof window.CTBC_getCurrentSummary === 'function'){
-      const s = window.CTBC_getCurrentSummary();
-      if (s && isFinite(s.sumN) && s.sumN !== 0 && isFinite(s.sumT)) {
-        roiForDash = (s.sumT / s.sumN) * 100;
-      } else if (isFinite(s.roi)) {
-        roiForDash = s.roi; // 已是百分比
-      }
-    }
-    if (!isFinite(roiForDash)){
-      roiForDash = (numOr(ct.value) ? (numOr(ct.pnl) / numOr(ct.value)) * 100 : 0);
-    }
-    // 先顯示保底 ROI
-    setPnlPill(document.getElementById('ctRetPill'), roiForDash, '%');
-
-    // 再以「全部項目」ROI 覆蓋（後端統一計算）
-    google.script.run
-      .withSuccessHandler(res => {
-        const roi = Number(res && res.ctbcAllROI) || 0;
-        setPnlPill(document.getElementById('ctRetPill'), roi, '%');
-      })
-      .withFailureHandler(err => {
-        console.warn('[dashmain] getCTBCAggregates(all) failed:', err);
-      })
-      .getCTBCAggregates();
-
-    setText('ctInt', ct.interest, 1);
+    // 先不在這裡寫 ctPnl/ctInt（避免用到舊的「股票+基金／美元」數字）
+    // 由下方 getCTBCAggregates('fund') 回來後寫入（台幣）。
+    updateCtbcHeaderTotal();
   }
 
   // 最小版 ROI 膠囊（沿用全域 .roi-badge 樣式）
@@ -235,18 +250,32 @@
     });
   }
 
-  // 在 getDashboardData 成功後，或你的 init() 裡額外呼叫：
-  google.script.run
-    .withSuccessHandler(res=>{
-      // res = { fund:{value, roi}, stock:{value, roi} }
-      setMoneyText('ctFundVal',  res?.fund?.value || 0, 0);
-      setPnlPill('ctFundROI',    res?.fund?.roi   ?? 0);
+  // 只抓「基金」，把 USD → TWD 後再顯示到 ctFundVal / ctPnl / ctInt
+(function(){
+  const run = google?.script?.run; if (!run) return;
+  run.withSuccessHandler(res => {
+    // 伺服端鍵名：ctbcUSD_N/T/AF、ctbcTWD_N/T/AF（皆為「基金」集合）
+    const usdN = Number(res?.ctbcUSD_N||0), usdT = Number(res?.ctbcUSD_T||0), usdAF = Number(res?.ctbcUSD_AF||0);
+    const twdN = Number(res?.ctbcTWD_N||0), twdT = Number(res?.ctbcTWD_T||0), twdAF = Number(res?.ctbcTWD_AF||0);
 
-      setMoneyText('ctStockVal', res?.stock?.value || 0, 0);
-      setPnlPill('ctStockROI',   res?.stock?.roi   ?? 0);
-    })
-    .withFailureHandler(err=>console.error('[dashmain] getCTBCFundStock failed', err))
-    .getCTBCFundStock();
+    const fx = Number(__ctbcHeader?.fxUSDTWD);
+    const hasFx = isFinite(fx) && fx>0;
+    const valTWD = (hasFx ? usdN*fx : 0) + twdN;   // 現值
+    const pnlTWD = (hasFx ? usdT*fx : 0) + twdT;   // 含息損益
+    const intTWD = (hasFx ? usdAF*fx : 0) + twdAF; // 已領利息
+
+    // 寫入（台幣）
+    setMoneyText('ctFundVal',  valTWD, 0);
+    setMoneyText('ctPnl',      pnlTWD, 0);   // 含息損益（台幣，基金-only）
+    setMoneyText('ctInt',      intTWD, 0);   // 已領利息（台幣，基金-only）
+
+    // Header pill 用基金 USD 供合計（USD→TWD 轉換交給 updateCtbcHeaderTotal）
+    __ctbcHeader.fundUSD = usdN;
+    updateCtbcHeaderTotal();
+  })
+  .withFailureHandler(err => console.warn('[dashmain] getCTBCAggregates(fund) failed', err))
+  .getCTBCAggregates('fund');
+})();
     
 
   // —— 載入 ——
@@ -255,6 +284,7 @@
       console.warn('[dashmain] google.script.run not available');
       return;
     }
+    fetchFxUSDTWD();
     google.script.run
       .withSuccessHandler(res=>{
         console.log('[dashmain] getDashboardData ok', res);

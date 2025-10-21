@@ -1,3 +1,17 @@
+// ---- helpers for parsing and indexing ----
+function parseMaybeString(v) {
+  try {
+    return typeof v === 'string' ? JSON.parse(v) : v;
+  } catch (e) {
+    console.warn('[parseMaybeString] parse failed, returning original', e);
+    return v;
+  }
+}
+function clamp(n, min, max) {
+  if (Number.isNaN(n)) return min;
+  return Math.max(min, Math.min(n, max));
+}
+// -----------------------------------------
 /** ========= Cody Wealth WebApp: server (app.gs) =========
  *  動態表頭整合版（A1 為表頭）
  *  - 全部讀寫一律用 getColMap_() 取欄位位置（不再寫死欄位號）
@@ -705,6 +719,74 @@ function getDatabaseRows(opt) {
   return { headers, rows, from, to, total, allHeaders:headers, lastUsedRow };
 }
 
+/**
+ * 依虛擬列索引（最新在上，0-based）計算所在分頁並回傳該分頁資料
+ * 用途：解法「row847 查無資料」—先用此 API 算 offset，再抓對的 page
+ * @param {Object} opt
+ * @param {number} opt.row    目標虛擬列索引（0 表「最新一列」）
+ * @param {number} [opt.limit=200] 每頁筆數
+ * @param {string} [opt.order='desc'] 'desc'=最新在上、'asc'=最舊在上（需與前端一致）
+ * @return {{headers:string[], rows:string[][], from:number, to:number, total:number, allHeaders:string[], lastUsedRow:number, selectedIndex:number, selectedRow:string[]|null}}
+ */
+function getDatabasePageForRow(opt){
+  opt = opt || {};
+  var want = Math.max(0, Number(opt.row||0));
+  var limit = Math.max(1, Number(opt.limit||200));
+  var order = String(opt.order||'desc').toLowerCase();
+
+  // 與 getDatabaseRows 同步的讀取邏輯（避免「尾端骨架列」干擾）
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(RECORD_SHEET_NAME);
+  if (!sh) return { headers:[], rows:[], from:0, to:0, total:0, allHeaders:[], lastUsedRow:2, selectedIndex:-1, selectedRow:null };
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return { headers:[], rows:[], from:0, to:0, total:0, allHeaders:[], lastUsedRow:2, selectedIndex:-1, selectedRow:null };
+
+  var headers = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var dataStart = 3;
+  if (lastRow < dataStart) return { headers, rows:[], from:0, to:0, total:0, allHeaders:headers, lastUsedRow:dataStart-1, selectedIndex:-1, selectedRow:null };
+
+  var block = sh.getRange(dataStart, 1, lastRow - dataStart + 1, lastCol).getDisplayValues();
+  function isBlankRow(arr){ return arr.every(function(v){ return String(v||'').trim()===''; }); }
+  var endIdx = block.length - 1;
+  while (endIdx >= 0){ if (!isBlankRow(block[endIdx])) break; endIdx--; }
+  if (endIdx < 0) return { headers, rows:[], from:0, to:0, total:0, allHeaders:headers, lastUsedRow:dataStart-1, selectedIndex:-1, selectedRow:null };
+
+  var lastUsedRow = dataStart + endIdx;  // 真實最後一列（有顯示值）
+  var data = block.slice(0, endIdx + 1);
+  var total = data.length;               // 虛擬清單總筆數
+
+  // 索引解讀：desc = 最新在上（反轉），asc = 最舊在上（保持）
+  var ordered = (order === 'desc') ? data.slice().reverse() : data;
+
+  // 重要：row 需夾在 [0, total)
+  var clamped = Math.max(0, Math.min(want, Math.max(0,total-1)));
+
+  // 計算 page 邊界（offset）與該頁 rows
+  var offset = Math.floor(clamped / limit) * limit; // page 的起點（含）
+  var from = Math.min(offset, total);
+  var to   = Math.min(offset + limit, total);
+  var rows = ordered.slice(from, to);
+
+  // 該頁中的相對 index 與那一列的資料
+  var selectedIndex = (clamped >= from && clamped < to) ? (clamped - from) : -1;
+  var selectedRow = selectedIndex >= 0 ? rows[selectedIndex] : null;
+
+  return { headers, rows, from, to, total, allHeaders:headers, lastUsedRow, selectedIndex, selectedRow };
+}
+
+/**
+ * 依虛擬列索引直接取該列原始值（不分頁）
+ * @param {number} rowIndexFromTop 0-based（與前端虛擬清單一致）
+ * @param {string} [order='desc']  'desc'=最新在上
+ * @return {{headers:string[], row:any[]|null, total:number, lastUsedRow:number}}
+ */
+function getDatabaseRowByIndex(rowIndexFromTop, order){
+  var page = getDatabasePageForRow({ row: Number(rowIndexFromTop||0), limit: 1, order: order||'desc' });
+  return { headers: page.headers||[], row: page.selectedRow||null, total: page.total||0, lastUsedRow: page.lastUsedRow||0 };
+}
+
 /** 左側最新資料卡：用欄位字母定位 + 同時取值(getValues)與顯示(getDisplayValues) */
 function getRecordLatest(){
   var ss = SpreadsheetApp.getActive();
@@ -826,15 +908,32 @@ function getDashboardData(){
   // 取近期 5 筆 planned（給 Dashboard 卡片列）
   const plannedList = (getTxByKind('planned')||[]).slice(0,5);
 
-  // --- CTBC：以 getCTBCInvestments 累加 USD 值
-  const ct = getCTBCInvestments() || [];
-  const all = ct.reduce((a,r)=>{
+  // --- CTBC：改為基金-only 指標 + 市場（STK）未賣出總市值 ---
+  const ctAll = getCTBCInvestments() || [];
+  const isFund = (r)=> /基金|FUND/i.test(String(r.H||'')) || /基金|FUND/i.test(String(r.K||''));
+
+  // 基金-only 匯總
+  const fundAgg = ctAll.reduce((a,r)=>{
+    if (!isFund(r)) return a;
     const v = Number(r.N||0);    // 現值 (USD)
     const pnl = Number(r.T||0);  // 含息損益 (USD)
     const intv= Number(r.AF||0); // 已領利息 (USD)
-    a.value+=v; a.pnl+=pnl; a.interest+=intv; return a;
-  }, {value:0, pnl:0, interest:0});
-  const ret = all.value!==0 ? (all.pnl/all.value)*100 : 0;
+    a.value += v; a.pnl += pnl; a.interest += intv;
+    // U 正規化（與前端一致：|U|≤1 視為小數，×100）
+    let u = Number(r.U||0); if (!isFinite(u)) u = 0; if (Math.abs(u) <= 1) u *= 100;
+    if (v){ a.w += v; a.wU += (u * v); }
+    return a;
+  }, { value:0, pnl:0, interest:0, w:0, wU:0 });
+  const fundROI = fundAgg.w ? (fundAgg.wU / fundAgg.w) : 0;
+
+  // 市場（STK）未賣出總市值：讀 STK，A=false 的 N 欄加總
+  let marketsMV = 0;
+  try {
+    const stkRows = getSTKRows() || [];
+    marketsMV = stkRows.reduce((s,r)=> s + ((r && r.A===true) ? 0 : Number(r.N||0)), 0);
+  } catch(e){ marketsMV = 0; }
+
+  const headerTotalMV = (Number(fundAgg.value||0) + Number(marketsMV||0));
 
   return {
     kpis: {
@@ -849,8 +948,13 @@ function getDashboardData(){
       total: cfTotal,
       plannedTop: plannedList
     },
+    // 儀表板用：ctbc 區塊回「基金-only」與「市場總市值」
     ctbc: {
-      allUSD: { value: all.value, pnl: all.pnl, ret, interest: all.interest }
+      fund: { value: fundAgg.value, pnl: fundAgg.pnl, interest: fundAgg.interest, roi: fundROI },
+      markets: { totalMV: marketsMV },
+      // 兼容舊鍵：allUSD 的 pnl/interest 改回傳基金-only，value 仍回基金現值（現值總合顯示交給 header pill）
+      allUSD: { value: fundAgg.value, pnl: fundAgg.pnl, ret: fundROI, interest: fundAgg.interest },
+      headerTotalMV: headerTotalMV
     },
     database: {
       latest // {date,C,D,E,G,BA,CU}
@@ -944,6 +1048,7 @@ function saveLinkNote(row, note){
 }
 
 /** （可選）=公式交給 Sheets 引擎算，例如 =SUM(100, 200) → 回計算後的數字 */
+
 function evalBySheetsEngine(expr) {
   if (!/^=/.test(expr)) throw new Error('Not a formula');
   const lock = LockService.getScriptLock(); lock.tryLock(5000);
@@ -957,6 +1062,75 @@ function evalBySheetsEngine(expr) {
     cell.clearContent();
     return { ok: true, value: Number(val) };
   } finally { lock.releaseLock(); }
+}
+
+/**
+ * 取得 USD→TWD 匯率（優先 GOOGLEFINANCE；10 分鐘快取；失敗回 32）
+ * 前端可直接呼叫 google.script.run.getUSDTWD()
+ */
+function getUSDTWD(){
+  try {
+    var cache = CacheService.getDocumentCache();
+    var hit = cache && cache.get('fx_USD_TWD');
+    if (hit != null && hit !== '') return Number(hit);
+  } catch(e) { /* ignore cache errors */ }
+
+  var v = NaN;
+  try {
+    var r = evalBySheetsEngine('=GOOGLEFINANCE("CURRENCY:USDTWD")');
+    if (r && r.ok && isFinite(r.value) && Number(r.value) > 0) v = Number(r.value);
+  } catch(e) { /* fallthrough */ }
+
+  // 一些情況 GOOGLEFINANCE 會回表格；INDEX 取最新價格
+  if (!isFinite(v) || v <= 0){
+    try {
+      var r2 = evalBySheetsEngine('=INDEX(GOOGLEFINANCE("CURRENCY:USDTWD"),2,2)');
+      if (r2 && r2.ok && isFinite(r2.value) && Number(r2.value) > 0) v = Number(r2.value);
+    } catch(e) { /* fallthrough */ }
+  }
+
+  // 兜底（離線或服務異常時）
+  if (!isFinite(v) || v <= 0) v = 32; // safe default
+
+  try { if (cache) cache.put('fx_USD_TWD', String(v), 600); } catch(e) {}
+  return v;
+}
+
+/**
+ * 通用：取得 base→quote 匯率，例如 getFxRate('USD','TWD')
+ * 失敗回 NaN；呼叫者自行處理預設值
+ */
+function getFxRate(base, quote){
+  base = String(base||'').trim().toUpperCase();
+  quote = String(quote||'').trim().toUpperCase();
+  if (!base || !quote) return NaN;
+
+  var key = 'fx_'+base+'_'+quote;
+  try {
+    var cache = CacheService.getDocumentCache();
+    var hit = cache && cache.get(key);
+    if (hit != null && hit !== '') return Number(hit);
+  } catch(e) { /* ignore cache errors */ }
+
+  var v = NaN;
+  var expr = '=GOOGLEFINANCE("CURRENCY:'+ base + quote + '")';
+  try {
+    var r = evalBySheetsEngine(expr);
+    if (r && r.ok && isFinite(r.value) && Number(r.value) > 0) v = Number(r.value);
+  } catch(e) { /* fallthrough */ }
+  if (!isFinite(v) || v <= 0){
+    try {
+      var r2 = evalBySheetsEngine('=INDEX(GOOGLEFINANCE("CURRENCY:'+ base + quote +'"),2,2)');
+      if (r2 && r2.ok && isFinite(r2.value) && Number(r2.value) > 0) v = Number(r2.value);
+    } catch(e) { /* fallthrough */ }
+  }
+  if (!isFinite(v) || v <= 0) return NaN;
+
+  try {
+    var cache2 = CacheService.getDocumentCache();
+    if (cache2) cache2.put(key, String(v), 600);
+  } catch(e) {}
+  return v;
 }
 
 /** Dash 指標：B1=總金額、E3=今日增減 */
@@ -1123,44 +1297,6 @@ function getPolicyControlsRange(){
 /**====================record=========================*/
 
 
-/**
- * 依「試算表實際列號」回傳該列所有欄位明細（不涉入排序/索引推算）
- * @param {number} rowNumber  真實列號（≥3）
- * @return {Array<{label:string,value:any,col_index:number}>}
- */
-function getRecordDetailsByRowNumber(rowNumber){
-  var ss = SpreadsheetApp.getActive();
-  // 盡可能精準取到 Record 分頁；RECORD_SHEET_NAME 未設定時用 'record'，再退到目前啟用分頁
-  var sh = ss.getSheetByName(typeof RECORD_SHEET_NAME==='string' && RECORD_SHEET_NAME ? RECORD_SHEET_NAME : 'record') || ss.getActiveSheet();
-  if (!sh) return [];
-
-  var lastRow = sh.getLastRow();
-  var lastCol = sh.getLastColumn();
-  var r = Number(rowNumber||0);
-  if (!r || r < 3 || r > lastRow || lastCol < 1) return [];
-
-  // 表頭第 1、2 列（顯示字串）→ 合併成 label
-  var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
-  var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
-
-  // 目標列：回傳原始值（保留型別：數字/日期）
-  var rowVals = sh.getRange(r, 1, 1, lastCol).getValues()[0] || [];
-
-  function combineLabel(a,b){
-    a = String(a||'').trim();
-    b = String(b||'').trim();
-    if (a && b && a!==b) return a + ' (' + b + ')';
-    return a || b || '';
-  }
-
-  var out = new Array(lastCol);
-  for (var c = 1; c <= lastCol; c++){
-    var label = combineLabel(hdr1[c-1], hdr2[c-1]);
-    if (!label && c === 1) label = '日期';
-    out[c-1] = { label: label, value: rowVals[c-1], col_index: c-1 };
-  }
-  return out;
-}
 
 
 /**
@@ -1722,4 +1858,161 @@ function deleteSTKRow(row){
   if (!r || r < 2 || r > last) throw new Error('列號超出範圍');
   sh.deleteRow(r);
   return { ok:true, row:r };
+}
+
+
+/** ==================== record：V2 快照/分頁 API ==================== */
+/** 設定 */
+const RECORD_V2_CFG = {
+  sheetName: typeof RECORD_SHEET_NAME === 'string' && RECORD_SHEET_NAME ? RECORD_SHEET_NAME : 'record',
+  headerRows: 2,       // 第1列+第2列為表頭
+  dataStartRow: 3,     // 第3列開始為資料
+  cacheKey: 'record_v2_snapshot',
+  cacheTtlSec: 60,     // 快照 60 秒有效
+};
+
+/** 小工具：取得「有效最後一列」（自尾端往上掃，整列顯示值皆空才略過） */
+function recordV2_lastUsedRow_(sh) {
+  const lastRow = sh.getLastRow();
+  const lastCol = sh.getLastColumn();
+  if (lastRow < RECORD_V2_CFG.dataStartRow || lastCol < 1) return RECORD_V2_CFG.dataStartRow - 1;
+
+  let r = lastRow;
+  while (r >= RECORD_V2_CFG.dataStartRow) {
+    const disp = sh.getRange(r, 1, 1, lastCol).getDisplayValues()[0];
+    const allBlank = disp.every(v => String(v || '').trim() === '');
+    if (!allBlank) break;
+    r--;
+  }
+  return r; // < dataStartRow 表示無有效資料
+}
+
+/** 取得 V2 meta（不存 cache）：{sheetId,lastCol,lastUsed,total,version} */
+function recordV2_getMeta_() {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(RECORD_V2_CFG.sheetName);
+  if (!sh) return { sheet: false, total: 0, lastCol: 0, lastUsed: 0, version: '' };
+  const lastCol = sh.getLastColumn();
+  const lastUsed = recordV2_lastUsedRow_(sh);
+  const total = Math.max(0, lastUsed - (RECORD_V2_CFG.headerRows));
+  const version = new Date().toISOString();
+  return { sheet: true, sheetId: sh.getSheetId(), lastCol, lastUsed, total, version };
+}
+
+/** 建立/覆寫快照（僅存 meta，不存整包資料；索引→實際列的換算公式即可） */
+function recordMakeSnapshotV2() {
+  const meta = recordV2_getMeta_();
+  const cache = CacheService.getDocumentCache();
+  cache.put(RECORD_V2_CFG.cacheKey, JSON.stringify(meta), RECORD_V2_CFG.cacheTtlSec);
+  return meta;
+}
+
+/** 讀取快照（若失效就重建） */
+function recordV2_readMeta_() {
+  const cache = CacheService.getDocumentCache();
+  const s = cache.get(RECORD_V2_CFG.cacheKey);
+  if (s) {
+    try { return JSON.parse(s); } catch (e) { /* fallthrough */ }
+  }
+  return recordMakeSnapshotV2();
+}
+
+/** Ping：給前端顯示 ready 狀態 */
+function recordPingV2() {
+  const meta = recordV2_readMeta_();
+  return { total: meta.total || 0, version: meta.version || '' };
+}
+
+/**
+ * 分頁清單：回 6 欄
+ *  A(日期顯示字串)｜C(總金額)｜D(總金額-含dad)｜E(可動用)｜F(損益)｜G(可用現金)
+ *  並附上 idx（0=最新在上）與實際 sheet 列號 row
+ * @param {{offset?:number, limit?:number}} opt
+ */
+function recordListV2(opt) {
+  opt = opt || {};
+  const offset = Math.max(0, Number(opt.offset || 0));
+  const limit  = Math.max(1, Number(opt.limit  || 200));
+
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(RECORD_V2_CFG.sheetName);
+  if (!sh) return { meta: { total: 0 }, rows: [] };
+
+  const meta = recordV2_readMeta_();
+  const total = meta.total || 0;
+  if (total <= 0) return { meta, rows: [] };
+
+  const from = Math.min(offset, total);
+  const to   = Math.min(offset + limit, total);
+  const count = Math.max(0, to - from);
+  if (count <= 0) return { meta, rows: [] };
+
+  // 將「虛擬 idx（最新在上）」映射到「實際列號」
+  // latestIdx=0 → realRow = meta.lastUsed - 0
+  // latestIdx=k → realRow = meta.lastUsed - k
+  const rows = [];
+  const tz = ss.getSpreadsheetTimeZone() || 'Asia/Taipei';
+  for (let i = 0; i < count; i++) {
+    const idx = from + i;                       // 0-based（最新在上）
+    const realRow = meta.lastUsed - idx;        // 實際列號
+    if (realRow < RECORD_V2_CFG.dataStartRow) break;
+
+    // 一次取 A..G（7欄），保留數字型別
+    const vals = sh.getRange(realRow, 1, 1, 7).getValues()[0];
+    const dispA = sh.getRange(realRow, 1, 1, 1).getDisplayValues()[0][0]; // A 欄顯示字串當日期
+
+    rows.push({
+      idx,
+      row: realRow,
+      A: String(dispA || ''),     // 日期（顯示）
+      C: Number(vals[2] || 0),
+      D: Number(vals[3] || 0),
+      E: Number(vals[4] || 0),
+      F: Number(vals[5] || 0),
+      G: Number(vals[6] || 0),
+    });
+  }
+  return { meta: { total, version: meta.version, lastCol: meta.lastCol }, rows };
+}
+
+/**
+ * 子清單：依 idx 反查實際列號 → 回傳整列的 {label,value,col_index}[]
+ * @param {{idx:number}} payload
+ */
+function recordDetailV2(payload) {
+  const idx = Math.max(0, Number(payload && payload.idx || 0));
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(RECORD_V2_CFG.sheetName);
+  if (!sh) return [];
+
+  const meta = recordV2_readMeta_();
+  const total = meta.total || 0;
+  if (total <= 0 || idx >= total) return [];
+
+  const realRow = meta.lastUsed - idx; // 由 idx 換算實際列號
+  if (realRow < RECORD_V2_CFG.dataStartRow) return [];
+
+  // 直接沿用你已存在的函式
+  return getRecordDetailsByRowNumber(realRow) || [];
+}
+
+/** === V2 Self-Test / Debug === */
+function recordV2_selfTest(){
+  // 快速驗證後端：回 meta + 前 3 筆列表（若有）
+  var meta = recordMakeSnapshotV2();
+  var page = recordListV2({ offset: 0, limit: 3 });
+  return { ok:true, meta: meta, rows: (page && page.rows) || [] };
+}
+function recordV2_debugRow(idx){
+  // 檢查某 idx → realRow 映射是否正常，並回傳前 6 欄顯示值
+  idx = Math.max(0, Number(idx||0));
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(RECORD_V2_CFG.sheetName);
+  if (!sh) return { ok:false, msg:'no sheet' };
+  var meta = recordV2_readMeta_();
+  if (!meta || !meta.total) return { ok:false, msg:'no meta/total' };
+  if (idx >= meta.total) return { ok:false, msg:'idx>=total', meta:meta };
+  var realRow = meta.lastUsed - idx;
+  var disp = sh.getRange(realRow, 1, 1, Math.min(6, sh.getLastColumn())).getDisplayValues()[0] || [];
+  return { ok:true, meta:meta, idx:idx, realRow:realRow, preview: disp };
 }

@@ -25,17 +25,12 @@
         <button class="btn-ghost" data-go="ctbc" title="去記帳頁"><span class="material-symbols-outlined">savings</span></button>
         <button class="btn-ghost" data-go="stk" title="股票 (STK)"><span class="material-symbols-outlined">payments</span></button>
       </header>
+      <div class="card-bd ctbc-body">
+        <!-- 左上註解：基金 -->
+        <div class="list-caption">基金</div>
         <div class="ctbc-list">
-          <div class="kpi-item"><div class="k">現值 (USD)</div><div id="ctVal" class="v money capsule">—</div></div>
           <div class="kpi-item"><div class="k">含息損益</div><div id="ctPnl" class="v money capsule">—</div></div>
           <div class="kpi-item"><div class="k">已領利息</div><div id="ctInt" class="v money capsule">—</div></div>
-          <div class="kpi-item">
-            <div class="k">中信台股</div>
-            <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-              <span class="money capsule" id="ctStockVal">—</span>
-              <span id="ctStockROI"></span>
-            </div>
-          </div>
           <div class="kpi-item">
             <div class="k">基金</div>
             <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
@@ -43,8 +38,14 @@
               <span id="ctFundROI"></span>
             </div>
           </div>
+        </div>
+
+        <!-- 左上註解：股票 -->
+        <div class="list-caption">股票</div>
+        <div class="ctbc-list markets" id="ctbcMarketsBlock">
           <div id="ctbcMarketsList"></div>
         </div>
+      </div>
     </section>
 
     <!-- C：Plan（把標題改 Plan，右邊放 pill） -->

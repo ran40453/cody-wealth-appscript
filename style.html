@@ -912,16 +912,16 @@ html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip{ background:#f
 #acctBalanceCard .bal-chip.outline{ background: transparent !important; color: var(--text); border-color: color-mix(in oklab, var(--tint) 40%, transparent); }
 #acctBalanceCard .bal-footer{ margin-top: 10px; padding-top: 10px; border-top: 1px dashed color-mix(in oklab, var(--tint) 24%, transparent); display:flex; justify-content:center; }
 #acctBalanceCard .bal-chip.small{ padding: 4px 8px; font-size: .85em; line-height: 1; }
-#acctBalanceCard .grand-total-wrap{ display:flex; justify-content:center; padding: 6px 0 2px; }
 #acctBalanceCard .bal-divider{ margin:8px 0; border:0; border-top:1px dashed color-mix(in oklab, var(--tint) 18%, transparent); opacity:.9; }
-
+#acctBalanceCard .grand-total-wrap{display:flex;align-items: center;justify-content:center;gap: 8px;padding: 6px 0 2px;}
+#acctBalanceCard .grand-label,#acctBalanceCard .bal-chip.total {font-weight: 200;font-size: calc(1em + 1px); /* 放大 1 字級 */opacity: .92;}
 /* 手機：餘額卡緊湊 */
 @media (max-width:1024px){
   #acctBalanceCard .bal-row{ gap:6px; padding:5px 0; }
   #acctBalanceCard .bal-row .name{ max-width:60%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #acctBalanceCard .bal-chip{ font-size:14px; padding:3px 8px; line-height:1.15; }
   #acctBalanceCard .bal-chip.pos, #acctBalanceCard .bal-chip.neg{ border-width:1px; }
-  #acctBalanceCard .bal-chip.small, #acctBalanceCard .bal-chip.total{ font-size:16px; padding:3px 7px; }
+  #acctBalanceCard .bal-chip.small{ font-size:16px; padding:3px 7px; }
 }
 
 /* 13.5 iOS 字級保底 + 備註高度 */
