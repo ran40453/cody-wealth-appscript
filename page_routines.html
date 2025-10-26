@@ -1,0 +1,16 @@
+<!-- page_routines：例行支出管理（虛擬清單 + 統計） -->
+<section id="page-routines" class="page" style="display:none;">
+  <div class="page-section card" style="margin-bottom:12px;">
+    <div class="top-bar" style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <div class="title-wrap" style="display:flex;flex-direction:column;">
+        <div class="title-row" style="font-weight:600;">例行支出總覽</div>
+        <div id="rtn-totals-card" class="totals-card"></div>
+      </div>
+      <button id="rtn-add-btn" class="btn btn--primary btn--sm">新增</button>
+    </div>
+  </div>
+
+  <div class="page-section card" id="rtn-list-wrap" style="max-height:60vh;overflow:auto;">
+    <div id="rtn-list-body" class="rtn-list"></div>
+  </div>
+</section>

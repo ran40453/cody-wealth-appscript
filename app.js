@@ -2016,3 +2016,148 @@ function recordV2_debugRow(idx){
   var disp = sh.getRange(realRow, 1, 1, Math.min(6, sh.getLastColumn())).getDisplayValues()[0] || [];
   return { ok:true, meta:meta, idx:idx, realRow:realRow, preview: disp };
 }
+
+
+/***** routines.gs *****/
+
+// 你 routines 分頁的名稱
+const ROUTINE_SHEET = 'routines';
+
+// 欄位對照（1-based column index in sheet）
+const ROUTINE_COLS = {
+  active:        1,  // A
+  name:          2,  // B
+  cat:           3,  // C
+  amount:        4,  // D
+  currency:      5,  // E
+  freq:          6,  // F
+  nextDueDate:   7,  // G
+  autoPost:      8,  // H
+  acc:           9,  // I
+  owner:         10, // J
+  dir:           11, // K
+  rollupOnly:    12, // L
+  lastPostedMonth:13 // M (不顯示在 UI，但會一起回傳，之後可能用得到)
+};
+
+
+// 後端：讀 routines 全部列
+function getRoutinesData() {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName(ROUTINE_SHEET);
+  if (!sh) return { rows: [], meta: {} };
+
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) {
+    return { rows: [], meta: {} };
+  }
+
+  // 把第2列到最後一列抓出來
+  const rng = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn());
+  const values = rng.getValues();
+
+  const tz = ss.getSpreadsheetTimeZone() || 'Asia/Taipei';
+
+  const rows = values.map((r, idx) => {
+    const rowNumber = 2 + idx; // 真實列號（之後更新會用）
+    const d = r[ROUTINE_COLS.nextDueDate - 1];
+    // 格式化日期給前端
+    const nextDue =
+      d instanceof Date
+        ? Utilities.formatDate(d, tz, 'yyyy-MM-dd')
+        : (d ? String(d) : '');
+
+    return {
+      _row: rowNumber,
+      active:      r[ROUTINE_COLS.active-1] === true,
+      name:        String(r[ROUTINE_COLS.name-1] || ''),
+      cat:         String(r[ROUTINE_COLS.cat-1] || ''),
+      amount:      Number(r[ROUTINE_COLS.amount-1] || 0),
+      currency:    String(r[ROUTINE_COLS.currency-1] || ''),
+      freq:        String(r[ROUTINE_COLS.freq-1] || ''),
+      nextDueDate: nextDue,
+      autoPost:    r[ROUTINE_COLS.autoPost-1] === true,
+      acc:         String(r[ROUTINE_COLS.acc-1] || ''),
+      owner:       String(r[ROUTINE_COLS.owner-1] || ''),
+      dir:         String(r[ROUTINE_COLS.dir-1] || ''),
+      rollupOnly:  r[ROUTINE_COLS.rollupOnly-1] === true,
+      lastPostedMonth: String(r[ROUTINE_COLS.lastPostedMonth-1] || '')
+    };
+  });
+
+  // 這裡把下拉清單的候選值也傳給前端（Acc, Owner, Freq 等）
+  // 目前你說 Acc 固定：中信, 台新, 星展, Cash, Richart, 貸款, 聯邦, ECO
+  // Owner：漢, 媽, 薰, 昕
+  // Freq：monthly / yearly / bi-monthly
+  const meta = {
+    accList:   ['中信','台新','星展','Cash','Richart','貸款','聯邦','ECO'],
+    ownerList: ['漢','媽','薰','昕'],
+    freqList:  ['monthly','bi-monthly','yearly'],
+    dirList:   ['out','in','xfer'], // 這個我先假設，可自行改
+    currencyList: ['TWD','USD','JPY','KRW'] // 也可以依照你實際用的幣別
+  };
+
+  return { rows, meta };
+}
+
+// 後端：更新單一欄位（例如切 active toggle、改 Acc、改金額…）
+// fieldName 必須是我們支援的 key（active/name/amount/...）
+// value 是前端送來的新值
+function updateRoutineField(rowNumber, fieldName, value){
+  const sh = SpreadsheetApp.getActive().getSheetByName(ROUTINE_SHEET);
+  if (!sh) throw new Error('找不到 sheet: ' + ROUTINE_SHEET);
+
+  const colIdx = ROUTINE_COLS[fieldName];
+  if (!colIdx) throw new Error('不支援欄位: ' + fieldName);
+
+  // 特別處理 boolean toggle 欄位
+  if (fieldName === 'active' || fieldName === 'autoPost' || fieldName === 'rollupOnly') {
+    sh.getRange(rowNumber, colIdx).setValue(!!value);
+    return { ok:true };
+  }
+
+  // 特別處理日期
+  if (fieldName === 'nextDueDate') {
+    // 預期 value 是 "yyyy-MM-dd" 字串
+    if (value) {
+      sh.getRange(rowNumber, colIdx).setValue(new Date(value));
+    } else {
+      sh.getRange(rowNumber, colIdx).setValue('');
+    }
+    return { ok:true };
+  }
+
+  // 其他純值 (文字/數字)
+  sh.getRange(rowNumber, colIdx).setValue(value);
+  return { ok:true };
+}
+
+// （可選）後端：新增一列空白 routine（按"新增"→確認）
+// 會在表頭下一列插入，並回傳新的 rowNumber，前端可直接編輯
+function addRoutineBlank() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(ROUTINE_SHEET);
+  if (!sh) throw new Error('找不到 sheet: ' + ROUTINE_SHEET);
+
+  // 我們要插到表頭下一列，也就是第2列
+  sh.insertRowAfter(1);
+  const newRow = 2;
+
+  // 預設值
+  sh.getRange(newRow, ROUTINE_COLS.active).setValue(true);
+  sh.getRange(newRow, ROUTINE_COLS.name).setValue('');
+  sh.getRange(newRow, ROUTINE_COLS.amount).setValue(0);
+  sh.getRange(newRow, ROUTINE_COLS.freq).setValue('monthly');
+  sh.getRange(newRow, ROUTINE_COLS.nextDueDate).setValue(new Date());
+  sh.getRange(newRow, ROUTINE_COLS.autoPost).setValue(false);
+  sh.getRange(newRow, ROUTINE_COLS.rollupOnly).setValue(false);
+
+  return { row: newRow };
+}
+
+function deleteRoutineRow(rowNumber){
+  const sh = SpreadsheetApp.getActive().getSheetByName(ROUTINE_SHEET);
+  if (!sh) throw new Error('找不到 sheet: ' + ROUTINE_SHEET);
+
+  sh.deleteRow(rowNumber);
+  return { ok:true };
+}

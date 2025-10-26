@@ -2145,4 +2145,279 @@ body.hdr-fab-open #hdrFabMenu{
   #stkEditDlg .modal-actions,#stkAddDlg .modal-actions{ display:flex; gap:8px; justify-content:flex-end; margin-top:12px; }
 }
 
+
+  /*========================================== page_routines ==========================================*/
+
+/* === Routines 頁面專屬 === */
+#page-routines .rtn-row.card{
+  border-radius:16px;
+  padding:12px;
+  margin-bottom:10px;
+  /* 不強灌黑底，延用 .card 的玻璃感/陰影 */
+  backdrop-filter: blur(12px) saturate(120%);
+  background: color-mix(in oklab, var(--card) 80%, transparent);
+  border:1px solid color-mix(in oklab, var(--tint) 18%, transparent);
+  box-shadow: 0 8px 24px var(--shadow);
+  color: var(--text);
+}
+
+
+:root.light #page-routines .rtn-row.card{
+  background: color-mix(in oklab, var(--card) 70%, transparent);
+  color: var(--text);
+}
+
+/* header */
+.rtn-header{
+  display:flex;
+  align-items:flex-start;
+  gap:8px;
+}
+/* 中段主體 */
+.rtn-main{
+  flex:1;
+  min-width:0;
+}
+.rtn-line1{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:8px;
+}
+.rtn-line1 .inline-edit{
+  flex:1;
+  min-width:0;
+  background:transparent;
+  border:none;
+  font-size:14px;
+  font-weight:600;
+  color:inherit;
+  padding:0;
+}
+
+/* 金額用膠囊 */
+.amount-chip{
+  display:inline-block;
+  border-radius:999px;
+  border:1px solid var(--hairline, color-mix(in oklab, var(--tint) 30%, transparent));
+  padding:2px 8px;
+  font-size:12px;
+  font-weight:600;
+  line-height:1.4;
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  color:inherit;
+  white-space:nowrap;
+}
+
+/* 第二行：freq / date / acc 橫向一排小膠囊 */
+.rtn-line2{
+  margin-top:6px;
+  display:flex;
+  flex-wrap:nowrap;
+  gap:6px;
+  font-size:12px;
+}
+.rtn-chip-field{
+  flex:0 0 auto;
+}
+.rtn-chip-field .pill-select,
+.rtn-chip-field .pill-input{
+  border-radius:999px;
+  border:1px solid var(--hairline, color-mix(in oklab, var(--tint) 25%, transparent));
+  background:transparent;
+  color:inherit;
+  font-size:12px;
+  line-height:1.2;
+  padding:4px 10px;
+  min-height:28px;
+}
+.pill-input{
+  /* for type=date */
+}
+.pill-select{
+  appearance:none;
+  -webkit-appearance:none;
+  -moz-appearance:none;
+  background:transparent;
+  color:inherit;
+  border-radius:999px;
+}
+
+/* 子清單 */
+.rtn-body{
+  display:none;
+  padding-top:10px;
+  font-size:12px;
+}
+.rtn-body.show{
+  display:block;
+}
+
+.pill-input{
+  /* for type=date */
+}
+.pill-select{
+  appearance:none;
+  /* 你可以自行加上小下箭頭背景圖 如果想要再漂亮 */
+}
+
+.rtn-line2 .pill-select,
+.rtn-line2 .pill-input{
+  font-size:12px;
+  border-radius:999px;
+  padding:4px 10px;
+  border:1px solid var(--border-color,#444);
+  background:transparent;
+  color:inherit;
+  min-height:32px;
+}
+
+/* 左邊圓鈕狀態 */
+.toggle-btn{
+  min-width:32px;
+  min-height:32px;
+  border-radius:999px;
+  border:1px solid var(--hairline, color-mix(in oklab, var(--tint) 30%, transparent));
+  background:transparent;
+  color:inherit;
+  font-size:14px;
+  line-height:32px;
+  text-align:center;
+  padding:0;
+  cursor:pointer;
+}
+.toggle-btn.on{
+  background: var(--tint);
+  color:#fff;
+  border-color: var(--tint);
+  box-shadow: 0 4px 14px color-mix(in oklab, var(--tint) 30%, transparent);
+}
+.toggle-btn.off{
+  opacity:.4;
+}
+
+/* 右邊的展開箭頭 */
+.rtn-arrow{
+  font-size:20px;
+  line-height:1;
+  user-select:none;
+  color:inherit;
+  opacity:.6;
+}
+
+/* body (子清單) */
+.rtn-body{
+  display:none;
+  padding-top:10px;
+  font-size:12px;
+}
+.rtn-body.show{
+  display:block;
+}
+
+
+.rtn-grid3{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px 8px;
+}
+
+/* grid 4 欄 */
+.rtn-grid4{
+  display:grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap:12px 8px;
+}
+.rtn-cell label{
+  display:block;
+  font-size:11px;
+  opacity:.6;
+  margin-bottom:4px;
+}
+.rtn-cell input,
+.rtn-cell select,
+.rtn-cell .inline-edit{
+  width:100%;
+  font-size:12px;
+  border-radius:8px;
+  border:1px solid var(--hairline, color-mix(in oklab, var(--tint) 25%, transparent));
+  background:transparent;
+  color:inherit;
+  padding:4px 8px;
+  min-height:28px;
+}
+
+.readonly-val{
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:8px;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--border-color,#444);
+  min-height:28px;
+  line-height:20px;
+  color:inherit;
+}
+
+.totals-card{
+  font-size:12px;
+  line-height:1.4;
+}
+.totals-row{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+}
+.totals-label{
+  opacity:.7;
+}
+.totals-value{
+  font-weight:600;
+  white-space:nowrap;
+}
+
+/* totals card 上半塊 */
+#rtn-totals-card .totals-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:8px;
+  font-size:12px;
+  line-height:1.3;
+}
+#rtn-totals-card .totals-label{
+  opacity:.7;
+}
+#rtn-totals-card .totals-value{
+  font-weight:600;
+  white-space:nowrap;
+  font-size:13px;
+  line-height:1.4;
+}
+.rtn-header{
+  align-items:flex-start;
+}
+
+.rtn-header-ops{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:4px;
+  margin-left:8px;
+}
+
+.rtn-delete{
+  background:transparent;
+  border:none;
+  color:var(--text);
+  opacity:.6;
+  font-size:20px;
+  line-height:1;
+  padding:4px;
+  border-radius:8px;
+}
+.rtn-delete:active{
+  opacity:1;
+  background:color-mix(in oklab, var(--tint) 20%, transparent);
+}
+
 </style>
