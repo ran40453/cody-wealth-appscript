@@ -48,9 +48,9 @@
    - --logo-h-desktop / --logo-h-mobile → 後續收斂為 --logo-h（媒體查詢覆蓋） */
 :root{
   /* 尺寸/排版 */
-  --ui-scale:            0.9;
+  --ui-scale:            1.0;
   --ui-scale-mobile:     2.1;
-  --container-max:       1200px;
+  --container-max: clamp(1400px, 98vw, 2200px);
   --space:               12px;
   --radius:              16px;
   --hdrH-desktop:        72px;
@@ -68,6 +68,8 @@
   --font-body:           18px;
   --lh-body:             1.5;
   --tap-min:             46px;
+
+    --dash-fs: 18px; /* ← 改這個就能一把抓dashmain四張卡片裡所有文字大小 */
 
   --title-size:          16px;
   --crumb-size:          13px;
@@ -185,7 +187,17 @@ body{
 }
 .app{
   max-width: var(--container-max); margin:0 auto;
-  padding: env(safe-area-inset-top) 16px calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra));
+    /* 以變數管理左右 padding，方便對單一頁面微調 */
+    --app-pad-inline: 16px;
+    padding:
+    env(safe-area-inset-top)
+    var(--app-pad-inline)
+    calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra));
+}
+/* Dashmain：當 Dash 頁啟用時，放寬整體寬度並縮小左右 padding，充分吃滿螢幕 */
+.app:has(#page-dashmain.show){
+  max-width: 100vw;          /* Dash 頁改為幾乎全寬（仍保留瀏覽器左右邊界） */
+  --app-pad-inline: 8px;     /* 縮小左右留白，讓四張卡片更寬 */
 }
 /* 鎖捲時避免跳動 */
 
@@ -1114,17 +1126,37 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 
 /* 桌機：四區塊 */
 #page-dashmain .dashmain{
-  --gap: 12px;
+  --gap: 8px;
   display:grid; gap:var(--gap);
-  grid-template-columns: repeat(12, minmax(0,1fr));
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
   grid-auto-rows: 1fr;
-  padding: var(--gap);
+  padding: 6px 8px;               /* ← 改用更小的外框留白 */
   height: calc(100dvh - var(--header-h, 56px) - var(--tabbar-h, 0px));
   box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
 }
+
+/* 只在 Dashmain 頁，把 .app 的左右 padding 從 16px 降到 6px（不影響他頁） */
+#page-dashmain{
+--app-pad-inline: 6px;
+} 
+
 #page-dashmain .card{ display:flex; flex-direction:column; min-height:0; }
 #page-dashmain .card-hd{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; z-index:1; position:relative; border-radius: var(--radius);}
 #page-dashmain .list{ overflow:auto; min-height:0; }
+/* Dashmain 投資卡片（ctbc）：內容超出時在卡片內部捲動，而不是撐高整頁 */
+#page-dashmain .card.ctbc{
+  min-height: 0;
+  overflow: hidden;              /* 外層卡片負責裁切，避免溢出 */
+}
+#page-dashmain .card.ctbc .card-bd{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;              /* 投資卡內容在內部垂直捲動 */
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
 #page-dashmain .list.slim .row{ padding:6px 0; border-bottom:1px dashed var(--border, rgba(0,0,0,.08)); }
 
 /* 清單成為可伸展的區域，才會吃到剩餘高度並可滾動 */
@@ -1132,6 +1164,26 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   flex: 1 1 auto;
   min-height: 0;      /* 關鍵：避免內容把父容器撐爆 */
   overflow: auto;     /* 在卡片內滾，不要把整頁撐出捲軸 */
+}
+
+/* Fallback: make any common inner container scrollable within cards */
+#page-dashmain .card > .card-bd,
+#page-dashmain .card .rows,
+#page-dashmain .card .body,
+#page-dashmain .card .content{
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Investment card (ctbc) must scroll its body if content exceeds card height */
+#page-dashmain .card.ctbc{ min-height: 0; overflow: hidden; }
+#page-dashmain .card.ctbc .card-bd,
+#page-dashmain .card.ctbc .list,
+#page-dashmain .card.ctbc .rows,
+#page-dashmain .card.ctbc .body,
+#page-dashmain .card.ctbc .content{
+  flex: 1 1 auto; min-height: 0; overflow: auto;
 }
 
 /* header 不要硬寫死 10px；用自適應高度更穩 */
@@ -1143,12 +1195,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 #page-dashmain :where(.kpi-grid){ 
   display:grid; grid-template-columns:1fr; gap:8px;
 }
-
-/* KPI 稍寬、CTBC 適中、Planned 吃滿一行，避免橫向捲軸 */
-#page-dashmain .card.kpi{ grid-column: span 3; }
-#page-dashmain .card.ctbc{ grid-column: span 3; }
-#page-dashmain .card.planned{ grid-column: span 3; }
-#page-dashmain .card.accounts{ grid-column: span 3; }
 
 /* 內容不要硬撐造成橫向捲軸 */
 #page-dashmain .card.planned .list{
@@ -1194,16 +1240,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   font-weight:800; font-variant-numeric:tabular-nums;
 }
 
-/* 手機：單欄 */
-@media (max-width: 1024px){
-  #page-dashmain .dashmain{
-    grid-template-columns: 1fr;
-    grid-auto-rows: auto;
-    height: calc(100dvh - var(--header-h, 56px) - var(--tabbar-h, 56px));
-  }
-  #page-dashmain :where(.kpi-grid){ grid-template-columns:1fr 1fr; }
-}
-
 /* ===== dashmain：plannedList 美化（不影響其他 list） ===== */
 #plannedList.list.slim { display: grid; gap: 8px; }
 #plannedList .item{
@@ -1242,17 +1278,18 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 /* 手機：2×2 等高格，卡片內滾動 */
 @media (max-width: 1024px){
   #page-dashmain .dashmain{
-    --gap: 12px;
+    --gap: 8px;
     display: grid; gap: var(--gap);
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;     /* 兩行等高 */
-    height: calc(92dvh - var(--header-h,56px) - var(--tabbar-h,0px));
     padding: var(--gap);
-    grid-auto-rows: unset;           /* 固定兩行，不自動往下長 */
     box-sizing: border-box;
+    grid-auto-rows: auto;
+    height: calc(100dvh - var(--header-h, 56px) - var(--tabbar-h, 56px));
   }
+  #page-dashmain :where(.kpi-grid){ grid-template-columns:1fr 1fr; }
 
-  /* 固定四張卡的位置（左上、右上、左下、右下） */
+    /* 固定四張卡的位置（左上、右上、左下、右下） */
   #page-dashmain .card.kpi      { grid-column: 1; grid-row: 1; }
   #page-dashmain .card.ctbc     { grid-column: 2; grid-row: 1; }
   #page-dashmain .card.planned  { grid-column: 1; grid-row: 2; }
@@ -1268,7 +1305,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
     min-height: 0;
     overflow: auto;
   }
-
   /* planned/accounts 的 list 已有虛擬清單支援，這裡只確保顯示 */
   #page-dashmain .card.planned .list,
   #page-dashmain .card.accounts .list{ overflow: auto; }
@@ -1277,11 +1313,7 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
   #page-dashmain .card .list{ overflow-x: hidden; }
 }
 /* ===== [Patch] Dashmain 四卡片字級關節（安全附掛版，貼在最末尾） ===== */
-
-/* 1) 全域變數：可依需要調整預設字級 */
-:root{
-  --dash-fs: 15px; /* ← 改這個就能一把抓四張卡片裡所有文字大小 */
-}
+/* 1) 定義 Dashmain 字級變數（可調整） */
 
 /* 2) 只影響 Dashmain 的四張卡片，且不提高選擇器權重（用 :where 降權） */
 #page-dashmain :where(.card.kpi, .card.ctbc, .card.planned, .card.accounts){
@@ -1302,8 +1334,6 @@ body.mask-on [contenteditable]{ color: inherit !important; -webkit-text-fill-col
 #page-dashmain .card.ctbc .card-hd .title-row{
   display:flex; align-items:center; gap:8px;
 }
-
-
 
 
 /* =========================================================
@@ -1529,6 +1559,8 @@ body.hdr-fab-open #hdrFabMenu{
 #page-dashmain .card .rows{
   font-size: var(--dash-kpi-font);
 }
+
+
 
 /* page_policy：明細表頭固定 + 容器內滾動 */
 #pol-btm .list { position: relative; overflow: auto; }
