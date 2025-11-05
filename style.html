@@ -186,18 +186,14 @@ body{
   font-size: calc(var(--font-body) * var(--ui-scale));
 }
 .app{
-  max-width: var(--container-max); margin:0 auto;
-    /* 以變數管理左右 padding，方便對單一頁面微調 */
-    --app-pad-inline: 16px;
-    padding:
+  max-width: 100vw;
+  margin:0 auto;
+  /* 以變數管理左右 padding，方便對單一頁面微調 */
+  --app-pad-inline: 8px;
+  padding:
     env(safe-area-inset-top)
     var(--app-pad-inline)
     calc(var(--tabbar-h) + env(safe-area-inset-bottom) + var(--tabbar-extra));
-}
-/* Dashmain：當 Dash 頁啟用時，放寬整體寬度並縮小左右 padding，充分吃滿螢幕 */
-.app:has(#page-dashmain.show){
-  max-width: 100vw;          /* Dash 頁改為幾乎全寬（仍保留瀏覽器左右邊界） */
-  --app-pad-inline: 8px;     /* 縮小左右留白，讓四張卡片更寬 */
 }
 /* 鎖捲時避免跳動 */
 
@@ -631,11 +627,19 @@ header .title-wrap{
    ========================================================= */
 /* 13.1 版面配置（Desktop：三欄；Mobile：上半 2 欄、下半 1 欄） */
 #page-input .input-layout{
-  display:grid; gap: var(--space);
-  grid-template-columns: 180px minmax(560px, 720px) 380px; /* balance / list / form */
+  display:grid;
+  gap: var(--space);
+  /* Desktop：三欄寬度自適應，吃滿畫面寬度 */
+  grid-template-columns:
+    minmax(220px, 1.1fr)   /* balance */
+    minmax(360px, 2fr)     /* list */
+    minmax(260px, 1.2fr);  /* form */
   grid-template-areas: "balance list form";
-  justify-content:center; align-items:stretch;
+  align-items:stretch;
   grid-auto-rows: 1fr;
+  /* 讓三張卡高度延伸到視窗底部，交給卡片內部滾動 */
+  height: calc(100dvh - var(--app-header-h, 56px) - var(--app-tabbar-h, 0px) - 12px);
+  overflow: hidden;
 }
 #page-input #acctBalanceCard{ grid-area: balance; display:block; }
 #page-input .tx-panel{ grid-area: list; min-width: 0; }
