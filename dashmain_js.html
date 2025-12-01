@@ -1,318 +1,362 @@
 <script>
-(function(){
-  // —— CTBC Header Total（基金 USD 轉台幣 + 市場台幣 MV）——
-  const __ctbcHeader = { fundUSD: 0, fxUSDTWD: NaN, marketsTWD: 0 };
-  function fmt0(n){ return isFinite(+n) ? Number(n).toLocaleString('zh-Hant-TW',{maximumFractionDigits:0}) : '—'; }
-  function updateCtbcHeaderTotal(){
-    const pill = document.getElementById('ctRetPill');
-    if (!pill) return;
-    const fx = Number(__ctbcHeader.fxUSDTWD);
-    const mk = Number(__ctbcHeader.marketsTWD)||0;
-    const usd= Number(__ctbcHeader.fundUSD)||0;
-    if (!isFinite(fx) || fx<=0){ pill.classList.add('money','capsule'); pill.textContent = '—'; return; }
-    const totalTWD = usd * fx + mk;
-    pill.classList.add('money','capsule');
-    pill.textContent = fmt0(totalTWD);
-  }
-  function fetchFxUSDTWD(){
-    const run = window.google?.script?.run; if (!run) return;
-    const setFx = v=>{ const n=Number(v); __ctbcHeader.fxUSDTWD = (isFinite(n)&&n>0)?n:32; updateCtbcHeaderTotal(); };
-    // 先嘗試 getUSDTWD()，失敗再嘗試 getFxRate('USD','TWD')
-    try{
-      run.withSuccessHandler(setFx)
-         .withFailureHandler(()=>{
-           try{ run.withSuccessHandler(setFx).withFailureHandler(()=>setFx(null)).getFxRate('USD','TWD'); }
-           catch(e){ setFx(null); }
-         })
-         .getUSDTWD();
-    }catch(e){ setFx(null); }
-  }
-  // 接收 STK 市場總市值（台幣）
-  window.addEventListener('stk:marketsMV', e=>{
-    __ctbcHeader.marketsTWD = Number(e?.detail?.mv||0);
-    updateCtbcHeaderTotal();
-  });
-
-  // —— 小工具 ——
-  function fmt(n, frac=0){
-    const num = Number(n);
-    return isFinite(num)
-      ? num.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac})
-      : '—';
-  }
-  function setText(id, v, frac=0, suffix=''){
-    const el = document.getElementById(id);
-    if (!el){
-      if (typeof console!== 'undefined') console.warn('[setText] element not found:', id);
-      return false;
+  (function () {
+    // —— CTBC Header Total（基金 USD 轉台幣 + 市場台幣 MV）——
+    const __ctbcHeader = { fundUSD: 0, fxUSDTWD: NaN, marketsTWD: 0 };
+    function fmt0(n) { return isFinite(+n) ? Number(n).toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 }) : '—'; }
+    function updateCtbcHeaderTotal() {
+      const pill = document.getElementById('ctRetPill');
+      if (!pill) return;
+      const fx = Number(__ctbcHeader.fxUSDTWD);
+      const mk = Number(__ctbcHeader.marketsTWD) || 0;
+      const usd = Number(__ctbcHeader.fundUSD) || 0;
+      if (!isFinite(fx) || fx <= 0) {
+        pill.classList.add('money', 'capsule', 'mask-num');
+        pill.dataset.maskStr = '＊＊＊';
+        pill.textContent = '—';
+        return;
+      }
+      const totalTWD = usd * fx + mk;
+      pill.classList.add('money', 'capsule', 'mask-num');
+      pill.dataset.maskStr = '＊＊＊';
+      pill.dataset.value = String(totalTWD);
+      pill.textContent = fmt0(totalTWD);
     }
-    const num = Number(v);
-    const ok  = isFinite(num);
-    el.textContent = ok ? fmt(num, frac) + (suffix||'') : '—';
-    // 讓遮罩機制一致（和其它 KPI 同樣 class / data-attr）
-    el.classList.add('mask-num');
-    el.dataset.maskStr = '＊＊＊';
-    // 同步 data-value 方便偵錯
-    el.dataset.value = ok ? String(num) : '';
-    return ok;
-  }
-
-  function setPnlPill(el, num, suffix=''){
-  if (!el) return;
-  const n = Number(num||0);
-  const sign = n>0?'+':'';
-  el.textContent = sign + fmt(n,1) + (suffix||'');
-  el.classList.remove('pos','neg','zero');
-  if (n>0) el.classList.add('pos');
-  else if (n<0) el.classList.add('neg');
-  else el.classList.add('zero');
-
-  // 讓遮罩機制一致
-  el.classList.add('mask-num');
-  el.dataset.maskStr = '＊＊＊';
-  }
-
-  function fmtMD(dstr){
-    if (!dstr) return '';
-    const d = new Date(dstr);
-    if (isNaN(d)) return String(dstr);
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const dd= String(d.getDate()).padStart(2,'0');
-    return `${m}/${dd}`;
-  }
-  function numOr(){
-    for (let i=0;i<arguments.length;i++){
-      const n = Number(arguments[i]);
-      if (isFinite(n)) return n;
+    function fetchFxUSDTWD() {
+      const run = window.google?.script?.run; if (!run) return;
+      const setFx = v => { const n = Number(v); __ctbcHeader.fxUSDTWD = (isFinite(n) && n > 0) ? n : 32; updateCtbcHeaderTotal(); };
+      // 先嘗試 getUSDTWD()，失敗再嘗試 getFxRate('USD','TWD')
+      try {
+        run.withSuccessHandler(setFx)
+          .withFailureHandler(() => {
+            try { run.withSuccessHandler(setFx).withFailureHandler(() => setFx(null)).getFxRate('USD', 'TWD'); }
+            catch (e) { setFx(null); }
+          })
+          .getUSDTWD();
+      } catch (e) { setFx(null); }
     }
-    return 0;
-  }
+    // 接收 STK 市場總市值（台幣）
+    window.addEventListener('stk:marketsMV', e => {
+      __ctbcHeader.marketsTWD = Number(e?.detail?.mv || 0);
+      updateCtbcHeaderTotal();
+    });
 
-  // —— 近期 planned 清單渲染 ——
-  function renderPlannedList(rows){
-  const wrap = document.getElementById('plannedList');
-  if (!wrap) return;
-  const html = (rows||[]).map(r=>{
-    const acc = (r.account||'').trim();
-    const date = fmtMD(r.date||'');
-    const name = (r.item||'').trim();
-    const amt = numOr(r.amount).toLocaleString('zh-Hant-TW');
-    return `
-      <div class="item">
-        <div class="row row-acc">
-          <span class="cap account" data-acc="${acc}">${acc || '-'}</span>
-        </div>
-        <div class="row row-meta">
-          <span class="date">${date}</span>
-          <span class="name" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name}</span>
-          <span class="cap amt mask-num" data-mask-str="＊＊＊">${amt}</span>
-        </div>
-      </div>`;
-  }).join('');
-  wrap.innerHTML = html || '<div class="empty">無 upcoming</div>';
+    // —— 小工具 ——
+    function fmt(n, frac = 0) {
+      const num = Number(n);
+      return isFinite(num)
+        ? num.toLocaleString('zh-Hant-TW', { minimumFractionDigits: frac, maximumFractionDigits: frac })
+        : '—';
+    }
+    function setText(id, v, frac = 0, suffix = '') {
+      const el = document.getElementById(id);
+      if (!el) {
+        if (typeof console !== 'undefined') console.warn('[setText] element not found:', id);
+        return false;
+      }
+      const num = Number(v);
+      const ok = isFinite(num);
+      el.textContent = ok ? fmt(num, frac) + (suffix || '') : '—';
+      // 讓遮罩機制一致（和其它 KPI 同樣 class / data-attr）
+      el.classList.add('mask-num');
+      el.dataset.maskStr = '＊＊＊';
+      // 同步 data-value 方便偵錯
+      el.dataset.value = ok ? String(num) : '';
+      return ok;
+    }
 
-  // ★ 計算 planned 總額並更新 pill（rows.amount 已是數字、且你 server 端已把 planned 轉為負數）
-  const total = (rows||[]).reduce((s,r)=> s + numOr(r.amount), 0);
-  setText('planPnlPill', total, 0);
-}
+    function setPnlPill(el, num, suffix = '') {
+      if (!el) return;
+      const n = Number(num || 0);
+      const sign = n > 0 ? '+' : '';
+      el.textContent = sign + fmt(n, 1) + (suffix || '');
+      el.classList.remove('pos', 'neg', 'zero');
+      if (n > 0) el.classList.add('pos');
+      else if (n < 0) el.classList.add('neg');
+      else el.classList.add('zero');
+
+      // 讓遮罩機制一致
+      el.classList.add('mask-num');
+      el.dataset.maskStr = '＊＊＊';
+    }
+
+    function fmtMD(dstr) {
+      if (!dstr) return '';
+      const d = new Date(dstr);
+      if (isNaN(d)) return String(dstr);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${m}/${dd}`;
+    }
+    function numOr() {
+      for (let i = 0; i < arguments.length; i++) {
+        const n = Number(arguments[i]);
+        if (isFinite(n)) return n;
+      }
+      return 0;
+    }
+
+    // —— Planned 卡片：改為顯示「貸款 + 一般帳戶」的 posted/sum —— 
+    // summary 來自伺服端 getDashBalanceSummary()：
+    // { loan: [{account, posted, sum}], normal: [{account, posted, sum}], normalTotalSum?: number }
+    function renderPlannedList(summary) {
+      const wrap = document.getElementById('plannedList');
+      if (!wrap) return;
+
+      const loan = Array.isArray(summary && summary.loan) ? summary.loan : [];
+      const normal = Array.isArray(summary && summary.normal) ? summary.normal : [];
+
+      const rows = [];
+
+      // 貸款與一般帳戶都顯示在列表中
+      loan.forEach(r => rows.push({ section: 'loan', account: r.account, posted: r.posted, sum: r.sum }));
+      normal.forEach(r => rows.push({ section: 'normal', account: r.account, posted: r.posted, sum: r.sum }));
+
+      const html = rows.map(r => {
+        const acc = (r.account || '').trim();
+        const posted = numOr(r.posted);
+        const sum = numOr(r.sum);
+        return `
+        <div class="item">
+          <div class="row row-acc">
+            <span class="cap account" data-acc="${acc}">${acc || '-'}</span>
+          </div>
+          <div class="row row-meta">
+            <span class="label">Posted</span>
+            <span class="cap amt mask-num" data-mask-str="＊＊＊">${fmt(posted, 0)}</span>
+            <span class="label" style="margin-left:8px;">Sum</span>
+            <span class="cap amt mask-num" data-mask-str="＊＊＊">${fmt(sum, 0)}</span>
+          </div>
+        </div>`;
+      }).join('');
+
+      wrap.innerHTML = html || '<div class="empty">無資料</div>';
+
+      // planPnlPill 顯示「一般帳戶」 Sum 的總和（不含貸款）
+      // 若後端有提供 normalTotalSum，優先使用；否則用 normal rows 自行加總
+      let normalTotal = 0;
+      if (summary && typeof summary.normalTotalSum === 'number' && isFinite(summary.normalTotalSum)) {
+        normalTotal = Number(summary.normalTotalSum) || 0;
+      } else {
+        normalTotal = normal.reduce((s, r) => s + numOr(r.sum), 0);
+      }
+      setText('planPnlPill', normalTotal, 0);
+    }
 
 
-  // —— 帳戶餘額清單 ——
-  function renderAccList(rows){
-  const wrap = document.getElementById('accList');
-  if (!wrap) return;
-  if (!rows || !rows.length){
-    wrap.innerHTML = '<div class="empty">尚無帳戶資料</div>';
-    // ★ 沒資料時 pill 顯示 0
-    setText('accSumPill', 0, 0);
-    return;
-  }
-  // 依名稱包含「中信」分組，讓中信置頂
-  const isCtbc = (s) => String(s || '').includes('中信');
-  const tops = (rows || []).filter(r => isCtbc(r.account));
-  const rest = (rows || []).filter(r => !isCtbc(r.account));
+    // —— 帳戶餘額清單 ——
+    function renderAccList(rows) {
+      const wrap = document.getElementById('accList');
+      if (!wrap) return;
+      if (!rows || !rows.length) {
+        wrap.innerHTML = '<div class="empty">尚無帳戶資料</div>';
+        // ★ 沒資料時 pill 顯示 0
+        setText('accSumPill', 0, 0);
+        return;
+      }
+      // 依名稱包含「中信」分組，讓中信置頂
+      const isCtbc = (s) => String(s || '').includes('中信');
+      const tops = (rows || []).filter(r => isCtbc(r.account));
+      const rest = (rows || []).filter(r => !isCtbc(r.account));
 
-  function rowHTML(r){
-    const acc = r.account || '';
-    const now = numOr(r.now).toLocaleString('zh-Hant-TW');
-    return `
+      function rowHTML(r) {
+        const acc = r.account || '';
+        const now = numOr(r.now).toLocaleString('zh-Hant-TW');
+        return `
       <div class="item" style="display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--hairline);background:var(--card);border-radius:14px;padding:10px 12px;">
         <span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${acc}</span>
         <span class="v mask-num" style="min-width:120px;justify-content:flex-end;" data-mask-str="＊＊＊">${now}</span>
       </div>`;
-  }
+      }
 
-  let html = '';
-  if (tops.length){
-    html += tops.map(rowHTML).join('');
-    if (rest.length) html += `<hr class="bal-divider">`; // 只有在其他帳戶存在時才顯示分隔線
-  }
-  html += rest.map(rowHTML).join('');
-  wrap.innerHTML = html;
+      let html = '';
+      if (tops.length) {
+        html += tops.map(rowHTML).join('');
+        if (rest.length) html += `<hr class="bal-divider">`; // 只有在其他帳戶存在時才顯示分隔線
+      }
+      html += rest.map(rowHTML).join('');
+      wrap.innerHTML = html;
 
-  // ★ 計算帳戶「現有餘額」總和並更新 pill（排除「中信」）
-  const sum = rest.reduce((s,r)=> s + numOr(r.now), 0);
-  setText('accSumPill', sum, 0);
-}
+      // ★ 計算帳戶「現有餘額」總和並更新 pill（排除「中信」）
+      const sum = rest.reduce((s, r) => s + numOr(r.now), 0);
+      setText('accSumPill', sum, 0);
+    }
 
 
-  function loadAccList(){
-    if (!window.google?.script?.run?.withSuccessHandler) return;
-    google.script.run
-      .withSuccessHandler(res=>{ renderAccList(Array.isArray(res)?res:[]); })
-      .withFailureHandler(err=>{
-        console.error('[accList] load error:', err);
-        const wrap = document.getElementById('accList');
-        if (wrap) wrap.innerHTML = '<div class="empty">載入失敗</div>';
+    function loadAccList() {
+      if (!window.google?.script?.run?.withSuccessHandler) return;
+      google.script.run
+        .withSuccessHandler(res => { renderAccList(Array.isArray(res) ? res : []); })
+        .withFailureHandler(err => {
+          console.error('[accList] load error:', err);
+          const wrap = document.getElementById('accList');
+          if (wrap) wrap.innerHTML = '<div class="empty">載入失敗</div>';
+        })
+        .getSummaryNow();
+    }
+
+    // —— 主渲染 ——
+    function renderDashboard(data) {
+      if (!data) { console.warn('[dashmain] 空資料'); return; }
+
+      const kp = data.kpis || {};
+      const latest = (data.database && data.database.latest) || {};
+
+      // When sheet columns shift (e.g., removed AQ), some fields may be undefined.
+      // Use the first finite number among several aliases / fallbacks.
+      const kTotal = numOr(kp.total);
+      const kNet = numOr(kp.net);
+      const kCash = numOr(kp.cash);
+      const kAvail = numOr(kp.avail);
+      // USD 可能尚未由後端 kpis.usd 提供，這裡加上 latest.CU 的後援
+      const kUSD = numOr(kp.usd, latest.CU, kp.CU);
+      // Day PnL may have moved from database.latest.F; fall back to KPI aliases if needed.
+      const dayPnl = numOr(latest.F, kp.dayPnl, kp.todayPnl, kp.pnl);
+
+      // A. KPI（TWD；USD 顯示獨立）
+      setText('kpiTotal', kTotal);
+      setText('kpiNet', kNet);
+      setText('kpiCash', kCash);
+      setText('kpiAvail', kAvail);
+      const wroteUSD = setText('kpiUSD', kUSD);
+      // 若被其它流程覆寫或延遲渲染，下一個 microtask 再寫一次
+      if (typeof queueMicrotask === 'function') {
+        queueMicrotask(() => { setText('kpiUSD', kUSD); });
+      } else {
+        setTimeout(() => { setText('kpiUSD', kUSD); }, 0);
+      }
+      // 驗證實際文字
+      const usdEl = document.getElementById('kpiUSD');
+      if (usdEl && typeof console !== 'undefined') {
+        console.log('[kpiUSD verify]', { wroteUSD, text: usdEl.textContent, dataValue: usdEl.dataset.value });
+      }
+      const d = document.getElementById('kpiDate');
+      if (d) d.textContent = kp.date || '—';
+
+      if (typeof console !== 'undefined' && !window.__dashUSDLogged) {
+        console.log('[dashmain] USD debug', { usdFromKpis: kp.usd, usdFromLatest: latest.CU, kUSD });
+        window.__dashUSDLogged = true;
+      }
+
+      // B. 當日損益膠囊（源自 latest.F）
+      setText('dashPnlPill', dayPnl, 0);
+
+      // C. Planned 卡片內容改由 getDashBalanceSummary() 提供（帳戶 posted/sum），
+      //    不再使用 cashflow.plannedTop；這裡僅保留欄位以避免 undefined。
+      const cf = data.cashflow || { plannedTop: [] };
+      // renderPlannedList(cf.plannedTop);
+
+      // D. CTBC KPI（Dash 顯示）
+      // 先不在這裡寫 ctPnl/ctInt（避免用到舊的「股票+基金／美元」數字）
+      // 由下方 getCTBCAggregates('fund') 回來後寫入（台幣）。
+      updateCtbcHeaderTotal();
+    }
+
+    // 最小版 ROI 膠囊（沿用全域 .roi-badge 樣式）
+    function roiChipHTML(v) {
+      if (v == null || !isFinite(+v)) return '<span class="roi-badge zero mask-num" data-mask-str="＊＊＊">—</span>';
+      const n = Number(v);
+      const cls = n > 0 ? 'pos' : (n < 0 ? 'neg' : 'zero');
+      const sign = n > 0 ? '+' : (n < 0 ? '−' : '');
+      const s = Math.abs(n).toLocaleString('zh-Hant-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      return `<span class="roi-badge ${cls} mask-num" data-mask-str="＊＊＊">${sign}${s}%</span>`;
+    }
+    function setPnlPill(elOrId, v) {
+      const el = (typeof elOrId === 'string') ? document.getElementById(elOrId) : elOrId;
+      if (!el) return;
+      el.innerHTML = roiChipHTML(v);
+    }
+
+    function setMoneyText(id, num, digits) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const n = Number(num || 0);
+      el.dataset.value = String(n);
+      el.textContent = n.toLocaleString('zh-Hant-TW', {
+        minimumFractionDigits: digits ?? 0,
+        maximumFractionDigits: digits ?? 0
+      });
+      // 加入遮罩支援（與 setText 一致）
+      el.classList.add('mask-num');
+      el.dataset.maskStr = '＊＊＊';
+    }
+
+    // 只抓「基金」，把 USD → TWD 後再顯示到 ctFundVal / ctPnl / ctInt
+    (function () {
+      const run = google?.script?.run; if (!run) return;
+      run.withSuccessHandler(res => {
+        // 伺服端鍵名：ctbcUSD_N/T/AF、ctbcTWD_N/T/AF（皆為「基金」集合）
+        const usdN = Number(res?.ctbcUSD_N || 0), usdT = Number(res?.ctbcUSD_T || 0), usdAF = Number(res?.ctbcUSD_AF || 0);
+        const twdN = Number(res?.ctbcTWD_N || 0), twdT = Number(res?.ctbcTWD_T || 0), twdAF = Number(res?.ctbcTWD_AF || 0);
+
+        const fx = Number(__ctbcHeader?.fxUSDTWD);
+        const hasFx = isFinite(fx) && fx > 0;
+        const valTWD = (hasFx ? usdN * fx : 0) + twdN;   // 現值
+        const pnlTWD = (hasFx ? usdT * fx : 0) + twdT;   // 含息損益
+        const intTWD = (hasFx ? usdAF * fx : 0) + twdAF; // 已領利息
+
+        // 寫入（台幣）
+        setMoneyText('ctFundVal', valTWD, 0);
+        setMoneyText('ctPnl', pnlTWD, 0);   // 含息損益（台幣，基金-only）
+        setMoneyText('ctInt', intTWD, 0);   // 已領利息（台幣，基金-only）
+
+        // Header pill 用基金 USD 供合計（USD→TWD 轉換交給 updateCtbcHeaderTotal）
+        __ctbcHeader.fundUSD = usdN;
+        updateCtbcHeaderTotal();
       })
-      .getSummaryNow();
-  }
+        .withFailureHandler(err => console.warn('[dashmain] getCTBCAggregates(fund) failed', err))
+        .getCTBCAggregates('fund');
+    })();
 
-  // —— 主渲染 ——
-  function renderDashboard(data){
-    if (!data){ console.warn('[dashmain] 空資料'); return; }
 
-    const kp     = data.kpis || {};
-    const latest = (data.database && data.database.latest) || {};
+    // —— 載入 ——
+    function loadDashboard() {
+      if (!window.google?.script?.run?.withSuccessHandler) {
+        console.warn('[dashmain] google.script.run not available');
+        return;
+      }
+      fetchFxUSDTWD();
+      google.script.run
+        .withSuccessHandler(res => {
+          console.log('[dashmain] getDashboardData ok', res);
+          renderDashboard(res);
+          loadAccList();
 
-    // When sheet columns shift (e.g., removed AQ), some fields may be undefined.
-    // Use the first finite number among several aliases / fallbacks.
-    const kTotal = numOr(kp.total);
-    const kNet   = numOr(kp.net);
-    const kCash  = numOr(kp.cash);
-    const kAvail = numOr(kp.avail);
-    // USD 可能尚未由後端 kpis.usd 提供，這裡加上 latest.CU 的後援
-    const kUSD  = numOr(kp.usd, latest.CU, kp.CU);
-    // Day PnL may have moved from database.latest.F; fall back to KPI aliases if needed.
-    const dayPnl = numOr(latest.F, kp.dayPnl, kp.todayPnl, kp.pnl);
-
-    // A. KPI（TWD；USD 顯示獨立）
-    setText('kpiTotal', kTotal);
-    setText('kpiNet',   kNet);
-    setText('kpiCash',  kCash);
-    setText('kpiAvail', kAvail);
-    const wroteUSD = setText('kpiUSD',   kUSD);
-    // 若被其它流程覆寫或延遲渲染，下一個 microtask 再寫一次
-    if (typeof queueMicrotask === 'function'){
-      queueMicrotask(()=>{ setText('kpiUSD', kUSD); });
-    } else {
-      setTimeout(()=>{ setText('kpiUSD', kUSD); }, 0);
-    }
-    // 驗證實際文字
-    const usdEl = document.getElementById('kpiUSD');
-    if (usdEl && typeof console !== 'undefined'){
-      console.log('[kpiUSD verify]', {wroteUSD, text: usdEl.textContent, dataValue: usdEl.dataset.value});
-    }
-    const d = document.getElementById('kpiDate');
-    if (d) d.textContent = kp.date || '—';
-
-    if (typeof console !== 'undefined' && !window.__dashUSDLogged){
-      console.log('[dashmain] USD debug', {usdFromKpis: kp.usd, usdFromLatest: latest.CU, kUSD});
-      window.__dashUSDLogged = true;
+          // 另行載入貸款＋一般帳戶的 posted/sum 摘要，填入 Planned 卡片
+          google.script.run
+            .withSuccessHandler(summary => {
+              try {
+                renderPlannedList(summary);
+              } catch (e) {
+                console.error('[dashmain] renderPlannedList(summary) error', e);
+              }
+            })
+            .withFailureHandler(err => {
+              console.error('[dashmain] getDashBalanceSummary ERR', (err && err.message) || err);
+            })
+            .getDashBalanceSummary();
+        })
+        .withFailureHandler(err => {
+          console.error('[dashmain] getDashboardData ERR', err && err.message || err);
+          const row = document.getElementById('kpiRow');
+          if (row) row.innerHTML = `<div class="empty">載入失敗：${(err && err.message) || err}</div>`;
+        })
+        .getDashboardData();
     }
 
-    // B. 當日損益膠囊（源自 latest.F）
-    setText('dashPnlPill', dayPnl, 0);
+    // —— Page hooks / Route —— 
+    window.App = window.App || {};
+    App.pages = App.pages || {};
 
-    // C. Planned Top5
-    const cf = data.cashflow || { plannedTop:[] };
-    renderPlannedList(cf.plannedTop);
-
-    // D. CTBC KPI（Dash 顯示）
-    // 先不在這裡寫 ctPnl/ctInt（避免用到舊的「股票+基金／美元」數字）
-    // 由下方 getCTBCAggregates('fund') 回來後寫入（台幣）。
-    updateCtbcHeaderTotal();
-  }
-
-  // 最小版 ROI 膠囊（沿用全域 .roi-badge 樣式）
-  function roiChipHTML(v){
-    if (v == null || !isFinite(+v)) return '<span class="roi-badge zero">—</span>';
-    const n = Number(v);
-    const cls  = n>0 ? 'pos' : (n<0 ? 'neg' : 'zero');
-    const sign = n>0 ? '+' : (n<0 ? '−' : '');
-    const s = Math.abs(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1});
-    return `<span class="roi-badge ${cls}">${sign}${s}%</span>`;
-  }
-  function setPnlPill(elOrId, v){
-    const el = (typeof elOrId === 'string') ? document.getElementById(elOrId) : elOrId;
-    if (!el) return;
-    el.innerHTML = roiChipHTML(v);
-  }
-
-  function setMoneyText(id, num, digits){
-    const el = document.getElementById(id);
-    if (!el) return;
-    const n = Number(num||0);
-    el.dataset.value = String(n);
-    el.textContent = n.toLocaleString('zh-Hant-TW', {
-      minimumFractionDigits: digits ?? 0,
-      maximumFractionDigits: digits ?? 0
-    });
-  }
-
-  // 只抓「基金」，把 USD → TWD 後再顯示到 ctFundVal / ctPnl / ctInt
-(function(){
-  const run = google?.script?.run; if (!run) return;
-  run.withSuccessHandler(res => {
-    // 伺服端鍵名：ctbcUSD_N/T/AF、ctbcTWD_N/T/AF（皆為「基金」集合）
-    const usdN = Number(res?.ctbcUSD_N||0), usdT = Number(res?.ctbcUSD_T||0), usdAF = Number(res?.ctbcUSD_AF||0);
-    const twdN = Number(res?.ctbcTWD_N||0), twdT = Number(res?.ctbcTWD_T||0), twdAF = Number(res?.ctbcTWD_AF||0);
-
-    const fx = Number(__ctbcHeader?.fxUSDTWD);
-    const hasFx = isFinite(fx) && fx>0;
-    const valTWD = (hasFx ? usdN*fx : 0) + twdN;   // 現值
-    const pnlTWD = (hasFx ? usdT*fx : 0) + twdT;   // 含息損益
-    const intTWD = (hasFx ? usdAF*fx : 0) + twdAF; // 已領利息
-
-    // 寫入（台幣）
-    setMoneyText('ctFundVal',  valTWD, 0);
-    setMoneyText('ctPnl',      pnlTWD, 0);   // 含息損益（台幣，基金-only）
-    setMoneyText('ctInt',      intTWD, 0);   // 已領利息（台幣，基金-only）
-
-    // Header pill 用基金 USD 供合計（USD→TWD 轉換交給 updateCtbcHeaderTotal）
-    __ctbcHeader.fundUSD = usdN;
-    updateCtbcHeaderTotal();
-  })
-  .withFailureHandler(err => console.warn('[dashmain] getCTBCAggregates(fund) failed', err))
-  .getCTBCAggregates('fund');
-})();
-    
-
-  // —— 載入 ——
-  function loadDashboard(){
-    if (!window.google?.script?.run?.withSuccessHandler){
-      console.warn('[dashmain] google.script.run not available');
-      return;
-    }
-    fetchFxUSDTWD();
-    google.script.run
-      .withSuccessHandler(res=>{
-        console.log('[dashmain] getDashboardData ok', res);
-        renderDashboard(res);
-        loadAccList();
-      })
-      .withFailureHandler(err=>{
-        console.error('[dashmain] getDashboardData ERR', err && err.message || err);
-        const row = document.getElementById('kpiRow');
-        if (row) row.innerHTML = `<div class="empty">載入失敗：${(err && err.message)||err}</div>`;
-      })
-      .getDashboardData();
-  }
-
-  // —— Page hooks / Route —— 
-  window.App = window.App || {};
-  App.pages  = App.pages || {};
-
-  App.pages.dashmain = {
-    init(){ loadDashboard(); },
-    refresh(){ loadDashboard(); }
-  };
-  App.routes = App.routes || {};
-  App.routes.dashmain = function(){
-    if (!App.__dashInited){
-      App.__dashInited = true;
-      App.pages.dashmain?.init?.();
-    }
-  };
-})();
+    App.pages.dashmain = {
+      init() { loadDashboard(); },
+      refresh() { loadDashboard(); }
+    };
+    App.routes = App.routes || {};
+    App.routes.dashmain = function () {
+      if (!App.__dashInited) {
+        App.__dashInited = true;
+        App.pages.dashmain?.init?.();
+      }
+    };
+  })();
 </script>

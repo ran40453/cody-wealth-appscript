@@ -24,8 +24,9 @@
         <div class="fx-select-wrap">
           <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
             <div class="seg-sm" id="statusSeg">
-              <button id="statusPlanned" type="button" aria-pressed="true" class="active">planned</button>
-              <button id="statusPosted"  type="button" aria-pressed="true" class="active">posted</button>
+              <button id="statusPlanned" class="seg-btn seg-sm">planned</button>
+              <button id="statusPosted" class="seg-btn seg-sm">posted</button>
+              <button id="statusUsing" class="seg-btn seg-sm">Using</button>
             </div>
           </div>
           <select id="txAccountPick" class="fx-select">
@@ -62,16 +63,19 @@
       </div>
 
       <div class="fx-select-wrap">
-        <select id="inAccount" class="fx-select">
-          <option value="">請選擇帳戶</option>
-        </select>
+        <div class="fx-select-inner">
+          <select id="inAccount" class="fx-select">
+            <option value="">請選擇帳戶</option>
+          </select>
+        </div>
+        <button type="button" id="btnToggleUsing" class="btn btn--ghost btn-using-toggle">
+          Using
+        </button>
       </div>
+      <input type="hidden" id="inStatus" value="auto">
 
       <textarea id="inNote" class="fx-field" placeholder="輸入備注"></textarea>
 
-      <div class="hint-bubble">
-        支出輸入正數；「±」可切換正/負；今天以前 → posted；未來 → planned
-      </div>
 
       <div class="form-actions">
       <button id="btnSubmit"   class="btn btn--lg btn--primary">送出</button>

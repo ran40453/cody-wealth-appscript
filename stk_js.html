@@ -1,124 +1,124 @@
 <script>
-window.App = window.App || {};
-App.modules = App.modules || {};
+  window.App = window.App || {};
+  App.modules = App.modules || {};
 
-App.modules.stk = (function(){
-  // ===== Config（之後要擴充可編輯欄位就在這裡加）=====
-  const EDITABLE_FIELDS = {
-  D: { key:'D', label:'買價', type:'number', decimals:2, min:0 },
-  E: { key:'E', label:'現價', type:'number', decimals:2, min:0 },
-  R: { key:'R', label:'股息', type:'number', decimals:3, min:0 },
-  A: { key:'A', label:'狀態', type:'select', options:[{v:'', t:'—'},{v:'已賣出', t:'已賣出'}] }
-};
+  App.modules.stk = (function () {
+    // ===== Config（之後要擴充可編輯欄位就在這裡加）=====
+    const EDITABLE_FIELDS = {
+      D: { key: 'D', label: '買價', type: 'number', decimals: 2, min: 0 },
+      E: { key: 'E', label: '現價', type: 'number', decimals: 2, min: 0 },
+      R: { key: 'R', label: '股息', type: 'number', decimals: 3, min: 0 },
+      A: { key: 'A', label: '狀態', type: 'select', options: [{ v: '', t: '—' }, { v: '已賣出', t: '已賣出' }] }
+    };
 
-  // ===== State =====
-  let allRows = [];
-  let viewRows = [];
-  const vs = { rowH:44, viewport:null, spacer:null, thead:null, tbody:null, last:[-1,-1] };
-  const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 8, markets: [], market: 'US',deleteMode: false, };
+    // ===== State =====
+    let allRows = [];
+    let viewRows = [];
+    const vs = { rowH: 44, viewport: null, spacer: null, thead: null, tbody: null, last: [-1, -1] };
+    const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 8, markets: [], market: 'US', deleteMode: false, };
 
-  // ===== Init =====
-  function init(){
-    setupViewport();
-    bindGlobalEditModal();
-    bindStatusToggle();
-    bindAddFlow();              // <= 新增這行
-    setBodyLoading(true);
-    fetchData();
-    bindDeleteMode();
-  }
-
-  // ===== Data =====
-  function fetchData(){
-    // 支援 GAS 內嵌與 iframe 場景：嘗試從 window 與 parent 取得 google.script.run
-    const run =
-      (window.google && google.script && google.script.run) ? google.script.run :
-      (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run :
-      null;
-
-    if (!run) {
-      // 等待 Apps Script 物件注入（多給幾次 & 間隔拉長）
-      if (!fetchData._try) fetchData._try = 0;
-      if (fetchData._try++ < 80) { setTimeout(fetchData, 250); return; }
-      failUI('載入失敗：找不到 Apps Script 執行環境（google.script.run）');
-      return;
+    // ===== Init =====
+    function init() {
+      setupViewport();
+      bindGlobalEditModal();
+      bindStatusToggle();
+      bindAddFlow();              // <= 新增這行
+      setBodyLoading(true);
+      fetchData();
+      bindDeleteMode();
     }
 
-    run
-      .withSuccessHandler(rows=>{
-        allRows = Array.isArray(rows) ? rows : [];
-        const set = new Set();
-        allRows.forEach(r=>{ const t = String(r.T||'').trim(); if (t) set.add(t); });
-        st.markets = Array.from(set);
-        if (!st.markets.includes(st.market) && st.markets.length) st.market = st.markets.includes('US') ? 'US' : st.markets[0];
+    // ===== Data =====
+    function fetchData() {
+      // 支援 GAS 內嵌與 iframe 場景：嘗試從 window 與 parent 取得 google.script.run
+      const run =
+        (window.google && google.script && google.script.run) ? google.script.run :
+          (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run :
+            null;
 
-        setBodyLoading(false);             // ← 清掉占位列
-        // renderMarketChips(); // removed per instructions
-        applyFilter();
-        renderKPI(viewRows);
-        renderHead();
-        renderTable(viewRows);
-        renderMarketsCard();
-      })
-      .withFailureHandler(err=> failUI(err && err.message || '讀取失敗'))
-      .getSTKRows();
-  }
+      if (!run) {
+        // 等待 Apps Script 物件注入（多給幾次 & 間隔拉長）
+        if (!fetchData._try) fetchData._try = 0;
+        if (fetchData._try++ < 80) { setTimeout(fetchData, 250); return; }
+        failUI('載入失敗：找不到 Apps Script 執行環境（google.script.run）');
+        return;
+      }
 
-  function applyFilter(){
-    let rows = allRows.slice();
-    if (st.market) rows = rows.filter(r => String(r.T||'').trim() === st.market);
-    rows = st.showOnlyOpen ? rows.filter(r => !isSoldRow(r))
-                          : rows.filter(r =>  isSoldRow(r));
-    viewRows = rows;
-    setBodyLoading(false);
-  }
+      run
+        .withSuccessHandler(rows => {
+          allRows = Array.isArray(rows) ? rows : [];
+          const set = new Set();
+          allRows.forEach(r => { const t = String(r.T || '').trim(); if (t) set.add(t); });
+          st.markets = Array.from(set);
+          if (!st.markets.includes(st.market) && st.markets.length) st.market = st.markets.includes('US') ? 'US' : st.markets[0];
 
-  function renderMarketChips(){
-    const host = byId('stkMarketChips'); if (!host) return;
-    host.innerHTML = st.markets.map(m=>{
-      const on = (m===st.market) ? 'on' : '';
-      return `<div class="chip ${on}" data-market="${esc(m)}">${esc(m)}</div>`;
-    }).join('');
-    host.querySelectorAll('.chip').forEach(ch=>{
-      ch.onclick = ()=>{
-        st.market = String(ch.dataset.market||'');
-        renderMarketChips();
-        applyFilter();
-        renderKPI(viewRows);
-        renderTable(viewRows);
-      };
-    });
-  }
+          setBodyLoading(false);             // ← 清掉占位列
+          // renderMarketChips(); // removed per instructions
+          applyFilter();
+          renderKPI(viewRows);
+          renderHead();
+          renderTable(viewRows);
+          renderMarketsCard();
+        })
+        .withFailureHandler(err => failUI(err && err.message || '讀取失敗'))
+        .getSTKRows();
+    }
 
-  // ===== KPI =====
-  function renderKPI(rows){
-    const sum = k => rows.reduce((s,r)=> s + toNum(r[k]), 0);
-    const totalMV   = sum('N'); // 市場價值
-    const totalCost = sum('K'); // 成本
-    const totalPL   = sum('G'); // 損益(NT)
+    function applyFilter() {
+      let rows = allRows.slice();
+      if (st.market) rows = rows.filter(r => String(r.T || '').trim() === st.market);
+      rows = st.showOnlyOpen ? rows.filter(r => !isSoldRow(r))
+        : rows.filter(r => isSoldRow(r));
+      viewRows = rows;
+      setBodyLoading(false);
+    }
 
-    // 加權 ROI（用 N 權重）
-    let w=0, wU=0;
-    rows.forEach(r=>{
-      const n = toNum(r.N);
-      const u = normalizePercent(r.H);
-      if (n) { w += n; wU += (n * u); }
-    });
-    const roi = w ? (wU / w) : null;
+    function renderMarketChips() {
+      const host = byId('stkMarketChips'); if (!host) return;
+      host.innerHTML = st.markets.map(m => {
+        const on = (m === st.market) ? 'on' : '';
+        return `<div class="chip ${on}" data-market="${esc(m)}">${esc(m)}</div>`;
+      }).join('');
+      host.querySelectorAll('.chip').forEach(ch => {
+        ch.onclick = () => {
+          st.market = String(ch.dataset.market || '');
+          renderMarketChips();
+          applyFilter();
+          renderKPI(viewRows);
+          renderTable(viewRows);
+        };
+      });
+    }
 
-    setNum('stkKpiMV',   totalMV,   1);
-    setNum('stkKpiCost', totalCost, 1);
-    setNum('stkKpiPL',   totalPL,   1);
-    setRoiPill(byId('stkKpiROI'), roi);
-    
-    const actions = document.getElementById('stkActions');
-    if (actions) actions.style.display = 'flex';
-  }
+    // ===== KPI =====
+    function renderKPI(rows) {
+      const sum = k => rows.reduce((s, r) => s + toNum(r[k]), 0);
+      const totalMV = sum('N'); // 市場價值
+      const totalCost = sum('K'); // 成本
+      const totalPL = sum('G'); // 損益(NT)
 
-  // ===== Head =====
-  function renderHead(){
-  if (!vs.thead) return;
-  vs.thead.innerHTML = `<tr>
+      // 加權 ROI（用 N 權重）
+      let w = 0, wU = 0;
+      rows.forEach(r => {
+        const n = toNum(r.N);
+        const u = normalizePercent(r.H);
+        if (n) { w += n; wU += (n * u); }
+      });
+      const roi = w ? (wU / w) : null;
+
+      setNum('stkKpiMV', totalMV, 1);
+      setNum('stkKpiCost', totalCost, 1);
+      setNum('stkKpiPL', totalPL, 1);
+      setRoiPill(byId('stkKpiROI'), roi);
+
+      const actions = document.getElementById('stkActions');
+      if (actions) actions.style.display = 'flex';
+    }
+
+    // ===== Head =====
+    function renderHead() {
+      if (!vs.thead) return;
+      vs.thead.innerHTML = `<tr>
     <th class="txt">產品</th>               <!-- B -->
     <th class="num col-fix-1">股數</th>     <!-- C -->
     <th class="num col-fix-2">均價</th>     <!-- F -->
@@ -128,250 +128,250 @@ App.modules.stk = (function(){
     <th class="txt col-fix-4">市場</th>     <!-- T -->
     <th class="txt">狀態</th>               <!-- A -->
   </tr>`;
-}
-
-  // ===== Body (virtual list) =====
-  function renderTable(rows){
-    setBodyLoading(false);
-    // spacer 高度 = 主列高度 + 展開列高度
-    const expandedCount = Array.from(st.expanded).filter(rowId => rows.find(r=> Number(r.ROW)===Number(rowId))).length;
-    if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH + expandedCount * st.detailH) + 'px';
-    if (vs.tbody){ vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML=''; }
-    vs.last = [-1,-1];
-    renderVirtual();
-  }
-  function renderVirtual(){
-    if (!vs.viewport || !vs.tbody) return;
-    const rows = viewRows;
-    const top  = vs.viewport.scrollTop;
-    const h    = vs.viewport.clientHeight;
-
-    const start= Math.max(0, Math.floor(top / vs.rowH) - 10);
-    // 計算 start 之前的展開列數，修正 offset
-    let expandedBefore = 0;
-    for (let i=0; i<start; i++){
-      const rowId = Number(rows[i]?.ROW||0);
-      if (st.expanded.has(rowId)) expandedBefore++;
     }
-    const offsetY = start * vs.rowH + expandedBefore * st.detailH;
 
-    const need = Math.ceil(h / vs.rowH) + 20;
-    const end  = Math.min(rows.length, start + need);
-    if (vs.last[0]===start && vs.last[1]===end) return;
-    vs.last = [start, end];
+    // ===== Body (virtual list) =====
+    function renderTable(rows) {
+      setBodyLoading(false);
+      // spacer 高度 = 主列高度 + 展開列高度
+      const expandedCount = Array.from(st.expanded).filter(rowId => rows.find(r => Number(r.ROW) === Number(rowId))).length;
+      if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH + expandedCount * st.detailH) + 'px';
+      if (vs.tbody) { vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML = ''; }
+      vs.last = [-1, -1];
+      renderVirtual();
+    }
+    function renderVirtual() {
+      if (!vs.viewport || !vs.tbody) return;
+      const rows = viewRows;
+      const top = vs.viewport.scrollTop;
+      const h = vs.viewport.clientHeight;
 
-    const slice = rows.slice(start, end);
-    vs.tbody.style.transform = `translateY(${offsetY}px)`;
-    // 移除可能殘留的占位列（避免「載入中…」卡在底部）
-    vs.tbody.querySelectorAll('.empty').forEach(el=> el.remove());
-    vs.tbody.innerHTML = slice.map(r=>{
-      const rowId = Number(r.ROW||0);
-      const roi   = normalizePercent(r.H);
-      const upl   = fmtMoney(r.G);   // 新
+      const start = Math.max(0, Math.floor(top / vs.rowH) - 10);
+      // 計算 start 之前的展開列數，修正 offset
+      let expandedBefore = 0;
+      for (let i = 0; i < start; i++) {
+        const rowId = Number(rows[i]?.ROW || 0);
+        if (st.expanded.has(rowId)) expandedBefore++;
+      }
+      const offsetY = start * vs.rowH + expandedBefore * st.detailH;
 
-      const main = `<tr class="stk-row" data-row="${rowId}">
-        <td class="txt">${esc(r.B||'-')}</td>
-        <td class="num col-fix-1">${fmtInt(r.C)}</td>
-        <td class="num col-fix-2">${fmtMoney2(r.F)}</td>
+      const need = Math.ceil(h / vs.rowH) + 20;
+      const end = Math.min(rows.length, start + need);
+      if (vs.last[0] === start && vs.last[1] === end) return;
+      vs.last = [start, end];
+
+      const slice = rows.slice(start, end);
+      vs.tbody.style.transform = `translateY(${offsetY}px)`;
+      // 移除可能殘留的占位列（避免「載入中…」卡在底部）
+      vs.tbody.querySelectorAll('.empty').forEach(el => el.remove());
+      vs.tbody.innerHTML = slice.map(r => {
+        const rowId = Number(r.ROW || 0);
+        const roi = normalizePercent(r.H);
+        const upl = fmtMoney(r.G);   // 新
+
+        const main = `<tr class="stk-row" data-row="${rowId}">
+        <td class="txt">${esc(r.B || '-')}</td>
+        <td class="num col-fix-1 mask-num" data-mask-str="＊＊＊">${fmtInt(r.C)}</td>
+        <td class="num col-fix-2 mask-num" data-mask-str="＊＊＊">${fmtMoney2(r.F)}</td>
         <td class="num col-fix-5">
-          <button class="cell-edit" data-col="D" title="點擊編輯買價">${fmtMoney2(r.D)}</button>
+          <button class="cell-edit mask-num" data-col="D" data-mask-str="＊＊＊" title="點擊編輯買價">${fmtMoney2(r.D)}</button>
         </td>
         <td class="num col-fix-3">
-          <button class="cell-edit" data-col="E" title="點擊編輯現價">${fmtMoney2(r.E)}</button>
+          <button class="cell-edit mask-num" data-col="E" data-mask-str="＊＊＊" title="點擊編輯現價">${fmtMoney2(r.E)}</button>
         </td>
         <td class="txt pnl-col">
           <div class="pnl-cell">
-            <span class="num">${upl}</span>
+            <span class="num mask-num" data-mask-str="＊＊＊">${upl}</span>
             ${roiPillHTML(roi)}
           </div>
         </td>
-        <td class="txt col-fix-4">${esc(r.T||'')}</td>
+        <td class="txt col-fix-4">${esc(r.T || '')}</td>
         <td class="txt">
-          <button class="cell-edit" data-col="A" title="修改狀態">${ isSoldRow(r) ? '已賣出' : '—' }</button>
+          <button class="cell-edit" data-col="A" title="修改狀態">${isSoldRow(r) ? '已賣出' : '—'}</button>
         </td>
       </tr>`;
 
-      if (!st.expanded.has(rowId)) return main;
+        if (!st.expanded.has(rowId)) return main;
 
-      const detail = `<tr class="stk-detail open" data-row="${rowId}">
+        const detail = `<tr class="stk-detail open" data-row="${rowId}">
         <td class="txt" colspan="${st.totalCols}">
           <div class="detail-card">
             <div class="detail-grid">
-              <div class="detail-item"><span class="label">市場價值 (N)</span><span class="value">${fmtMoney(r.N)}</span></div>
-              <div class="detail-item"><span class="label">成本 (K)</span><span class="value">${fmtMoney(r.K)}</span></div>
-              <div class="detail-item"><span class="label">股息 (R)</span><span class="value"><button class="cell-edit" data-col="R" title="點擊編輯股息">${fmtMoney(r.R)}</button></span></div>
+              <div class="detail-item"><span class="label">市場價值 (N)</span><span class="value mask-num" data-mask-str="＊＊＊">${fmtMoney(r.N)}</span></div>
+              <div class="detail-item"><span class="label">成本 (K)</span><span class="value mask-num" data-mask-str="＊＊＊">${fmtMoney(r.K)}</span></div>
+              <div class="detail-item"><span class="label">股息 (R)</span><span class="value"><button class="cell-edit mask-num" data-col="R" data-mask-str="＊＊＊" title="點擊編輯股息">${fmtMoney(r.R)}</button></span></div>
 
               <div class="detail-item"><span class="label">ROI (H)</span><span class="value">${roiPillHTML(roi)}</span></div>
               <div class="detail-item"><span class="label">買日 (L)</span><span class="value">${fmtDate(r.L)}</span></div>
               <div class="detail-item"><span class="label">賣日 (M)</span><span class="value">${fmtDate(r.M)}</span></div>
 
-              <div class="detail-item"><span class="label">手續+稅 (Q)</span><span class="value">${fmtMoney(r.Q)}</span></div>
-              <div class="detail-item"><span class="label">單位 (U)</span><span class="value">${esc(r.U||'')}</span></div>
-              <div class="detail-item"><span class="label">市場 (T)</span><span class="value">${esc(r.T||'')}</span></div>
+              <div class="detail-item"><span class="label">手續+稅 (Q)</span><span class="value mask-num" data-mask-str="＊＊＊">${fmtMoney(r.Q)}</span></div>
+              <div class="detail-item"><span class="label">單位 (U)</span><span class="value">${esc(r.U || '')}</span></div>
+              <div class="detail-item"><span class="label">市場 (T)</span><span class="value">${esc(r.T || '')}</span></div>
             </div>
           </div>
         </td>
       </tr>`;
-      return main + detail;
-    }).join('');
+        return main + detail;
+      }).join('');
 
-    // 綁定 slice 內事件
-    vs.tbody.querySelectorAll('.cell-edit').forEach(btn=>{
-      btn.addEventListener('click', onEditCellClick);
-    });
+      // 綁定 slice 內事件
+      vs.tbody.querySelectorAll('.cell-edit').forEach(btn => {
+        btn.addEventListener('click', onEditCellClick);
+      });
 
-    if (!slice.length){
-      vs.tbody.style.transform = 'translateY(0px)';
-      vs.tbody.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">目前沒有資料</td></tr>`;
+      if (!slice.length) {
+        vs.tbody.style.transform = 'translateY(0px)';
+        vs.tbody.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">目前沒有資料</td></tr>`;
+      }
+
+      if (st.anim) {
+        vs.tbody.querySelectorAll('tr.stk-detail').forEach(tr => {
+          tr.classList.add('entering');
+          requestAnimationFrame(() => tr.classList.remove('entering'));
+        });
+      }
     }
 
-    if (st.anim) {
-      vs.tbody.querySelectorAll('tr.stk-detail').forEach(tr=>{
-        tr.classList.add('entering');
-        requestAnimationFrame(()=> tr.classList.remove('entering'));
+    // caret 點擊
+    function onToggleRow(e) {
+      const rowId = Number(e.currentTarget.dataset.row || 0);
+      if (!rowId) return;
+      if (st.expanded.has(rowId)) {
+        st.expanded.delete(rowId);
+      } else {
+        st.expanded.clear();
+        st.expanded.add(rowId);
+      }
+      renderTable(viewRows);
+    }
+
+
+    function bindDeleteMode() {
+      const btn = document.getElementById('stkDeleteModeBtn');
+      if (!btn) return;
+      const sync = () => {
+        btn.setAttribute('aria-pressed', st.deleteMode ? 'true' : 'false');
+        btn.classList.toggle('danger', st.deleteMode);
+        const icon = btn.querySelector('.material-symbols-outlined');
+        if (icon) icon.textContent = st.deleteMode ? 'delete_forever' : 'delete';
+        btn.title = st.deleteMode ? '退出刪除' : '刪除模式';
+      };
+      btn.onclick = () => { st.deleteMode = !st.deleteMode; sync(); };
+      sync();
+    }
+
+    function bindStatusToggle() {
+      const btn = byId('stkStatusToggle');
+      if (!btn) return;
+      const sync = () => {
+        const icon = btn.querySelector('.material-symbols-outlined');
+        // true = 顯示「持有」，false = 顯示「已賣出」
+        if (icon) icon.textContent = st.showOnlyOpen ? 'inventory_2' : 'sell';
+        btn.title = st.showOnlyOpen ? '持有' : '已賣出';
+        btn.setAttribute('aria-pressed', st.showOnlyOpen ? 'false' : 'true');
+      };
+      sync();
+      btn.onclick = () => {
+        st.showOnlyOpen = !st.showOnlyOpen;
+        st.expanded.clear();
+        applyFilter();
+        renderKPI(viewRows);
+        renderHead();
+        renderTable(viewRows);
+        renderMarketsCard();
+        sync();
+      };
+    }
+
+    // ===== Edit modal =====
+    function bindGlobalEditModal() {
+      const dlg = byId('stkEditDlg');
+      const form = byId('stkEditForm');
+      const input = byId('stkEditInput');
+      const ok = byId('stkEditOk');
+      const cancelBtn = byId('stkEditCancel');
+      const closeBtn = byId('stkEditClose');
+
+      if (!dlg || !form) return;
+
+      const close = () => closeEdit();
+      if (cancelBtn) cancelBtn.onclick = close;
+      if (closeBtn) closeBtn.onclick = close;
+      ok.onclick = (e) => { e.preventDefault(); submitEdit(); };
+      form.onsubmit = (e) => { e.preventDefault(); submitEdit(); };
+      input.onkeydown = (e) => { if (e.key === 'Escape') closeEdit(); };
+    }
+
+    function onEditCellClick(e) {
+      const btn = e.currentTarget;
+      const tr = btn.closest('tr');
+      const row = Number(tr && tr.dataset.row || 0);
+      const col = String(btn.dataset.col || '').toUpperCase();
+
+      const field = EDITABLE_FIELDS[col];
+      if (!row || !field) return;
+
+      const r = allRows.find(x => Number(x.ROW) === row);
+      const current = r ? r[col] : '';
+      const passVal = (field.type === 'select') ? String(current || '') : toNum(current);
+
+      openEdit({
+        row, col,
+        title: field.label,
+        type: field.type,
+        value: passVal,
+        decimals: field.decimals ?? 2,
+        min: field.min ?? null,
+        updateDateCol: field.updateDateCol || null
       });
     }
-  }
 
-  // caret 點擊
-function onToggleRow(e){
-  const rowId = Number(e.currentTarget.dataset.row||0);
-  if (!rowId) return;
-  if (st.expanded.has(rowId)) {
-    st.expanded.delete(rowId);
-  } else {
-    st.expanded.clear();
-    st.expanded.add(rowId);
-  }
-  renderTable(viewRows);
-}
+    function openEdit(meta) {
+      const dlg = byId('stkEditDlg');
+      if (!dlg) return;
+      dlg.dataset.row = meta.row;
+      dlg.dataset.col = meta.col;
+      dlg.dataset.decimals = meta.decimals;
+      dlg.dataset.min = (meta.min == null ? '' : String(meta.min));
+      dlg.dataset.updateDateCol = meta.updateDateCol || '';
+      byId('stkEditTitle').textContent = `編輯：${meta.title}`;
 
+      // —— 先清理舊的元件（避免重複累積）
+      ['stkEditSelect', 'stkSellExtras', 'stkStatusSeg'].forEach(id => {
+        const el = byId(id); if (el && el.parentNode) el.parentNode.removeChild(el);
+      });
 
-  function bindDeleteMode(){
-    const btn = document.getElementById('stkDeleteModeBtn');
-    if (!btn) return;
-    const sync = ()=>{
-      btn.setAttribute('aria-pressed', st.deleteMode ? 'true' : 'false');
-      btn.classList.toggle('danger', st.deleteMode);
-      const icon = btn.querySelector('.material-symbols-outlined');
-      if (icon) icon.textContent = st.deleteMode ? 'delete_forever' : 'delete';
-      btn.title = st.deleteMode ? '退出刪除' : '刪除模式';
-    };
-    btn.onclick = ()=>{ st.deleteMode = !st.deleteMode; sync(); };
-    sync();
-  }  
+      const input = byId('stkEditInput');
+      input.type = (meta.type === 'number' ? 'number' : 'text');
+      input.step = (meta.type === 'number' ? 'any' : undefined);
+      input.value = (meta.value ?? '');
+      input.style.display = '';
+      input.removeAttribute('data-hidden');
 
-  function bindStatusToggle(){
-    const btn = byId('stkStatusToggle');
-    if (!btn) return;
-    const sync = ()=>{
-      const icon = btn.querySelector('.material-symbols-outlined');
-      // true = 顯示「持有」，false = 顯示「已賣出」
-      if (icon) icon.textContent = st.showOnlyOpen ? 'inventory_2' : 'sell';
-      btn.title = st.showOnlyOpen ? '持有' : '已賣出';
-      btn.setAttribute('aria-pressed', st.showOnlyOpen ? 'false' : 'true');
-    };
-    sync();
-    btn.onclick = ()=>{
-      st.showOnlyOpen = !st.showOnlyOpen;
-      st.expanded.clear();
-      applyFilter();
-      renderKPI(viewRows);
-      renderHead();
-      renderTable(viewRows);
-      renderMarketsCard();
-      sync();
-    };
-  }
+      // A 欄（狀態）改用 segmented control
+      if (meta.col === 'A') {
+        // 隱藏文字/數值輸入框
+        input.style.display = 'none';
+        input.setAttribute('data-hidden', '1');
 
-  // ===== Edit modal =====
-  function bindGlobalEditModal(){
-    const dlg = byId('stkEditDlg');
-    const form= byId('stkEditForm');
-    const input= byId('stkEditInput');
-    const ok  = byId('stkEditOk');
-    const cancelBtn = byId('stkEditCancel');
-    const closeBtn  = byId('stkEditClose');
-
-    if (!dlg || !form) return;
-
-    const close = ()=> closeEdit();
-    if (cancelBtn) cancelBtn.onclick = close;
-    if (closeBtn)  closeBtn.onclick  = close;
-    ok.onclick = (e)=>{ e.preventDefault(); submitEdit(); };
-    form.onsubmit = (e)=>{ e.preventDefault(); submitEdit(); };
-    input.onkeydown = (e)=>{ if (e.key === 'Escape') closeEdit(); };
-  }
-
-  function onEditCellClick(e){
-    const btn = e.currentTarget;
-    const tr  = btn.closest('tr');
-    const row = Number(tr && tr.dataset.row || 0);
-    const col = String(btn.dataset.col||'').toUpperCase();
-
-    const field = EDITABLE_FIELDS[col];
-    if (!row || !field) return;
-
-    const r = allRows.find(x => Number(x.ROW)===row);
-    const current = r ? r[col] : '';
-    const passVal = (field.type === 'select') ? String(current||'') : toNum(current);
-
-    openEdit({
-      row, col,
-      title: field.label,
-      type: field.type,
-      value: passVal,
-      decimals: field.decimals ?? 2,
-      min: field.min ?? null,
-      updateDateCol: field.updateDateCol || null
-    });
-  }
-
-  function openEdit(meta){
-    const dlg = byId('stkEditDlg');
-    if (!dlg) return;
-    dlg.dataset.row = meta.row;
-    dlg.dataset.col = meta.col;
-    dlg.dataset.decimals = meta.decimals;
-    dlg.dataset.min = (meta.min==null ? '' : String(meta.min));
-    dlg.dataset.updateDateCol = meta.updateDateCol || '';
-    byId('stkEditTitle').textContent = `編輯：${meta.title}`;
-
-    // —— 先清理舊的元件（避免重複累積）
-    ['stkEditSelect','stkSellExtras','stkStatusSeg'].forEach(id=>{
-      const el = byId(id); if (el && el.parentNode) el.parentNode.removeChild(el);
-    });
-
-    const input = byId('stkEditInput');
-    input.type = (meta.type==='number' ? 'number' : 'text');
-    input.step = (meta.type==='number' ? 'any' : undefined);
-    input.value = (meta.value ?? '');
-    input.style.display = '';
-    input.removeAttribute('data-hidden');
-
-    // A 欄（狀態）改用 segmented control
-    if (meta.col === 'A'){
-      // 隱藏文字/數值輸入框
-      input.style.display = 'none';
-      input.setAttribute('data-hidden','1');
-
-      // 建立 segmented control（持有 / 已賣出）
-      const seg = document.createElement('div');
-      seg.id = 'stkStatusSeg';
-      seg.className = 'seg';
-      const val = String(meta.value||'');
-      seg.innerHTML = `
-        <input type="radio" id="stkStatusOpen"  name="stkStatus" value="" ${val===''?'checked':''}>
+        // 建立 segmented control（持有 / 已賣出）
+        const seg = document.createElement('div');
+        seg.id = 'stkStatusSeg';
+        seg.className = 'seg';
+        const val = String(meta.value || '');
+        seg.innerHTML = `
+        <input type="radio" id="stkStatusOpen"  name="stkStatus" value="" ${val === '' ? 'checked' : ''}>
         <label for="stkStatusOpen">持有</label>
-        <input type="radio" id="stkStatusSold" name="stkStatus" value="已賣出" ${val==='已賣出'?'checked':''}>
+        <input type="radio" id="stkStatusSold" name="stkStatus" value="已賣出" ${val === '已賣出' ? 'checked' : ''}>
         <label for="stkStatusSold">已賣出</label>
       `;
-      input.parentNode.insertBefore(seg, input.nextSibling);
+        input.parentNode.insertBefore(seg, input.nextSibling);
 
-      // 追加賣出表單（股數、賣價）
-      const wrap = document.createElement('div');
-      wrap.id = 'stkSellExtras';
-      wrap.innerHTML = `
+        // 追加賣出表單（股數、賣價）
+        const wrap = document.createElement('div');
+        wrap.id = 'stkSellExtras';
+        wrap.innerHTML = `
         <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
           <div><label>股數</label><input id="stkSellQty" type="number" step="any" class="input" /></div>
           <div><label>賣價</label><input id="stkSellPrice" type="number" step="any" class="input" /></div>
@@ -380,440 +380,440 @@ function onToggleRow(e){
           <label>賣出日期</label>
           <input id="stkSellDate" type="date" class="input" />
         </div>`;
-      seg.parentNode.insertBefore(wrap, seg.nextSibling);
+        seg.parentNode.insertBefore(wrap, seg.nextSibling);
 
-      // 預設填上本列數值
-      const dateEl = byId('stkSellDate');
-      if (dateEl){
-        const now = new Date();
-        const iso = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
-        dateEl.value = iso;
+        // 預設填上本列數值
+        const dateEl = byId('stkSellDate');
+        if (dateEl) {
+          const now = new Date();
+          const iso = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+          dateEl.value = iso;
+        }
+        const r0 = allRows.find(x => Number(x.ROW) === meta.row) || {};
+        const qtyEl = byId('stkSellQty'); const priceEl = byId('stkSellPrice');
+        if (qtyEl) qtyEl.value = toNum(r0.C);
+        if (priceEl) priceEl.value = toNum(r0.E);
+
+        // 只有選「已賣出」才顯示賣出表單
+        const syncExtras = () => { const sold = document.getElementById('stkStatusSold').checked; wrap.style.display = sold ? '' : 'none'; };
+        seg.addEventListener('change', syncExtras);
+        syncExtras();
       }
-      const r0 = allRows.find(x => Number(x.ROW)===meta.row) || {};
-      const qtyEl = byId('stkSellQty'); const priceEl = byId('stkSellPrice');
-      if (qtyEl) qtyEl.value = toNum(r0.C);
-      if (priceEl) priceEl.value = toNum(r0.E);
+      // 其他 select 欄位（若之後有用到），保留原邏輯
+      else if (meta.type === 'select') {
+        const oldSel = byId('stkEditSelect');
+        if (oldSel && oldSel.parentNode) oldSel.parentNode.removeChild(oldSel);
+        const pick = document.createElement('select');
+        pick.id = 'stkEditSelect';
+        pick.className = 'input';
+        pick.innerHTML = (meta.options || []).map(o => `<option value="${esc(o.v)}"${o.v === String(meta.value || '') ? ' selected' : ''}>${esc(o.t)}</option>`).join('');
+        input.style.display = 'none';
+        input.setAttribute('data-hidden', '1');
+        input.parentNode.insertBefore(pick, input.nextSibling);
+      }
 
-      // 只有選「已賣出」才顯示賣出表單
-      const syncExtras = ()=>{ const sold = document.getElementById('stkStatusSold').checked; wrap.style.display = sold ? '' : 'none'; };
-      seg.addEventListener('change', syncExtras);
-      syncExtras();
-    }
-    // 其他 select 欄位（若之後有用到），保留原邏輯
-    else if (meta.type==='select'){
-      const oldSel = byId('stkEditSelect');
-      if (oldSel && oldSel.parentNode) oldSel.parentNode.removeChild(oldSel);
-      const pick = document.createElement('select');
-      pick.id = 'stkEditSelect';
-      pick.className = 'input';
-      pick.innerHTML = (meta.options||[]).map(o=> `<option value="${esc(o.v)}"${o.v===String(meta.value||'')?' selected':''}>${esc(o.t)}</option>`).join('');
-      input.style.display='none';
-      input.setAttribute('data-hidden','1');
-      input.parentNode.insertBefore(pick, input.nextSibling);
+      dlg.style.display = 'flex';
+      setTimeout(() => input.focus(), 0);
     }
 
-    dlg.style.display = 'flex';
-    setTimeout(()=> input.focus(), 0);
-  }
+    function closeEdit() {
+      const dlg = byId('stkEditDlg');
+      if (!dlg) return;
+      dlg.style.display = 'none';
+      dlg.dataset.row = dlg.dataset.col = dlg.dataset.decimals = dlg.dataset.min = dlg.dataset.updateDateCol = '';
 
-  function closeEdit(){
-  const dlg = byId('stkEditDlg');
-  if (!dlg) return;
-  dlg.style.display = 'none';
-  dlg.dataset.row = dlg.dataset.col = dlg.dataset.decimals = dlg.dataset.min = dlg.dataset.updateDateCol = '';
+      // 清理彈窗內動態插入的元件
+      ['stkSellExtras', 'stkStatusSeg', 'stkEditSelect'].forEach(id => {
+        const el = byId(id); if (el && el.parentNode) el.parentNode.removeChild(el);
+      });
+      const input = byId('stkEditInput');
+      if (input) { input.style.display = ''; input.removeAttribute('data-hidden'); }
+    }
 
-  // 清理彈窗內動態插入的元件
-  ['stkSellExtras','stkStatusSeg','stkEditSelect'].forEach(id=>{
-    const el = byId(id); if (el && el.parentNode) el.parentNode.removeChild(el);
-  });
-  const input = byId('stkEditInput');
-  if (input){ input.style.display=''; input.removeAttribute('data-hidden'); }
-}
+    function submitEdit() {
+      const dlg = byId('stkEditDlg');
+      if (!dlg) return;
+      const row = Number(dlg.dataset.row || 0);
+      const col = String(dlg.dataset.col || '');
+      const decimals = Number(dlg.dataset.decimals || 2);
+      const min = (dlg.dataset.min === '' ? null : Number(dlg.dataset.min));
+      const updateDateCol = dlg.dataset.updateDateCol || '';
+      const sel = byId('stkEditSelect');
+      const input = byId('stkEditInput');
 
-  function submitEdit(){
-  const dlg = byId('stkEditDlg');
-  if (!dlg) return;
-  const row = Number(dlg.dataset.row||0);
-  const col = String(dlg.dataset.col||'');
-  const decimals = Number(dlg.dataset.decimals||2);
-  const min = (dlg.dataset.min===''? null : Number(dlg.dataset.min));
-  const updateDateCol = dlg.dataset.updateDateCol || '';
-  const sel = byId('stkEditSelect');
-  const input = byId('stkEditInput');
+      // 狀態欄（A）
+      if (col === 'A') {
+        const checked = document.querySelector('input[name="stkStatus"]:checked');
+        const val = checked ? checked.value : '';
+        if (val === '') {
+          toggleBusy(true);
+          google.script.run
+            .withSuccessHandler(() => { toggleBusy(false); closeEdit(); fetchData(); })
+            .withFailureHandler(err => { toggleBusy(false); alert('更新失敗：' + (err && err.message || '')); })
+            .setSTKValue(row, 'A', '', null);
+          return;
+        }
+        const qty = toNum(byId('stkSellQty')?.value);
+        const price = toNum(byId('stkSellPrice')?.value);
+        const orig = allRows.find(x => Number(x.ROW) === row) || {};
+        const currentQty = toNum(orig.C);
+        if (!qty || qty <= 0) { alert('請輸入賣出股數'); return; }
+        if (qty > currentQty) { alert('股數不可大於現有股數'); return; }
+        if (!isFinite(price) || price <= 0) { alert('請輸入賣出價格'); return; }
+        const sellDate = (byId('stkSellDate') && byId('stkSellDate').value) || '';
 
-  // 狀態欄（A）
-  if (col === 'A'){
-    const checked = document.querySelector('input[name="stkStatus"]:checked');
-    const val = checked ? checked.value : '';
-    if (val === '') {
+        toggleBusy(true);
+        const run = (window.google && google.script && google.script.run) ? google.script.run
+          : (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run
+            : null;
+        if (!run) { toggleBusy(false); alert('更新失敗：找不到 Apps Script 執行環境'); return; }
+
+        run
+          .withSuccessHandler(() => {
+            if (sellDate) {
+              run
+                .withSuccessHandler(() => { toggleBusy(false); closeEdit(); fetchData(); })
+                .withFailureHandler(err => { toggleBusy(false); alert('回填賣出日期失敗：' + (err && err.message || '')); })
+                .setSTKValue(row, 'M', sellDate, null);
+            } else {
+              toggleBusy(false); closeEdit(); fetchData();
+            }
+          })
+          .withFailureHandler(err => { toggleBusy(false); alert('賣出處理失敗：' + (err && err.message || '')); })
+          .splitSell(row, qty, price);
+        return;
+      }
+
+      // 其他欄位（D/E/R）照舊
+      let val = input ? input.value : '';
+      if (val === '' || val == null) { alert('請輸入數值'); return; }
+      let num = toNum(val);
+      if (min != null && num < min) { alert(`數值不可小於 ${min}`); return; }
+
       toggleBusy(true);
       google.script.run
-        .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
-        .withFailureHandler(err=>{ toggleBusy(false); alert('更新失敗：'+(err&&err.message||'')); })
-        .setSTKValue(row, 'A', '', null);
-      return;
+        .withSuccessHandler(() => { toggleBusy(false); closeEdit(); fetchData(); })
+        .withFailureHandler(err => { toggleBusy(false); alert('寫入失敗：' + (err && err.message || '')); })
+        .setSTKValue(row, col, round(num, decimals), updateDateCol || null);
     }
-    const qty = toNum(byId('stkSellQty')?.value);
-    const price = toNum(byId('stkSellPrice')?.value);
-    const orig = allRows.find(x=> Number(x.ROW)===row) || {};
-    const currentQty = toNum(orig.C);
-    if (!qty || qty<=0){ alert('請輸入賣出股數'); return; }
-    if (qty > currentQty){ alert('股數不可大於現有股數'); return; }
-    if (!isFinite(price) || price<=0){ alert('請輸入賣出價格'); return; }
-    const sellDate = (byId('stkSellDate') && byId('stkSellDate').value) || '';
-
-    toggleBusy(true);
-      const run = (window.google && google.script && google.script.run) ? google.script.run
-                : (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run
-                : null;
-      if (!run){ toggleBusy(false); alert('更新失敗：找不到 Apps Script 執行環境'); return; }
-
-      run
-        .withSuccessHandler(()=>{
-          if (sellDate){
-            run
-              .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
-              .withFailureHandler(err=>{ toggleBusy(false); alert('回填賣出日期失敗：'+(err&&err.message||'')); })
-              .setSTKValue(row, 'M', sellDate, null);
-          }else{
-            toggleBusy(false); closeEdit(); fetchData();
-          }
-        })
-        .withFailureHandler(err=>{ toggleBusy(false); alert('賣出處理失敗：'+(err&&err.message||'')); })
-        .splitSell(row, qty, price);
-      return;
-  }
-
-  // 其他欄位（D/E/R）照舊
-  let val = input ? input.value : '';
-  if (val==='' || val==null){ alert('請輸入數值'); return; }
-  let num = toNum(val);
-  if (min!=null && num < min){ alert(`數值不可小於 ${min}`); return; }
-
-  toggleBusy(true);
-  google.script.run
-    .withSuccessHandler(()=>{ toggleBusy(false); closeEdit(); fetchData(); })
-    .withFailureHandler(err=>{ toggleBusy(false); alert('寫入失敗：' + (err && err.message || '')); })
-    .setSTKValue(row, col, round(num, decimals), updateDateCol || null);
-}
 
 
-  function bindAddFlow(){
-    const open = byId('stkAddBtn');
-    const dlg  = byId('stkAddDlg');
-    const form = byId('stkAddForm');
-    const close= byId('stkAddClose');
-    const cancel= byId('stkAddCancel');
-    const ok   = byId('stkAddOk');
-    if (!open || !dlg || !form) return;
+    function bindAddFlow() {
+      const open = byId('stkAddBtn');
+      const dlg = byId('stkAddDlg');
+      const form = byId('stkAddForm');
+      const close = byId('stkAddClose');
+      const cancel = byId('stkAddCancel');
+      const ok = byId('stkAddOk');
+      if (!open || !dlg || !form) return;
 
-    const fillMarkets = ()=>{
-      const sel = byId('stkAddMarket'); if (!sel) return;
-      sel.innerHTML = st.markets.map(m=> `<option value="${esc(m)}"${m===st.market?' selected':''}>${esc(m)}</option>`).join('');
-    };
-    const today = ()=> new Date().toISOString().slice(0,10);
-
-    open.onclick = ()=>{
-      fillMarkets();
-      byId('stkAddName').value = '';
-      byId('stkAddShares').value = '';
-      byId('stkAddBuy').value = '';
-      byId('stkAddDiv').value = '0.0';
-      byId('stkAddDate').value = today();
-      byId('stkAddUnit').value = '零股';
-      dlg.style.display = 'flex';  // 搭配 CSS 置中
-    };
-    const closeDlg = ()=> dlg.style.display='none';
-    if (close) close.onclick = closeDlg;
-    if (cancel) cancel.onclick = closeDlg;
-
-    form.onsubmit = (e)=>{
-      e.preventDefault();
-      const item = {
-        B: byId('stkAddName').value.trim(),
-        C: Number(byId('stkAddShares').value||0),
-        D: Number(byId('stkAddBuy').value||0),
-        T: byId('stkAddMarket').value,
-        R: Number(byId('stkAddDiv').value||0),
-        L: byId('stkAddDate').value,
-        U: byId('stkAddUnit').value
+      const fillMarkets = () => {
+        const sel = byId('stkAddMarket'); if (!sel) return;
+        sel.innerHTML = st.markets.map(m => `<option value="${esc(m)}"${m === st.market ? ' selected' : ''}>${esc(m)}</option>`).join('');
       };
-      if (!item.B || !item.C || !item.D){ alert('請填寫 產品 / 股數 / 買價'); return; }
-      // Optimistic UI: 先在清單前端插入一筆暫時列（等待後端寫入與回填公式）
-      const pending = {
-        ROW: 0, A:false, B:item.B, C:item.C, D:item.D, E:'', F:'', G:'', H:'', I:'', J:'', K:'',
-        L:item.L, M:'', N:'', O:'', P:'', Q:'', R:item.R, S:'', T:item.T, U:item.U, V:''
+      const today = () => new Date().toISOString().slice(0, 10);
+
+      open.onclick = () => {
+        fillMarkets();
+        byId('stkAddName').value = '';
+        byId('stkAddShares').value = '';
+        byId('stkAddBuy').value = '';
+        byId('stkAddDiv').value = '0.0';
+        byId('stkAddDate').value = today();
+        byId('stkAddUnit').value = '零股';
+        dlg.style.display = 'flex';  // 搭配 CSS 置中
       };
-      // 僅當前市場符合時顯示（避免切市場時看到不相關資料）
-      if (!st.market || st.market === item.T){
-        viewRows = [pending, ...viewRows];
+      const closeDlg = () => dlg.style.display = 'none';
+      if (close) close.onclick = closeDlg;
+      if (cancel) cancel.onclick = closeDlg;
+
+      form.onsubmit = (e) => {
+        e.preventDefault();
+        const item = {
+          B: byId('stkAddName').value.trim(),
+          C: Number(byId('stkAddShares').value || 0),
+          D: Number(byId('stkAddBuy').value || 0),
+          T: byId('stkAddMarket').value,
+          R: Number(byId('stkAddDiv').value || 0),
+          L: byId('stkAddDate').value,
+          U: byId('stkAddUnit').value
+        };
+        if (!item.B || !item.C || !item.D) { alert('請填寫 產品 / 股數 / 買價'); return; }
+        // Optimistic UI: 先在清單前端插入一筆暫時列（等待後端寫入與回填公式）
+        const pending = {
+          ROW: 0, A: false, B: item.B, C: item.C, D: item.D, E: '', F: '', G: '', H: '', I: '', J: '', K: '',
+          L: item.L, M: '', N: '', O: '', P: '', Q: '', R: item.R, S: '', T: item.T, U: item.U, V: ''
+        };
+        // 僅當前市場符合時顯示（避免切市場時看到不相關資料）
+        if (!st.market || st.market === item.T) {
+          viewRows = [pending, ...viewRows];
+          renderTable(viewRows);
+        }
+        toggleAddBusy(true);
+        google.script.run
+          .withSuccessHandler(_ => {
+            toggleAddBusy(false);
+            closeDlg();
+            fetchData();
+          })
+          .withFailureHandler(err => {
+            toggleAddBusy(false);
+            alert('新增失敗：' + (err && err.message || ''));
+          })
+          .addSTKItem(item);
+      };
+    }
+    function toggleAddBusy(on) {
+      const ok = byId('stkAddOk');
+      const txt = byId('stkAddOkTxt');
+      const sp = byId('stkAddOkSpin');
+      if (!ok) return;
+      ok.disabled = !!on;
+      if (txt && sp) {
+        txt.style.display = on ? 'none' : 'inline';
+        sp.style.display = on ? 'inline-block' : 'none';
+      }
+    }
+
+
+    // ===== UI helpers =====
+    function setupViewport() {
+      vs.viewport = byId('stkViewport');
+      vs.spacer = byId('stkSpacer');
+      vs.thead = byId('stkHead');
+      vs.tbody = byId('stkBody');
+      if (!vs.viewport) return;
+      let raf = null;
+      vs.viewport.addEventListener('scroll', () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => { raf = null; renderVirtual(); });
+      });
+      // 點整列
+      vs.tbody?.addEventListener('click', (ev) => {
+        const isInteractive = ev.target.closest('.cell-edit, .row-toggle, button, a, input, select, textarea');
+        if (isInteractive) return;
+        const tr = ev.target.closest('tr.stk-row');
+        if (!tr) return;
+        const rowId = Number(tr.dataset.row || 0);
+        if (!rowId) return;
+
+        if (st.expanded.has(rowId)) {
+          st.expanded.delete(rowId);
+        } else {
+          st.expanded.clear();
+          st.expanded.add(rowId);
+        }
         renderTable(viewRows);
-      }
-      toggleAddBusy(true);
-      google.script.run
-        .withSuccessHandler(_=>{
-          toggleAddBusy(false);
-          closeDlg();
-          fetchData();
-        })
-        .withFailureHandler(err=>{
-          toggleAddBusy(false);
-          alert('新增失敗：' + (err && err.message || ''));
-        })
-        .addSTKItem(item);
-    };
-  }
-function toggleAddBusy(on){
-  const ok = byId('stkAddOk');
-  const txt= byId('stkAddOkTxt');
-  const sp = byId('stkAddOkSpin');
-  if (!ok) return;
-  ok.disabled = !!on;
-  if (txt && sp){
-    txt.style.display = on ? 'none' : 'inline';
-    sp.style.display  = on ? 'inline-block' : 'none';
-  }
-}
-
-
-  // ===== UI helpers =====
-  function setupViewport(){
-    vs.viewport = byId('stkViewport');
-    vs.spacer   = byId('stkSpacer');
-    vs.thead    = byId('stkHead');
-    vs.tbody    = byId('stkBody');
-    if (!vs.viewport) return;
-    let raf=null;
-    vs.viewport.addEventListener('scroll', ()=>{
-      if (raf) return;
-      raf = requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
-    });
-    // 點整列
-    vs.tbody?.addEventListener('click', (ev)=>{
-      const isInteractive = ev.target.closest('.cell-edit, .row-toggle, button, a, input, select, textarea');
-      if (isInteractive) return;
-      const tr = ev.target.closest('tr.stk-row');
-      if (!tr) return;
-      const rowId = Number(tr.dataset.row||0);
-      if (!rowId) return;
-
-      if (st.expanded.has(rowId)) {
-        st.expanded.delete(rowId);
-      } else {
-        st.expanded.clear();
-        st.expanded.add(rowId);
-      }
-      renderTable(viewRows);
-    });
-    // Mobile-friendly: pointerup 也可展開/收合（避開按鈕與輸入）
-    vs.tbody?.addEventListener('pointerup', (ev)=>{
-        if (ev.pointerType && ev.pointerType!=='touch' && ev.pointerType!=='pen') return;
+      });
+      // Mobile-friendly: pointerup 也可展開/收合（避開按鈕與輸入）
+      vs.tbody?.addEventListener('pointerup', (ev) => {
+        if (ev.pointerType && ev.pointerType !== 'touch' && ev.pointerType !== 'pen') return;
         const t = ev.target; if (!t) return;
         if (t.closest('button, .icon-btn, .cell-edit, a, input, select, textarea')) return;
         const tr = t.closest('tr.stk-row'); if (!tr) return;
-        const rowId = Number(tr.dataset.row||0); if (!rowId) return;
+        const rowId = Number(tr.dataset.row || 0); if (!rowId) return;
         if (st.expanded.has(rowId)) { st.expanded.delete(rowId); }
         else { st.expanded.clear(); st.expanded.add(rowId); }
         renderTable(viewRows);
-    }, {passive:true});
-    // iOS/部分瀏覽器：用 touchend 再補一次開合（避開互動元件）
-    vs.tbody?.addEventListener('touchend', (ev)=>{
-      const t = ev.target; if (!t) return;
-      if (t.closest('button, .icon-btn, .cell-edit, a, input, select, textarea')) return;
-      const tr = t.closest('tr.stk-row'); if (!tr) return;
-      const rowId = Number(tr.dataset.row||0); if (!rowId) return;
-      if (st.expanded.has(rowId)) { st.expanded.delete(rowId); }
-      else { st.expanded.clear(); st.expanded.add(rowId); }
-      renderTable(viewRows);
-    }, {passive:true});
-  }
-
-  // ===== Generic helpers =====
-  function byId(id){ return document.getElementById(id); }
-  function esc(s){ return String(s??'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[m])); }
-  function toNum(v){
-    if (v == null || v === '') return 0;
-    if (typeof v === 'number') return isFinite(v) ? v : 0;
-    const s = String(v).replace(/[%\uFFE5\u00A5$￥]/g,'').replace(/[\s,]/g,'');
-    const x = parseFloat(s);
-    return isFinite(x) ? x : 0;
-  }
-  function round(n, dec=2){ const f = Math.pow(10, dec); return Math.round(n * f) / f; }
-  function todayISO(){ return new Date().toISOString().slice(0,10); }
-  function normalizePercent(u){
-    // 來源可能是：
-    //  1) 分數：0.014 -> 1.4%
-    //  2) 比率：1.5 -> 150%，5.5 -> 550%
-    //  3) 直接百分數：55 -> 55%，550 -> 550%
-    const n = Number(u||0);
-    if (!isFinite(n)) return null;
-    const a = Math.abs(n);
-    if (a === 0) return 0;
-    if (a <= 1) return n * 100;  // 0.014 -> 1.4
-    if (a < 10) return n * 100;  // 1.5 -> 150, 5.5 -> 550
-    return n;                    // 55/550 -> 當作百分數
-  }
-
-  function fmtMoney(v){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '—'; }
-  function fmtMoneyN(v, n){ return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW',{minimumFractionDigits:n, maximumFractionDigits:n}) : '—'; }
-  function fmtMoney2(v){ return fmtMoneyN(v, 2); }
-  function fmtInt(v){ return isFinite(+v) ? Math.round(+v).toLocaleString('zh-Hant-TW') : '—'; }
-  function isSoldRow(r){
-    const a = r && r.A;
-    if (typeof a === 'boolean') return a;
-    const s = String(a||'').trim().toLowerCase();
-    return (s === 'true' || s === '已賣出');
-  }
-  function fmtDate(v){
-    try{
-      if (v instanceof Date) {
-        return new Date(v.getTime() - v.getTimezoneOffset()*60000).toISOString().slice(0,10);
-      }
-      const s = String(v||'').trim();
-      if (!s) return '';
-      const d = new Date(s);
-      return isNaN(d) ? s : d.toISOString().slice(0,10);
-    }catch(_){ return String(v||''); }
-  }
-  function setNum(id, v, frac=1){
-    const el = byId(id); if (!el) return;
-    const n = Number(v);
-    el.textContent = isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac}) : '—';
-    if (!el.classList.contains('mask-num')) el.classList.add('mask-num');
-    if (!el.dataset.maskStr) el.dataset.maskStr = '＊＊＊';
-  }
-  function roiPillHTML(v){
-    if (v == null || !isFinite(+v)) return '<span class="roi-badge zero">—</span>';
-    const n = Number(v);
-    const cls  = n>0 ? 'pos' : (n<0 ? 'neg' : 'zero');
-    const sign = n>0 ? '+' : (n<0 ? '−' : '');
-    const s = Math.abs(n).toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1});
-    return `<span class="roi-badge ${cls}">${sign}${s}%</span>`;
-  }
-  function setRoiPill(el, v){ if (el) el.innerHTML = roiPillHTML(v); }
-  function setBodyLoading(on){
-    const tb = byId('stkBody'); if (!tb) return;
-    tb.innerHTML = on ? `<tr><td class="empty" colspan="${st.totalCols}">載入中…</td></tr>` : '';
-  }
-  function failUI(msg){
-    const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">發生錯誤：${esc(msg||'')}</td></tr>`;
-  }
-  function toggleBusy(on){
-    const ok = byId('stkEditOk');
-    const txt= byId('stkEditOkTxt');
-    const sp = byId('stkEditOkSpin');
-    if (!ok) return;
-    ok.disabled = !!on;
-    if (txt && sp){
-      txt.style.display = on ? 'none' : 'inline';
-      sp.style.display  = on ? 'inline-block' : 'none';
+      }, { passive: true });
+      // iOS/部分瀏覽器：用 touchend 再補一次開合（避開互動元件）
+      vs.tbody?.addEventListener('touchend', (ev) => {
+        const t = ev.target; if (!t) return;
+        if (t.closest('button, .icon-btn, .cell-edit, a, input, select, textarea')) return;
+        const tr = t.closest('tr.stk-row'); if (!tr) return;
+        const rowId = Number(tr.dataset.row || 0); if (!rowId) return;
+        if (st.expanded.has(rowId)) { st.expanded.delete(rowId); }
+        else { st.expanded.clear(); st.expanded.add(rowId); }
+        renderTable(viewRows);
+      }, { passive: true });
     }
-  }
 
-  // === Market aggregation and renderer ===
-  function computeByMarket(rows){
-    const by = new Map();
-    rows.forEach(r=>{
-      const t = String(r.T||'').trim() || '-';
-      const mv = toNum(r.N);
-      const pl = toNum(r.G);
-      const cost = toNum(r.K);
-      const roiRow = normalizePercent(r.H);     // 跟 KPI 同步：先把 H 正規化成百分比
-      const cur = by.get(t) || { T:t, MV:0, PL:0, Cost:0, w:0, wU:0 };
-      cur.MV += mv; cur.PL += pl; cur.Cost += cost;
-      if (isFinite(roiRow) && mv){ cur.w += mv; cur.wU += (mv * roiRow); }
-      by.set(t, cur);
-    });
-    return Array.from(by.values());
-  }
+    // ===== Generic helpers =====
+    function byId(id) { return document.getElementById(id); }
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
+    function toNum(v) {
+      if (v == null || v === '') return 0;
+      if (typeof v === 'number') return isFinite(v) ? v : 0;
+      const s = String(v).replace(/[%\uFFE5\u00A5$￥]/g, '').replace(/[\s,]/g, '');
+      const x = parseFloat(s);
+      return isFinite(x) ? x : 0;
+    }
+    function round(n, dec = 2) { const f = Math.pow(10, dec); return Math.round(n * f) / f; }
+    function todayISO() { return new Date().toISOString().slice(0, 10); }
+    function normalizePercent(u) {
+      // 來源可能是：
+      //  1) 分數：0.014 -> 1.4%
+      //  2) 比率：1.5 -> 150%，5.5 -> 550%
+      //  3) 直接百分數：55 -> 55%，550 -> 550%
+      const n = Number(u || 0);
+      if (!isFinite(n)) return null;
+      const a = Math.abs(n);
+      if (a === 0) return 0;
+      if (a <= 1) return n * 100;  // 0.014 -> 1.4
+      if (a < 10) return n * 100;  // 1.5 -> 150, 5.5 -> 550
+      return n;                    // 55/550 -> 當作百分數
+    }
 
-  function renderMarketsCard(){
-    const targets = [ document.getElementById('stkMarketsList'), document.getElementById('ctbcMarketsList') ].filter(Boolean);
-    if (!targets.length) return; // 沒有任何容器就跳過
+    function fmtMoney(v) { return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—'; }
+    function fmtMoneyN(v, n) { return isFinite(+v) ? (+v).toLocaleString('zh-Hant-TW', { minimumFractionDigits: n, maximumFractionDigits: n }) : '—'; }
+    function fmtMoney2(v) { return fmtMoneyN(v, 2); }
+    function fmtInt(v) { return isFinite(+v) ? Math.round(+v).toLocaleString('zh-Hant-TW') : '—'; }
+    function isSoldRow(r) {
+      const a = r && r.A;
+      if (typeof a === 'boolean') return a;
+      const s = String(a || '').trim().toLowerCase();
+      return (s === 'true' || s === '已賣出');
+    }
+    function fmtDate(v) {
+      try {
+        if (v instanceof Date) {
+          return new Date(v.getTime() - v.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+        }
+        const s = String(v || '').trim();
+        if (!s) return '';
+        const d = new Date(s);
+        return isNaN(d) ? s : d.toISOString().slice(0, 10);
+      } catch (_) { return String(v || ''); }
+    }
+    function setNum(id, v, frac = 1) {
+      const el = byId(id); if (!el) return;
+      const n = Number(v);
+      el.textContent = isFinite(n) ? n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: frac, maximumFractionDigits: frac }) : '—';
+      if (!el.classList.contains('mask-num')) el.classList.add('mask-num');
+      if (!el.dataset.maskStr) el.dataset.maskStr = '＊＊＊';
+    }
+    function roiPillHTML(v) {
+      if (v == null || !isFinite(+v)) return '<span class="roi-badge zero mask-num" data-mask-str="＊＊＊">—</span>';
+      const n = Number(v);
+      const cls = n > 0 ? 'pos' : (n < 0 ? 'neg' : 'zero');
+      const sign = n > 0 ? '+' : (n < 0 ? '−' : '');
+      const s = Math.abs(n).toLocaleString('zh-Hant-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      return `<span class="roi-badge ${cls} mask-num" data-mask-str="＊＊＊">${sign}${s}%</span>`;
+    }
+    function setRoiPill(el, v) { if (el) el.innerHTML = roiPillHTML(v); }
+    function setBodyLoading(on) {
+      const tb = byId('stkBody'); if (!tb) return;
+      tb.innerHTML = on ? `<tr><td class="empty" colspan="${st.totalCols}">載入中…</td></tr>` : '';
+    }
+    function failUI(msg) {
+      const tb = byId('stkBody'); if (tb) tb.innerHTML = `<tr><td class="empty" colspan="${st.totalCols}">發生錯誤：${esc(msg || '')}</td></tr>`;
+    }
+    function toggleBusy(on) {
+      const ok = byId('stkEditOk');
+      const txt = byId('stkEditOkTxt');
+      const sp = byId('stkEditOkSpin');
+      if (!ok) return;
+      ok.disabled = !!on;
+      if (txt && sp) {
+        txt.style.display = on ? 'none' : 'inline';
+        sp.style.display = on ? 'inline-block' : 'none';
+      }
+    }
 
-    // 與主清單一致的過濾（持有/已賣出）
-    let rows = allRows.slice();
-    rows = st.showOnlyOpen ? rows.filter(r=> !isSoldRow(r)) : rows.filter(r=> isSoldRow(r));
+    // === Market aggregation and renderer ===
+    function computeByMarket(rows) {
+      const by = new Map();
+      rows.forEach(r => {
+        const t = String(r.T || '').trim() || '-';
+        const mv = toNum(r.N);
+        const pl = toNum(r.G);
+        const cost = toNum(r.K);
+        const roiRow = normalizePercent(r.H);     // 跟 KPI 同步：先把 H 正規化成百分比
+        const cur = by.get(t) || { T: t, MV: 0, PL: 0, Cost: 0, w: 0, wU: 0 };
+        cur.MV += mv; cur.PL += pl; cur.Cost += cost;
+        if (isFinite(roiRow) && mv) { cur.w += mv; cur.wU += (mv * roiRow); }
+        by.set(t, cur);
+      });
+      return Array.from(by.values());
+    }
 
-    const items = computeByMarket(rows);
-    const order = { US:0, TW:1, VN:2, CTBC:3 };
-    items.sort((a,b)=> (order[a.T] ?? 9) - (order[b.T] ?? 9));
+    function renderMarketsCard() {
+      const targets = [document.getElementById('stkMarketsList'), document.getElementById('ctbcMarketsList')].filter(Boolean);
+      if (!targets.length) return; // 沒有任何容器就跳過
 
-    // 累計所有市場市值（依當前持有/已賣出篩選），供 dashmain 監聽使用
-    const totalMarketsMV = items.reduce((s,o)=> s + (Number(o.MV)||0), 0);
-    window.__stkMarketsMV__ = totalMarketsMV;
-    try {
-      window.dispatchEvent(new CustomEvent('stk:marketsMV', { detail: { mv: totalMarketsMV } }));
-    } catch(_) {}
+      // 與主清單一致的過濾（持有/已賣出）
+      let rows = allRows.slice();
+      rows = st.showOnlyOpen ? rows.filter(r => !isSoldRow(r)) : rows.filter(r => isSoldRow(r));
 
-    // --- build two flavors: STK (with PL) & Dashboard (w/o PL) ---
-    const htmlForSTK = items.map(o=>{
-      const roiPct = o.w ? (o.wU / o.w) : 0;   // 市值加權 ROI（%）
-      const roiHTML = roiPillHTML(roiPct);
-      const active = (String(st.market||'') === String(o.T));
-      return `<div class="mkt-row${active?' active':''}" data-mkt="${esc(o.T)}">
-        <div class="mkt-name">${esc(o.T||'-')}</div>
-        <div class="mkt-mv">${fmtMoney(o.MV)}</div>
+      const items = computeByMarket(rows);
+      const order = { US: 0, TW: 1, VN: 2, CTBC: 3 };
+      items.sort((a, b) => (order[a.T] ?? 9) - (order[b.T] ?? 9));
+
+      // 累計所有市場市值（依當前持有/已賣出篩選），供 dashmain 監聽使用
+      const totalMarketsMV = items.reduce((s, o) => s + (Number(o.MV) || 0), 0);
+      window.__stkMarketsMV__ = totalMarketsMV;
+      try {
+        window.dispatchEvent(new CustomEvent('stk:marketsMV', { detail: { mv: totalMarketsMV } }));
+      } catch (_) { }
+
+      // --- build two flavors: STK (with PL) & Dashboard (w/o PL) ---
+      const htmlForSTK = items.map(o => {
+        const roiPct = o.w ? (o.wU / o.w) : 0;   // 市值加權 ROI（%）
+        const roiHTML = roiPillHTML(roiPct);
+        const active = (String(st.market || '') === String(o.T));
+        return `<div class="mkt-row${active ? ' active' : ''}" data-mkt="${esc(o.T)}">
+        <div class="mkt-name">${esc(o.T || '-')}</div>
+        <div class="mkt-mv mask-num" data-mask-str="＊＊＊">${fmtMoney(o.MV)}</div>
         <div class="sub">
-          <div class="pl">${fmtMoney(o.PL)}</div>
+          <div class="pl mask-num" data-mask-str="＊＊＊">${fmtMoney(o.PL)}</div>
           <div class="roi">${roiHTML}</div>
         </div>
       </div>`;
-    }).join('');
+      }).join('');
 
-    const htmlForDash = items.map(o=>{
-      const roiPct = o.w ? (o.wU / o.w) : 0;
-      const roiHTML = roiPillHTML(roiPct);
-      return `<div class="kpi-item" data-mkt="${esc(o.T)}">
-        <div class="k">${esc(o.T||'-')}</div>
+      const htmlForDash = items.map(o => {
+        const roiPct = o.w ? (o.wU / o.w) : 0;
+        const roiHTML = roiPillHTML(roiPct);
+        return `<div class="kpi-item" data-mkt="${esc(o.T)}">
+        <div class="k">${esc(o.T || '-')}</div>
         <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-          <span class="money capsule">${fmtMoney(o.MV)}</span>
+          <span class="money capsule mask-num" data-mask-str="＊＊＊">${fmtMoney(o.MV)}</span>
           ${roiHTML}
         </div>
       </div>`;
-    }).join('');
+      }).join('');
 
-    // --- render into each available target ---
-    targets.forEach(box=>{
-      const isDash = (box.id === 'ctbcMarketsList');
-      box.innerHTML = (isDash ? htmlForDash : htmlForSTK) || (isDash ? '' : '<div class="empty">沒有資料</div>');
+      // --- render into each available target ---
+      targets.forEach(box => {
+        const isDash = (box.id === 'ctbcMarketsList');
+        box.innerHTML = (isDash ? htmlForDash : htmlForSTK) || (isDash ? '' : '<div class="empty">沒有資料</div>');
 
-      const rows = isDash ? box.querySelectorAll('.kpi-item[data-mkt]')
-                          : box.querySelectorAll('.mkt-row[data-mkt]');
-      rows.forEach(el=>{
-        el.addEventListener('click', ()=>{
-          const m = el.getAttribute('data-mkt');
-          st.market = m;                 // 切換市場
-          st.expanded.clear();
-          applyFilter();
-          renderKPI(viewRows);
-          renderHead();
-          renderTable(viewRows);
-          // 若從儀表板點擊，嘗試切頁到 STK
-          try{ if (typeof go==='function') go('stk'); }catch(_){/* no-op */}
-          // 重新高亮 STK 端的市場選中狀態
-          if (!isDash){
-            targets.forEach(t=>{
-              if (t.id!== 'ctbcMarketsList'){
-                t.querySelectorAll('[data-mkt]').forEach(row=>{
-                  row.classList.toggle('active', row.getAttribute('data-mkt')===m);
-                });
-              }
-            });
-          }
+        const rows = isDash ? box.querySelectorAll('.kpi-item[data-mkt]')
+          : box.querySelectorAll('.mkt-row[data-mkt]');
+        rows.forEach(el => {
+          el.addEventListener('click', () => {
+            const m = el.getAttribute('data-mkt');
+            st.market = m;                 // 切換市場
+            st.expanded.clear();
+            applyFilter();
+            renderKPI(viewRows);
+            renderHead();
+            renderTable(viewRows);
+            // 若從儀表板點擊，嘗試切頁到 STK
+            try { if (typeof go === 'function') go('stk'); } catch (_) {/* no-op */ }
+            // 重新高亮 STK 端的市場選中狀態
+            if (!isDash) {
+              targets.forEach(t => {
+                if (t.id !== 'ctbcMarketsList') {
+                  t.querySelectorAll('[data-mkt]').forEach(row => {
+                    row.classList.toggle('active', row.getAttribute('data-mkt') === m);
+                  });
+                }
+              });
+            }
+          });
         });
       });
-    });
-  }
+    }
 
-  return { init };
-})();
+    return { init };
+  })();
 
-;(function autoInitSTK(){
-  try{
-    const start = ()=> { if (App && App.modules && App.modules.stk && typeof App.modules.stk.init==='function') App.modules.stk.init(); };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-    else start();
-  }catch(_){}
-})();
+  ; (function autoInitSTK() {
+    try {
+      const start = () => { if (App && App.modules && App.modules.stk && typeof App.modules.stk.init === 'function') App.modules.stk.init(); };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+      else start();
+    } catch (_) { }
+  })();
 </script>
