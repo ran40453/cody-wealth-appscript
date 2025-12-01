@@ -294,7 +294,7 @@
         const uNum = isFinite(+toNum(r.U)) ? normalizeU(r.U) : null;
         const pnlCell = `
       <div class="pnl-cell">
-        <span class="num">${esc(tVal)}</span>
+        <span class="num mask-num" data-mask-str="＊＊＊">${esc(tVal)}</span>
         ${roiChipHTML(uNum)}
       </div>`;
 
@@ -312,7 +312,7 @@
 
         return `<tr data-row="${rowNo}">
       <td class="txt">${esc(r.K || '-')}</td>                         <!-- 項目 K -->
-      <td class="num col-fix-1">${esc(fmtMoney(r.N))}</td>           <!-- 現值 N -->
+      <td class="num col-fix-1 mask-num" data-mask-str="＊＊＊">${esc(fmtMoney(r.N))}</td>           <!-- 現值 N -->
       <td class="num col-fix-2 cell-quote" data-row="${rowNo}">${quoteHtml}</td>   <!-- 目前報價 R(可點) -->
       <td class="txt col-fix-3">${pnlCell}</td>                      <!-- 含息損益/ROI -->
       <td class="num col-fix-4 cell-af" data-row="${rowNo}">${afHtml}</td> <!-- 已領利息 AF(可點) -->
