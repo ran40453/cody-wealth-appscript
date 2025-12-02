@@ -1,823 +1,838 @@
 <script>
-/* =========================================================
-   page_input 專用 JS（表單、虛擬清單、編輯覆寫、狀態篩選、iOS 防放大）
-   ========================================================= */
-window.App = window.App || {};
-App.modules = App.modules || {};
+  /* =========================================================
+     page_input 專用 JS（表單、虛擬清單、編輯覆寫、狀態篩選、iOS 防放大）
+     ========================================================= */
+  window.App = window.App || {};
+  App.modules = App.modules || {};
 
-App.modules.pageInput = (function(){
-  /* ===== 左側虛擬清單狀態 ===== */
-  const vs = {
-    rowH: 44,
-    viewport: null, spacer: null, head: null, body: null,
-    rows: [], view: [], last: [-1, -1],
-    filters: { planned: true, posted: true, using: true },
+  App.modules.pageInput = (function () {
+    /* ===== 左側虛擬清單狀態 ===== */
+    const vs = {
+      rowH: 44,
+      viewport: null, spacer: null, head: null, body: null,
+      rows: [], view: [], last: [-1, -1],
+      filters: { planned: true, posted: true, using: true },
 
-    // 編輯狀態（目前選中的試算表實際列號，以及列資料）
-    selectedRow: null,
-    selectedRec: null,
-    selectedEl:  null
-  };
+      // 編輯狀態（目前選中的試算表實際列號，以及列資料）
+      selectedRow: null,
+      selectedRec: null,
+      selectedEl: null
+    };
 
-  /* ===== 入口 ===== */
-  function init(){
-    // 預填今天日期
-    const d = byId('inDate');
-    if (d){ const today = new Date(); d.value = today.toISOString().slice(0,10); }
+    /* ===== 入口 ===== */
+    function init() {
+      // 預填今天日期
+      const d = byId('inDate');
+      if (d) { const today = new Date(); d.value = today.toISOString().slice(0, 10); }
 
-    bindForm();
-    // 初次同步一次（若有預設選中）
-    (function(){
+      bindForm();
+      // 初次同步一次（若有預設選中）
+      (function () {
+        const typeSel = document.querySelector('input[name="type"]:checked');
+        if (typeSel) { const ev = new Event('change'); typeSel.dispatchEvent(ev); }
+      })();
+      // 篩選器：segmented buttons（.seg-sm）優先；無則回退至舊 checkbox
+      const btnPln = byId('statusPlanned');  // <button id="statusPlanned">
+      const btnPst = byId('statusPosted');   // <button id="statusPosted">
+      const btnUse = byId('statusUsing');    // <button id="statusUsing">
+      if (btnPln && btnPst && btnUse) {
+        function syncStatusButtons() {
+          btnPln.classList.toggle('active', !!vs.filters.planned);
+          btnPln.setAttribute('aria-pressed', vs.filters.planned ? 'true' : 'false');
+
+          btnPst.classList.toggle('active', !!vs.filters.posted);
+          btnPst.setAttribute('aria-pressed', vs.filters.posted ? 'true' : 'false');
+
+          btnUse.classList.toggle('active', !!vs.filters.using);
+          btnUse.setAttribute('aria-pressed', vs.filters.using ? 'true' : 'false');
+        }
+        btnPln.addEventListener('click', () => {
+          vs.filters.planned = !vs.filters.planned;
+          syncStatusButtons();
+          applyStatusFilter();
+        });
+        btnPst.addEventListener('click', () => {
+          vs.filters.posted = !vs.filters.posted;
+          syncStatusButtons();
+          applyStatusFilter();
+        });
+        btnUse.addEventListener('click', () => {
+          vs.filters.using = !vs.filters.using;
+          syncStatusButtons();
+          applyStatusFilter();
+        });
+        // 初始狀態：三者皆開
+        vs.filters.planned = true;
+        vs.filters.posted = true;
+        vs.filters.using = true;
+        syncStatusButtons();
+      } else {
+        // Fallback：舊 checkbox
+        const cPln = byId('statusFilterPlanned');
+        const cPst = byId('statusFilterPosted');
+        if (cPln) cPln.addEventListener('change', () => { vs.filters.planned = !!cPln.checked; applyStatusFilter(); });
+        if (cPst) cPst.addEventListener('change', () => { vs.filters.posted = !!cPst.checked; applyStatusFilter(); });
+        // 初始：如果 checkbox 存在且已勾選，沿用；否則預設皆開
+        if (cPln || cPst) {
+          vs.filters.planned = cPln ? !!cPln.checked : true;
+          vs.filters.posted = cPst ? !!cPst.checked : true;
+        }
+      }
+
+      // 虛擬清單視口
+      setupViewport();
+
+      // 取帳戶/交易資料
+      if (google?.script?.run) {
+        google.script.run.withSuccessHandler(meta => fillAccounts(meta?.accounts || [])).getMeta();
+        loadTx(); // 預設全帳戶
+      }
+    }
+
+    /* ===== 表單 ===== */
+    function bindForm() {
+      // in/out segment（radio）— 規則：out=收入=負號；in=支出=正號
+      const amt = byId('inAmount');
+      const typeIn = document.getElementById('typeIn');   // value="in"
+      const typeOut = document.getElementById('typeOut');  // value="out"
+      function applySignByType() {
+        if (!amt) return;
+        const raw = String(amt.value || '').trim();
+        if (raw === '') return; // 空值不動
+        const n = Number(raw.replace(/,/g, ''));
+        if (!isFinite(n)) return;
+        const abs = Math.abs(n);
+        const sel = document.querySelector('input[name="type"]:checked');
+        const v = sel ? String(sel.value).toLowerCase() : 'in'; // 預設 in（支出）
+        const isOut = (v === 'out'); // out=收入=負
+        amt.value = String(isOut ? -abs : abs);
+      }
+      typeIn?.addEventListener('change', applySignByType);
+      typeOut?.addEventListener('change', applySignByType);
+      // 使用者輸入金額時也即時依 radio 套用正負
+      amt?.addEventListener('input', applySignByType);
+
+      // ★ 日期變更時，若狀態為 planned/posted，則重置為 auto，讓後端依新日期重算
+      const dateEl = byId('inDate');
+      if (dateEl) {
+        dateEl.addEventListener('change', () => {
+          const stEl = byId('inStatus');
+          if (stEl) {
+            const val = String(stEl.value || '').toLowerCase();
+            // 若是 using 則保留，否則重置為 auto
+            if (val !== 'using') {
+              stEl.value = 'auto';
+            }
+          }
+        });
+      }
+
+      // 送出（新增一筆）
+      byId('btnSubmit')?.addEventListener('click', () => {
+        const rec = collect();
+        if (!rec.account || rec.amount === '' || isNaN(rec.amount)) {
+          alert('請確認「金額」與「帳戶」。'); return;
+        }
+        google.script.run
+          .withSuccessHandler(() => {
+            clearFormAndSelection(false);
+            App?.modules?.pageInput?.reloadList?.();  // 直接重抓目前帳戶清單
+            updateBalanceCard();
+            window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
+          })
+          .withFailureHandler(err => {
+            console.error('submitCashflow failed:', err);
+            alert('送出失敗：' + (err?.message || err));
+          })
+          .submitCashflow(rec);   // ★ 這行一定要有！
+      });
+
+      // 由「清空」改為「移除選擇列」
+      byId('btnClear')?.addEventListener('click', () => {
+        if (!vs.selectedRow) {
+          alert('請先在左側清單點選要移除的一列');
+          return;
+        }
+        const row = Number(vs.selectedRow);
+        const ok = confirm('確定要刪除此筆紀錄嗎？此動作無法復原。');
+        if (!ok) return;
+        if (!google?.script?.run) {
+          alert('移除失敗：未連線到 Apps Script');
+          return;
+        }
+        google.script.run
+          .withSuccessHandler(() => {
+            clearFormAndSelection(false);
+            App?.modules?.pageInput?.reloadList?.();
+            updateBalanceCard();
+          })
+          .withFailureHandler(err => {
+            console.error('deleteTransaction failed:', err);
+            alert('移除失敗：' + (err?.message || err));
+          })
+          .deleteTransaction(row);
+      });
+
+      // 更新（覆寫所選列，不新增）
+      byId('btnUpdateTx')?.addEventListener('click', () => {
+        if (!vs.selectedRow) {
+          alert('請先在左側清單點選要編輯的一列'); return;
+        }
+        const rec = collect();
+        if (!rec.account || rec.amount === '' || isNaN(rec.amount)) {
+          alert('請確認「金額」與「帳戶」。'); return;
+        }
+        google.script.run
+          .withSuccessHandler(() => {
+            clearFormAndSelection(false);
+            App?.modules?.pageInput?.reloadList?.();
+            updateBalanceCard();
+            window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
+          })
+          .withFailureHandler(err => {
+            console.error('updateTransaction failed:', err);
+            alert('更新失敗：' + (err?.message || err));
+          })
+          .updateTransaction(vs.selectedRow, rec);
+      });
+
+      // 左側帳戶篩選（虛擬清單）
+      byId('txAccountPick')?.addEventListener('change', () => loadTx(byId('txAccountPick').value || ''));
+
+      // Using 狀態切換按鈕：控制 inStatus 為 'using' 或恢復自動
+      const btnUsing = byId('btnToggleUsing');
+      const selStatus = byId('inStatus');
+      if (btnUsing && selStatus) {
+        let usingOn = String(selStatus.value || '').toLowerCase() === 'using';
+
+        const syncUsingButton = () => {
+          btnUsing.classList.toggle('active', usingOn);
+          btnUsing.setAttribute('aria-pressed', usingOn ? 'true' : 'false');
+        };
+        syncUsingButton();
+
+        btnUsing.addEventListener('click', () => {
+          usingOn = !usingOn;
+          selStatus.value = usingOn ? 'using' : 'auto';
+          syncUsingButton();
+        });
+      }
+
+      updateBalanceCard();
+    }
+
+    function collect() {
+      const date = byId('inDate')?.value || '';
+      const item = byId('inItem')?.value || '';
+      const amountV = byId('inAmount')?.value || '';
+      const account = byId('inAccount')?.value || '';
+      const status = byId('inStatus')?.value || 'auto';
+      const note = byId('inNote')?.value || '';
       const typeSel = document.querySelector('input[name="type"]:checked');
-      if (typeSel){ const ev = new Event('change'); typeSel.dispatchEvent(ev); }
-    })();
-    // 篩選器：segmented buttons（.seg-sm）優先；無則回退至舊 checkbox
-    const btnPln = byId('statusPlanned');  // <button id="statusPlanned">
-    const btnPst = byId('statusPosted');   // <button id="statusPosted">
-    const btnUse = byId('statusUsing');    // <button id="statusUsing">
-    if (btnPln && btnPst && btnUse){
-      function syncStatusButtons(){
-        btnPln.classList.toggle('active', !!vs.filters.planned);
-        btnPln.setAttribute('aria-pressed', vs.filters.planned ? 'true' : 'false');
+      const type = (typeSel ? String(typeSel.value) : 'in').toLowerCase(); // 預設 in（支出=正）
 
-        btnPst.classList.toggle('active', !!vs.filters.posted);
-        btnPst.setAttribute('aria-pressed', vs.filters.posted ? 'true' : 'false');
+      if (amountV === '') return { date, item, amount: '', account, status, note, type };
+      const nRaw = Number(String(amountV).replace(/,/g, ''));
+      const abs = Math.abs(isFinite(nRaw) ? nRaw : 0);
+      const amount = (type === 'out') ? -abs : abs; // out=收入=負；in=支出=正
 
-        btnUse.classList.toggle('active', !!vs.filters.using);
-        btnUse.setAttribute('aria-pressed', vs.filters.using ? 'true' : 'false');
+      return { date, item, amount, account, status, note, type };
+    }
+
+    function clearForm() {
+      ['inItem', 'inAmount', 'inAccount', 'inNote'].forEach(id => {
+        const el = byId(id);
+        if (!el) return;
+        if (el.tagName === 'SELECT') el.value = '';
+        else el.value = '';
+      });
+    }
+
+    function clearFormAndSelection(keepForm = false) {
+      // 清表單
+      if (!keepForm) clearForm();
+
+      // 取消列選取
+      if (vs.selectedEl) vs.selectedEl.classList.remove('selected');
+      vs.selectedEl = null;
+      vs.selectedRow = null;
+      vs.selectedRec = null;
+
+      // 鎖回更新鈕
+      const btnUpd = byId('btnUpdateTx');
+      if (btnUpd) btnUpd.disabled = true;
+    }
+
+    function fillAccounts(list) {
+      const selA = byId('inAccount');
+      const selT = byId('txAccountPick');
+      if (selA) {
+        const v = selA.value;
+        selA.innerHTML = `<option value="">請選擇帳戶</option>` + list.map(a => `<option>${esc(a)}</option>`).join('');
+        selA.value = v || '';
       }
-      btnPln.addEventListener('click', ()=>{
-        vs.filters.planned = !vs.filters.planned;
-        syncStatusButtons();
-        applyStatusFilter();
-      });
-      btnPst.addEventListener('click', ()=>{
-        vs.filters.posted = !vs.filters.posted;
-        syncStatusButtons();
-        applyStatusFilter();
-      });
-      btnUse.addEventListener('click', ()=>{
-        vs.filters.using = !vs.filters.using;
-        syncStatusButtons();
-        applyStatusFilter();
-      });
-      // 初始狀態：三者皆開
-      vs.filters.planned = true;
-      vs.filters.posted  = true;
-      vs.filters.using   = true;
-      syncStatusButtons();
-    } else {
-      // Fallback：舊 checkbox
-      const cPln = byId('statusFilterPlanned');
-      const cPst = byId('statusFilterPosted');
-      if (cPln) cPln.addEventListener('change', ()=>{ vs.filters.planned = !!cPln.checked; applyStatusFilter(); });
-      if (cPst) cPst.addEventListener('change', ()=>{ vs.filters.posted  = !!cPst.checked; applyStatusFilter(); });
-      // 初始：如果 checkbox 存在且已勾選，沿用；否則預設皆開
-      if (cPln || cPst){
-        vs.filters.planned = cPln ? !!cPln.checked : true;
-        vs.filters.posted  = cPst ? !!cPst.checked : true;
+      if (selT) {
+        const v = selT.value;
+        selT.innerHTML = `<option value="">請選擇帳號（顯示全部）</option>` + list.map(a => `<option>${esc(a)}</option>`).join('');
+        selT.value = v || '';
       }
     }
 
-    // 虛擬清單視口
-    setupViewport();
+    /* ===== 左側清單：虛擬捲動 ===== */
+    function setupViewport() {
+      // 允許用 id 或 class，避免 HTML 改掉 id 就炸
+      vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
+      vs.spacer = document.getElementById('txSpacer') || document.querySelector('#page-input #txSpacer');
+      // tbody 沒 id 時，退而求其次抓 tx-table 的 tbody
+      vs.body = document.getElementById('txBody') || document.querySelector('#page-input .tx-table tbody');
+      vs.head = document.getElementById('txHead') || document.querySelector('#page-input .tx-table thead');
 
-    // 取帳戶/交易資料
-    if (google?.script?.run){
-      google.script.run.withSuccessHandler(meta=>fillAccounts(meta?.accounts||[])).getMeta();
-      loadTx(); // 預設全帳戶
+      // 若沒有 spacer，就動態補一個，避免 virtual 計算高度失效
+      if (vs.viewport && !vs.spacer) {
+        vs.spacer = document.createElement('div');
+        vs.spacer.id = 'txSpacer';
+        vs.viewport.appendChild(vs.spacer);
+      }
+
+      if (!vs.viewport) {
+        // 沒 viewport 也不要報錯，等之後再 render（但資料仍可先抓）
+        return;
+      }
+
+      let raf = null;
+      vs.viewport.addEventListener('scroll', () => {
+        if (raf) return;
+        raf = requestAnimationFrame(() => { raf = null; renderVirtual(); });
+      });
+      // --- 一次性委派：點 tr 進入編輯模式 ---
+      if (vs.body && !vs._boundRowClick) {
+        vs.body.addEventListener('click', (e) => {
+          const tr = e.target.closest('tr[data-row]');
+          if (!tr) return;
+
+          const row = Number(tr.dataset.row);
+          // 用 _row 找回原始資料（不要用 index，因為 virtual 有切片）
+          const rec = (vs.rows || []).find(r => Number(r._row) === row);
+          if (!rec) return;
+
+          // 先移除舊選取
+          if (vs.selectedEl && vs.selectedEl !== tr) vs.selectedEl.classList.remove('selected');
+
+          // 標記新選取
+          vs.selectedEl = tr;
+          vs.selectedRow = row;
+          vs.selectedRec = rec;
+          tr.classList.add('selected');
+
+          // 帶入表單並開啟「更新」按鈕
+          fillFormByRec(rec);
+          const btnUpd = document.getElementById('btnUpdateTx');
+          if (btnUpd) btnUpd.disabled = false;
+        });
+        vs._boundRowClick = true;
+      }
     }
-  }
 
-  /* ===== 表單 ===== */
-  function bindForm(){
-  // in/out segment（radio）— 規則：out=收入=負號；in=支出=正號
-  const amt = byId('inAmount');
-  const typeIn  = document.getElementById('typeIn');   // value="in"
-  const typeOut = document.getElementById('typeOut');  // value="out"
-  function applySignByType(){
-    if (!amt) return;
-    const raw = String(amt.value||'').trim();
-    if (raw === '') return; // 空值不動
-    const n = Number(raw.replace(/,/g,''));
-    if (!isFinite(n)) return;
-    const abs = Math.abs(n);
-    const sel = document.querySelector('input[name="type"]:checked');
-    const v   = sel ? String(sel.value).toLowerCase() : 'in'; // 預設 in（支出）
-    const isOut = (v === 'out'); // out=收入=負
-    amt.value = String(isOut ? -abs : abs);
-  }
-  typeIn?.addEventListener('change', applySignByType);
-  typeOut?.addEventListener('change', applySignByType);
-  // 使用者輸入金額時也即時依 radio 套用正負
-  amt?.addEventListener('input', applySignByType);
-
-  // 送出（新增一筆）
-  byId('btnSubmit')?.addEventListener('click', ()=>{
-    const rec = collect();
-    if (!rec.account || rec.amount === '' || isNaN(rec.amount)){
-      alert('請確認「金額」與「帳戶」。'); return;
+    function loadTx(account) {
+      if (!google?.script?.run) return;  // 只檢查 GAS 是否可用；不要因為沒有 viewport 就不抓
+      const filter = account ? { account } : {};
+      google.script.run
+        .withSuccessHandler(rows => {
+          // rows: [{date,item,amount,account,status,note,_row?}]
+          vs.rows = Array.isArray(rows) ? rows : [];
+          applyStatusFilter();            // 依狀態過濾 + 嘗試重畫（如果 DOM 已就緒）
+          updateBalanceCard();            // 左側餘額卡不依賴 viewport，直接更新
+        })
+        .getTransactions(filter);
     }
-    google.script.run
-      .withSuccessHandler(()=>{
-        clearFormAndSelection(false);
-        App?.modules?.pageInput?.reloadList?.();  // 直接重抓目前帳戶清單
-        updateBalanceCard();
-        window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
-      })
-      .withFailureHandler(err=>{
-        console.error('submitCashflow failed:', err);
-        alert('送出失敗：' + (err?.message || err));
-      })
-      .submitCashflow(rec);   // ★ 這行一定要有！
-  });
 
-  // 由「清空」改為「移除選擇列」
-  byId('btnClear')?.addEventListener('click', ()=>{
-    if (!vs.selectedRow){
-      alert('請先在左側清單點選要移除的一列');
-      return;
-    }
-    const row = Number(vs.selectedRow);
-    const ok = confirm('確定要刪除此筆紀錄嗎？此動作無法復原。');
-    if (!ok) return;
-    if (!google?.script?.run){
-      alert('移除失敗：未連線到 Apps Script');
-      return;
-    }
-    google.script.run
-      .withSuccessHandler(()=>{
-        clearFormAndSelection(false);
-        App?.modules?.pageInput?.reloadList?.();
-        updateBalanceCard();
-      })
-      .withFailureHandler(err=>{
-        console.error('deleteTransaction failed:', err);
-        alert('移除失敗：' + (err?.message || err));
-      })
-      .deleteTransaction(row);
-  });
-
-  // 更新（覆寫所選列，不新增）
-  byId('btnUpdateTx')?.addEventListener('click', ()=>{
-    if (!vs.selectedRow){
-      alert('請先在左側清單點選要編輯的一列'); return;
-    }
-    const rec = collect();
-    if (!rec.account || rec.amount === '' || isNaN(rec.amount)){
-      alert('請確認「金額」與「帳戶」。'); return;
-    }
-    google.script.run
-      .withSuccessHandler(()=>{
-        clearFormAndSelection(false);
-        App?.modules?.pageInput?.reloadList?.();
-        updateBalanceCard();
-        window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
-      })
-      .withFailureHandler(err=>{
-        console.error('updateTransaction failed:', err);
-        alert('更新失敗：' + (err?.message || err));
-      })
-      .updateTransaction(vs.selectedRow, rec);
-  });
-
-  // 左側帳戶篩選（虛擬清單）
-  byId('txAccountPick')?.addEventListener('change', ()=> loadTx(byId('txAccountPick').value || ''));
-
-  // Using 狀態切換按鈕：控制 inStatus 為 'using' 或恢復自動
-  const btnUsing  = byId('btnToggleUsing');
-  const selStatus = byId('inStatus');
-  if (btnUsing && selStatus) {
-    let usingOn = String(selStatus.value || '').toLowerCase() === 'using';
-
-    const syncUsingButton = () => {
-      btnUsing.classList.toggle('active', usingOn);
-      btnUsing.setAttribute('aria-pressed', usingOn ? 'true' : 'false');
-    };
-    syncUsingButton();
-
-    btnUsing.addEventListener('click', () => {
-      usingOn = !usingOn;
-      selStatus.value = usingOn ? 'using' : 'auto';
-      syncUsingButton();
-    });
-  }
-
-  updateBalanceCard();
-  }
-
-  function collect(){
-    const date    = byId('inDate')?.value || '';
-    const item    = byId('inItem')?.value || '';
-    const amountV = byId('inAmount')?.value || '';
-    const account = byId('inAccount')?.value || '';
-    const status  = byId('inStatus')?.value || 'auto';
-    const note    = byId('inNote')?.value || '';
-    const typeSel = document.querySelector('input[name="type"]:checked');
-    const type    = (typeSel ? String(typeSel.value) : 'in').toLowerCase(); // 預設 in（支出=正）
-
-    if (amountV === '') return { date, item, amount:'', account, status, note, type };
-    const nRaw = Number(String(amountV).replace(/,/g,''));
-    const abs  = Math.abs(isFinite(nRaw) ? nRaw : 0);
-    const amount = (type === 'out') ? -abs : abs; // out=收入=負；in=支出=正
-
-    return { date, item, amount, account, status, note, type };
-  }
-
-  function clearForm(){
-    ['inItem','inAmount','inAccount','inNote'].forEach(id=>{
-      const el = byId(id);
-      if (!el) return;
-      if (el.tagName === 'SELECT') el.value = '';
-      else el.value = '';
-    });
-  }
-
-  function clearFormAndSelection(keepForm=false){
-    // 清表單
-    if (!keepForm) clearForm();
-
-    // 取消列選取
-    if (vs.selectedEl) vs.selectedEl.classList.remove('selected');
-    vs.selectedEl  = null;
-    vs.selectedRow = null;
-    vs.selectedRec = null;
-
-    // 鎖回更新鈕
-    const btnUpd = byId('btnUpdateTx');
-    if (btnUpd) btnUpd.disabled = true;
-  }
-
-  function fillAccounts(list){
-    const selA = byId('inAccount');
-    const selT = byId('txAccountPick');
-    if (selA){
-      const v = selA.value;
-      selA.innerHTML = `<option value="">請選擇帳戶</option>` + list.map(a=>`<option>${esc(a)}</option>`).join('');
-      selA.value = v || '';
-    }
-    if (selT){
-      const v = selT.value;
-      selT.innerHTML = `<option value="">請選擇帳號（顯示全部）</option>` + list.map(a=>`<option>${esc(a)}</option>`).join('');
-      selT.value = v || '';
-    }
-  }
-
-  /* ===== 左側清單：虛擬捲動 ===== */
-  function setupViewport(){
-  // 允許用 id 或 class，避免 HTML 改掉 id 就炸
-  vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
-  vs.spacer   = document.getElementById('txSpacer')   || document.querySelector('#page-input #txSpacer');
-  // tbody 沒 id 時，退而求其次抓 tx-table 的 tbody
-  vs.body     = document.getElementById('txBody')     || document.querySelector('#page-input .tx-table tbody');
-  vs.head     = document.getElementById('txHead')     || document.querySelector('#page-input .tx-table thead');
-
-  // 若沒有 spacer，就動態補一個，避免 virtual 計算高度失效
-  if (vs.viewport && !vs.spacer) {
-    vs.spacer = document.createElement('div');
-    vs.spacer.id = 'txSpacer';
-    vs.viewport.appendChild(vs.spacer);
-  }
-
-  if (!vs.viewport) {
-    // 沒 viewport 也不要報錯，等之後再 render（但資料仍可先抓）
-    return;
-  }
-
-  let raf = null;
-  vs.viewport.addEventListener('scroll', ()=>{
-    if (raf) return;
-    raf = requestAnimationFrame(()=>{ raf=null; renderVirtual(); });
-  });
-  // --- 一次性委派：點 tr 進入編輯模式 ---
-  if (vs.body && !vs._boundRowClick) {
-    vs.body.addEventListener('click', (e)=>{
-      const tr = e.target.closest('tr[data-row]');
-      if (!tr) return;
-
-      const row = Number(tr.dataset.row);
-      // 用 _row 找回原始資料（不要用 index，因為 virtual 有切片）
-      const rec = (vs.rows || []).find(r => Number(r._row) === row);
+    function fillFormByRec(rec) {
       if (!rec) return;
-
-      // 先移除舊選取
-      if (vs.selectedEl && vs.selectedEl !== tr) vs.selectedEl.classList.remove('selected');
-
-      // 標記新選取
-      vs.selectedEl  = tr;
-      vs.selectedRow = row;
-      vs.selectedRec = rec;
-      tr.classList.add('selected');
-
-      // 帶入表單並開啟「更新」按鈕
-      fillFormByRec(rec);
-      const btnUpd = document.getElementById('btnUpdateTx');
-      if (btnUpd) btnUpd.disabled = false;
-    });
-    vs._boundRowClick = true;
-  }
-  }
-
-function loadTx(account){
-  if (!google?.script?.run) return;  // 只檢查 GAS 是否可用；不要因為沒有 viewport 就不抓
-  const filter = account ? {account} : {};
-  google.script.run
-    .withSuccessHandler(rows=>{
-      // rows: [{date,item,amount,account,status,note,_row?}]
-      vs.rows = Array.isArray(rows) ? rows : [];
-      applyStatusFilter();            // 依狀態過濾 + 嘗試重畫（如果 DOM 已就緒）
-      updateBalanceCard();            // 左側餘額卡不依賴 viewport，直接更新
-    })
-    .getTransactions(filter);
-}
-
-  function fillFormByRec(rec){
-    if (!rec) return;
-    // 你的表單欄位 id 對應
-    const map = {
-      date:    'inDate',
-      item:    'inItem',
-      amount:  'inAmount',
-      account: 'inAccount',
-      status:  'inStatus',
-      note:    'inNote'
-    };
-    Object.entries(map).forEach(([k, id])=>{
-      const el = byId(id);
-      if (!el) return;
-      el.value = rec[k] ?? '';
-    });
-    // 同步 Using 切換鈕狀態
-    const btnUsing = byId('btnToggleUsing');
-    const selStatus = byId('inStatus');
-    if (btnUsing && selStatus) {
-      const s = String(rec.status || '').toLowerCase();
-      const usingOn = (s === 'using');
-      btnUsing.classList.toggle('active', usingOn);
-      btnUsing.setAttribute('aria-pressed', usingOn ? 'true' : 'false');
+      // 你的表單欄位 id 對應
+      const map = {
+        date: 'inDate',
+        item: 'inItem',
+        amount: 'inAmount',
+        account: 'inAccount',
+        status: 'inStatus',
+        note: 'inNote'
+      };
+      Object.entries(map).forEach(([k, id]) => {
+        const el = byId(id);
+        if (!el) return;
+        el.value = rec[k] ?? '';
+      });
+      // 同步 Using 切換鈕狀態
+      const btnUsing = byId('btnToggleUsing');
+      const selStatus = byId('inStatus');
+      if (btnUsing && selStatus) {
+        const s = String(rec.status || '').toLowerCase();
+        const usingOn = (s === 'using');
+        btnUsing.classList.toggle('active', usingOn);
+        btnUsing.setAttribute('aria-pressed', usingOn ? 'true' : 'false');
+      }
+      // 依金額正負決定 in/out，並把金額欄顯示絕對值
+      try {
+        const n = Number(rec.amount);
+        const isOut = isFinite(n) && n < 0; // out=收入=負
+        const rOut = document.getElementById('typeOut'); // value="out"
+        const rIn = document.getElementById('typeIn');  // value="in"
+        if (rOut && rIn) {
+          rOut.checked = isOut;
+          rIn.checked = !isOut;
+        }
+        const amtEl = byId('inAmount');
+        if (amtEl) { amtEl.value = String(Math.abs(isFinite(n) ? n : 0)); }
+      } catch (e) { }
     }
-    // 依金額正負決定 in/out，並把金額欄顯示絕對值
-    try{
-      const n = Number(rec.amount);
-      const isOut = isFinite(n) && n < 0; // out=收入=負
-      const rOut = document.getElementById('typeOut'); // value="out"
-      const rIn  = document.getElementById('typeIn');  // value="in"
-      if (rOut && rIn){
-        rOut.checked = isOut;
-        rIn.checked  = !isOut;
-      }
-      const amtEl = byId('inAmount');
-      if (amtEl){ amtEl.value = String(Math.abs(isFinite(n)?n:0)); }
-    }catch(e){}
-  }
 
-  function applyStatusFilter(){
-    const f = vs.filters;
-    let arr = (vs.rows||[]).filter(r=>{
-      const s = String(r.status||'').toLowerCase();
-      if (s === 'using') {
-        return !!f.using;
-      }
-      if (s === 'planned') {
-        return !!f.planned;
-      }
-      if (s === 'posted') {
-        return !!f.posted;
-      }
-      // 其他狀態預設顯示
-      return true;
-    });
+    function applyStatusFilter() {
+      const f = vs.filters;
+      let arr = (vs.rows || []).filter(r => {
+        const s = String(r.status || '').toLowerCase();
+        if (s === 'using') {
+          return !!f.using;
+        }
+        if (s === 'planned') {
+          return !!f.planned;
+        }
+        if (s === 'posted') {
+          return !!f.posted;
+        }
+        // 其他狀態預設顯示
+        return true;
+      });
 
-    // 依狀態排序：using (0) > planned (1) > posted (2)，同狀態再依日期新到舊
-    arr.sort((a,b)=>{
-      const sa = String(a.status||'').toLowerCase();
-      const sb = String(b.status||'').toLowerCase();
-      const wa = (sa === 'using') ? 0 : (sa === 'planned') ? 1 : 2;
-      const wb = (sb === 'using') ? 0 : (sb === 'planned') ? 1 : 2;
-      if (wa !== wb) return wa - wb;
-      const da = Date.parse(a.date || '') || 0;
-      const db = Date.parse(b.date || '') || 0;
-      return db - da; // 新的在上
-    });
+      // 依狀態排序：using (0) > planned (1) > posted (2)，同狀態再依日期新到舊
+      arr.sort((a, b) => {
+        const sa = String(a.status || '').toLowerCase();
+        const sb = String(b.status || '').toLowerCase();
+        const wa = (sa === 'using') ? 0 : (sa === 'planned') ? 1 : 2;
+        const wb = (sb === 'using') ? 0 : (sb === 'planned') ? 1 : 2;
+        if (wa !== wb) return wa - wb;
+        const da = Date.parse(a.date || '') || 0;
+        const db = Date.parse(b.date || '') || 0;
+        return db - da; // 新的在上
+      });
 
-    vs.view = arr;
-    if (vs.spacer) vs.spacer.style.height = (vs.view.length * vs.rowH) + 'px';
-    vs.last = [-1,-1];
-    renderVirtual();
-  }
+      vs.view = arr;
+      if (vs.spacer) vs.spacer.style.height = (vs.view.length * vs.rowH) + 'px';
+      vs.last = [-1, -1];
+      renderVirtual();
+    }
 
-  function renderVirtual(){
-    if (!vs.viewport) vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
-    if (!vs.body)     vs.body     = document.getElementById('txBody')     || document.querySelector('#page-input .tx-table tbody');
-    if (!vs.viewport || !vs.body) return;
-    const top = vs.viewport.scrollTop;
-    const h   = vs.viewport.clientHeight;
-    const start = Math.max(0, Math.floor(top / vs.rowH) - 10);
-    const need  = Math.ceil(h / vs.rowH) + 20;
-    const end   = Math.min(vs.view.length, start + need);
-    if (vs.last[0]===start && vs.last[1]===end) return;
-    vs.last = [start, end];
+    function renderVirtual() {
+      if (!vs.viewport) vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
+      if (!vs.body) vs.body = document.getElementById('txBody') || document.querySelector('#page-input .tx-table tbody');
+      if (!vs.viewport || !vs.body) return;
+      const top = vs.viewport.scrollTop;
+      const h = vs.viewport.clientHeight;
+      const start = Math.max(0, Math.floor(top / vs.rowH) - 10);
+      const need = Math.ceil(h / vs.rowH) + 20;
+      const end = Math.min(vs.view.length, start + need);
+      if (vs.last[0] === start && vs.last[1] === end) return;
+      vs.last = [start, end];
 
-    const slice = vs.view.slice(start, end);
-    vs.body.style.transform = `translateY(${start * vs.rowH}px)`;
-    vs.body.innerHTML = slice.map(r=>{
-      const status = String(r.status||'').toLowerCase();
-      const isPln   = (status === 'planned');
-      const isUsing = (status === 'using');
-      const rowCls =
-        isUsing ? 'row-using' :
-        isPln   ? 'row-planned' : 'row-posted';
-      const statusCls =
-        isUsing ? 'using' :
-        isPln   ? 'planned' : 'posted';
-      const sel   = (Number(r._row||0) === Number(vs.selectedRow)) ? ' selected' : '';
-      return `
+      const slice = vs.view.slice(start, end);
+      vs.body.style.transform = `translateY(${start * vs.rowH}px)`;
+      vs.body.innerHTML = slice.map(r => {
+        const status = String(r.status || '').toLowerCase();
+        const isPln = (status === 'planned');
+        const isUsing = (status === 'using');
+        const rowCls =
+          isUsing ? 'row-using' :
+            isPln ? 'row-planned' : 'row-posted';
+        const statusCls =
+          isUsing ? 'using' :
+            isPln ? 'planned' : 'posted';
+        const sel = (Number(r._row || 0) === Number(vs.selectedRow)) ? ' selected' : '';
+        return `
       <tr class="${rowCls}${sel}" data-row="${esc(r._row)}">
-        <td class="txt">${esc(r.date||'')}</td>
-        <td class="txt"><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account||'').toLowerCase())}">${esc(r.account||'')}</span></td>
-        <td class="txt">${esc(r.item||'')}</td>
+        <td class="txt">${esc(r.date || '')}</td>
+        <td class="txt"><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account || '').toLowerCase())}">${esc(r.account || '')}</span></td>
+        <td class="txt">${esc(r.item || '')}</td>
         <td class="num"><span class="mask-num" data-mask-str="＊＊＊">${fmtMoney(r.amount)}</span></td>
         <td class="txt"><span class="tx-chip tx-chip--status ${statusCls}">${esc(status)}</span></td>
       </tr>`;
-    }).join('');
+      }).join('');
 
-    if (!slice.length){
-      vs.body.style.transform = 'translateY(0px)';
-      vs.body.innerHTML = `<tr><td class="empty" colspan="5">沒有資料</td></tr>`;
-    }
-  }
-
-  /* ===== utils ===== */
-  function byId(id){ return document.getElementById(id); }
-  function esc(s){ const map={ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":"&#39;" }; return String(s??'').replace(/[&<>"']/g, m=>map[m]); }
-  function fmtMoney(v){
-    const n = Number(v); if (!isFinite(n)) return '—';
-    return n.toLocaleString('zh-Hant-TW',{ minimumFractionDigits:0, maximumFractionDigits:0 });
-  }
-
-  return {
-    init,
-    __getRows: () => vs.rows,
-    reloadList: () => loadTx(document.getElementById('txAccountPick')?.value || '')
-  };
-})();
-
-/* ===== 帳戶餘額：計算工具（沿用你原本的） ===== */
-function input_computePostedBalancesByAccount(rows){
-  const posted = (rows||[]).filter(r => String(r.status||'').toLowerCase()==='posted');
-  const byAcct = new Map();
-  posted.forEach(r=>{
-    const acct = String(r.account||'').trim();
-    if(!acct) return;
-    (byAcct.get(acct) || byAcct.set(acct, []).get(acct)).push(r);
-  });
-  const out = [];
-  for(const [acct, list] of byAcct.entries()){
-    const currentRows = list.filter(r=>/\bcurrent\b/i.test(String(r.item||'')));
-    
-    let base = 0;
-    let snapTs = -1;
-
-    if(currentRows.length) {
-      const latest = currentRows
-        .map(r=>({...r,_ts:Date.parse(r.date||'')||0}))
-        .sort((a,b)=>b._ts-a._ts)[0];
-      base = Number(latest.amount)||0;
-      snapTs = latest._ts;
-    }
-
-    const others = list.filter(r=>!/\bcurrent\b/i.test(String(r.item||'')));
-    
-    // 修正：只扣除「日期 > Snapshot」的交易
-    // 若無 Snapshot (snapTs=-1)，則全部扣除
-    const sumOthers = others.reduce((t,r)=>{
-      const rTs = Date.parse(r.date||'')||0;
-      if (rTs > snapTs) {
-        return t + (Number(r.amount)||0);
+      if (!slice.length) {
+        vs.body.style.transform = 'translateY(0px)';
+        vs.body.innerHTML = `<tr><td class="empty" colspan="5">沒有資料</td></tr>`;
       }
-      return t;
-    },0);
-    
-    out.push({account:acct, balance: base - sumOthers});
+    }
+
+    /* ===== utils ===== */
+    function byId(id) { return document.getElementById(id); }
+    function esc(s) { const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }; return String(s ?? '').replace(/[&<>"']/g, m => map[m]); }
+    function fmtMoney(v) {
+      const n = Number(v); if (!isFinite(n)) return '—';
+      return n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    return {
+      init,
+      __getRows: () => vs.rows,
+      reloadList: () => loadTx(document.getElementById('txAccountPick')?.value || '')
+    };
+  })();
+
+  /* ===== 帳戶餘額：計算工具（沿用你原本的） ===== */
+  function input_computePostedBalancesByAccount(rows) {
+    const posted = (rows || []).filter(r => String(r.status || '').toLowerCase() === 'posted');
+    const byAcct = new Map();
+    posted.forEach(r => {
+      const acct = String(r.account || '').trim();
+      if (!acct) return;
+      (byAcct.get(acct) || byAcct.set(acct, []).get(acct)).push(r);
+    });
+    const out = [];
+    for (const [acct, list] of byAcct.entries()) {
+      const currentRows = list.filter(r => /\bcurrent\b/i.test(String(r.item || '')));
+
+      let base = 0;
+      let snapTs = -1;
+
+      if (currentRows.length) {
+        const latest = currentRows
+          .map(r => ({ ...r, _ts: Date.parse(r.date || '') || 0 }))
+          .sort((a, b) => b._ts - a._ts)[0];
+        base = Number(latest.amount) || 0;
+        snapTs = latest._ts;
+      }
+
+      const others = list.filter(r => !/\bcurrent\b/i.test(String(r.item || '')));
+
+      // 修正：只扣除「日期 > Snapshot」的交易
+      // 若無 Snapshot (snapTs=-1)，則全部扣除
+      const sumOthers = others.reduce((t, r) => {
+        const rTs = Date.parse(r.date || '') || 0;
+        if (rTs > snapTs) {
+          return t + (Number(r.amount) || 0);
+        }
+        return t;
+      }, 0);
+
+      out.push({ account: acct, balance: base - sumOthers });
+    }
+    return out.sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
   }
-  return out.sort((a,b)=> a.account.localeCompare(b.account, 'zh-Hant'));
-}
 
-function input_computePlannedTotalsByAccount(rows){
-  const planned = (rows||[]).filter(r => String(r.status||'').toLowerCase()==='planned');
-  const byAcct = new Map();
-  planned.forEach(r=>{
-    if (/\bcurrent\b/i.test(String(r.item||''))) return;
-    const acct = String(r.account||'').trim();
-    if(!acct) return;
-    const v = -(Number(r.amount)||0);
-    byAcct.set(acct, (byAcct.get(acct)||0) + v);
-  });
-  return Array.from(byAcct.entries())
-    .map(([account, balance])=>({account, balance}))
-    .sort((a,b)=>a.account.localeCompare(b.account,'zh-Hant'));
-}
-
-function input_computeUsingTotalsByAccount(rows){
-  const usingRows = (rows||[]).filter(r => String(r.status||'').toLowerCase()==='using');
-  const byAcct = new Map();
-  usingRows.forEach(r=>{
-    if (/\bcurrent\b/i.test(String(r.item||''))) return;
-    const acct = String(r.account||'').trim();
-    if(!acct) return;
-    // 與 planned 相同邏輯：將資料列金額轉為「支出為正」的方向
-    const v = -(Number(r.amount)||0);
-    byAcct.set(acct, (byAcct.get(acct)||0) + v);
-  });
-  return Array.from(byAcct.entries())
-    .map(([account, balance])=>({account, balance}))
-    .sort((a,b)=>a.account.localeCompare(b.account,'zh-Hant'));
-}
-
-function renderBalanceCard(activeAccount){
-  const cardEl = document.getElementById('acctBalanceCard');
-  if (!cardEl) return;
-  const rows = App.modules.pageInput?.__getRows?.() || [];
-
-  let posted  = input_computePostedBalancesByAccount(rows);
-  let planned = input_computePlannedTotalsByAccount(rows);
-  let using   = input_computeUsingTotalsByAccount(rows);
-
-  // activeAccount 篩選：只顯示指定帳戶
-  if (activeAccount){
-    const acct = String(activeAccount).trim();
-    posted  = posted.filter(x => x.account === acct);
-    planned = planned.filter(x => x.account === acct);
-    using   = using.filter(x => x.account === acct);
+  function input_computePlannedTotalsByAccount(rows) {
+    const planned = (rows || []).filter(r => String(r.status || '').toLowerCase() === 'planned');
+    const byAcct = new Map();
+    planned.forEach(r => {
+      if (/\bcurrent\b/i.test(String(r.item || ''))) return;
+      const acct = String(r.account || '').trim();
+      if (!acct) return;
+      const v = -(Number(r.amount) || 0);
+      byAcct.set(acct, (byAcct.get(acct) || 0) + v);
+    });
+    return Array.from(byAcct.entries())
+      .map(([account, balance]) => ({ account, balance }))
+      .sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
   }
 
-  // 判斷貸款帳戶（專屬置頂表格）
-  const isLoanAccount = (name) => {
-    const s = String(name || '');
-    return s.includes('貸款');
-  };
+  function input_computeUsingTotalsByAccount(rows) {
+    const usingRows = (rows || []).filter(r => String(r.status || '').toLowerCase() === 'using');
+    const byAcct = new Map();
+    usingRows.forEach(r => {
+      if (/\bcurrent\b/i.test(String(r.item || ''))) return;
+      const acct = String(r.account || '').trim();
+      if (!acct) return;
+      // 與 planned 相同邏輯：將資料列金額轉為「支出為正」的方向
+      const v = -(Number(r.amount) || 0);
+      byAcct.set(acct, (byAcct.get(acct) || 0) + v);
+    });
+    return Array.from(byAcct.entries())
+      .map(([account, balance]) => ({ account, balance }))
+      .sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
+  }
 
-  // 判斷一般置頂帳戶（中信 + Cash，但不包含貸款）
-  const isPinnedAccount = (name) => {
-    const s = String(name || '');
-    const sLow = s.toLowerCase();
-    if (isLoanAccount(name)) return false;
-    return s.includes('中信') || sLow === 'cash';
-  };
+  function renderBalanceCard(activeAccount) {
+    const cardEl = document.getElementById('acctBalanceCard');
+    if (!cardEl) return;
+    const rows = App.modules.pageInput?.__getRows?.() || [];
 
-  // 轉為帳戶對應 map
-  const postedMap  = new Map((posted  || []).map(x => [String(x.account||'').trim(), Number(x.balance)||0]));
-  const plannedMap = new Map((planned || []).map(x => [String(x.account||'').trim(), Number(x.balance)||0]));
-  const usingMap   = new Map((using   || []).map(x => [String(x.account||'').trim(), Number(x.balance)||0]));
+    let posted = input_computePostedBalancesByAccount(rows);
+    let planned = input_computePlannedTotalsByAccount(rows);
+    let using = input_computeUsingTotalsByAccount(rows);
 
-  // 蒐集所有帳戶
-  const acctSet = new Set([
-    ...Array.from(postedMap.keys()),
-    ...Array.from(plannedMap.keys()),
-    ...Array.from(usingMap.keys())
-  ]);
+    // activeAccount 篩選：只顯示指定帳戶
+    if (activeAccount) {
+      const acct = String(activeAccount).trim();
+      posted = posted.filter(x => x.account === acct);
+      planned = planned.filter(x => x.account === acct);
+      using = using.filter(x => x.account === acct);
+    }
 
-  const allRows = Array.from(acctSet)
-    .filter(acct => acct) // 排除空帳戶
-    .map(acct => {
-      const pln = plannedMap.get(acct) || 0;
-      const pst = postedMap.get(acct)  || 0;
-      const use = usingMap.get(acct)   || 0;
-      return {
-        account: acct,
-        planned: pln,
-        posted:  pst,
-        using:   use,
-        sum:     pln + pst   // 基本 Sum（一般帳戶使用這個：posted + planned）
-      };
-    })
-    .sort((a,b)=> a.account.localeCompare(b.account, 'zh-Hant'));
+    // 判斷貸款帳戶（專屬置頂表格）
+    const isLoanAccount = (name) => {
+      const s = String(name || '');
+      return s.includes('貸款');
+    };
 
-  // 分為「貸款帳戶」、「置頂帳戶（中信/Cash）」、「一般帳戶」
-  const loanRows  = allRows.filter(r => isLoanAccount(r.account));
-  const pinRows   = allRows.filter(r => isPinnedAccount(r.account));
-  const restRows  = allRows.filter(r => !isLoanAccount(r.account) && !isPinnedAccount(r.account));
+    // 判斷一般置頂帳戶（中信 + Cash，但不包含貸款）
+    const isPinnedAccount = (name) => {
+      const s = String(name || '');
+      const sLow = s.toLowerCase();
+      if (isLoanAccount(name)) return false;
+      return s.includes('中信') || sLow === 'cash';
+    };
 
-  // 金額 chip
-  const moneyChip = (val, extraCls='') => {
-    const n = Number(val) || 0;
-    const clsSign = n < 0 ? 'neg' : 'pos';
-    const txt = Math.round(n).toLocaleString('zh-Hant-TW');
-    const classes = ['bal-chip', clsSign, 'mask-num'];
-    if (extraCls) classes.push(extraCls);
-    return `<span class="${classes.join(' ')}" data-mask-str="＊＊＊">${txt}</span>`;
-  };
+    // 轉為帳戶對應 map
+    const postedMap = new Map((posted || []).map(x => [String(x.account || '').trim(), Number(x.balance) || 0]));
+    const plannedMap = new Map((planned || []).map(x => [String(x.account || '').trim(), Number(x.balance) || 0]));
+    const usingMap = new Map((using || []).map(x => [String(x.account || '').trim(), Number(x.balance) || 0]));
 
-  // 1) 貸款帳戶表格（置頂）：帳戶｜Posted｜Using｜Planned｜Sum
-  //    Posted 顯示為「原始 posted 扣掉 using（原始金額）之後的餘額」
-  //    Sum ＝ Posted + Using + Planned（其中 Planned 已為負值）
-  let loanHTML = '';
-  if (loanRows.length){
-    loanHTML += `<div class="bal-table-wrap bal-loan"><table class="bal-table"><thead><tr>
+    // 蒐集所有帳戶
+    const acctSet = new Set([
+      ...Array.from(postedMap.keys()),
+      ...Array.from(plannedMap.keys()),
+      ...Array.from(usingMap.keys())
+    ]);
+
+    const allRows = Array.from(acctSet)
+      .filter(acct => acct) // 排除空帳戶
+      .map(acct => {
+        const pln = plannedMap.get(acct) || 0;
+        const pst = postedMap.get(acct) || 0;
+        const use = usingMap.get(acct) || 0;
+        return {
+          account: acct,
+          planned: pln,
+          posted: pst,
+          using: use,
+          sum: pln + pst   // 基本 Sum（一般帳戶使用這個：posted + planned）
+        };
+      })
+      .sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
+
+    // 分為「貸款帳戶」、「置頂帳戶（中信/Cash）」、「一般帳戶」
+    const loanRows = allRows.filter(r => isLoanAccount(r.account));
+    const pinRows = allRows.filter(r => isPinnedAccount(r.account));
+    const restRows = allRows.filter(r => !isLoanAccount(r.account) && !isPinnedAccount(r.account));
+
+    // 金額 chip
+    const moneyChip = (val, extraCls = '') => {
+      const n = Number(val) || 0;
+      const clsSign = n < 0 ? 'neg' : 'pos';
+      const txt = Math.round(n).toLocaleString('zh-Hant-TW');
+      const classes = ['bal-chip', clsSign, 'mask-num'];
+      if (extraCls) classes.push(extraCls);
+      return `<span class="${classes.join(' ')}" data-mask-str="＊＊＊">${txt}</span>`;
+    };
+
+    // 1) 貸款帳戶表格（置頂）：帳戶｜Posted｜Using｜Planned｜Sum
+    //    Posted 顯示為「原始 posted 扣掉 using（原始金額）之後的餘額」
+    //    Sum ＝ Posted + Using + Planned（其中 Planned 已為負值）
+    let loanHTML = '';
+    if (loanRows.length) {
+      loanHTML += `<div class="bal-table-wrap bal-loan"><table class="bal-table"><thead><tr>
       <th>帳戶</th>
       <th>Posted</th>
       <th>Using</th>
       <th>Planned</th>
       <th>Sum</th>
     </tr></thead><tbody>`;
-    loanRows.forEach(r=>{
-      const usingAgg  = Number(usingMap.get(r.account) || 0); // 聚合值（支出為正）
-      const rawPosted = Number(r.posted) || 0;
-      const pln       = Number(r.planned) || 0;
+      loanRows.forEach(r => {
+        const usingAgg = Number(usingMap.get(r.account) || 0); // 聚合值（支出為正）
+        const rawPosted = Number(r.posted) || 0;
+        const pln = Number(r.planned) || 0;
 
-      // using 原始方向總和（＝各筆原始 amount 相加）
-      const usingRaw = -usingAgg;
+        // using 原始方向總和（＝各筆原始 amount 相加）
+        const usingRaw = -usingAgg;
 
-      // Posted 欄位：顯示「原始 posted 扣掉 using 原始金額」後的餘額
-      const postedDisplay = rawPosted - usingRaw;
+        // Posted 欄位：顯示「原始 posted 扣掉 using 原始金額」後的餘額
+        const postedDisplay = rawPosted - usingRaw;
 
-      // Sum：Posted + Using + Planned
-      // ＝ (current cash after using) + (invested using) + (future planned, usually negative)
-      const sumLoan = postedDisplay + usingRaw + pln;
+        // Sum：Posted + Using + Planned
+        // ＝ (current cash after using) + (invested using) + (future planned, usually negative)
+        const sumLoan = postedDisplay + usingRaw + pln;
 
-      // Using 欄位顯示原始方向
-      const usingDisplay = usingRaw;
+        // Using 欄位顯示原始方向
+        const usingDisplay = usingRaw;
 
-      loanHTML += `<tr>
+        loanHTML += `<tr>
         <td class="name">${esc(r.account)}</td>
-        <td class="num">${moneyChip(postedDisplay,'posted')}</td>
-        <td class="num">${moneyChip(usingDisplay,'using')}</td>
-        <td class="num">${moneyChip(pln,'planned')}</td>
-        <td class="num">${moneyChip(sumLoan,'sum')}</td>
+        <td class="num">${moneyChip(postedDisplay, 'posted')}</td>
+        <td class="num">${moneyChip(usingDisplay, 'using')}</td>
+        <td class="num">${moneyChip(pln, 'planned')}</td>
+        <td class="num">${moneyChip(sumLoan, 'sum')}</td>
       </tr>`;
-    });
-    loanHTML += `</tbody></table></div><hr class="bal-divider">`;
-  }
-
-  // 2) 一般置頂帳戶（中信 / Cash）：帳戶｜Posted｜Planned｜Sum（沿用原本邏輯）
-  let topHTML = '';
-  if (pinRows.length){
-    topHTML += `<div class="bal-table-wrap bal-top"><table class="bal-table"><thead><tr>
-      <th>帳戶</th>
-      <th>Posted</th>
-      <th>Planned</th>
-      <th>Sum</th>
-    </tr></thead><tbody>`;
-    pinRows.forEach(r=>{
-      topHTML += `<tr>
-        <td class="name">${esc(r.account)}</td>
-        <td class="num">${moneyChip(r.posted,'posted')}</td>
-        <td class="num">${moneyChip(r.planned,'planned')}</td>
-        <td class="num">${moneyChip(r.sum,'sum')}</td>
-      </tr>`;
-    });
-    topHTML += `</tbody></table></div><hr class="bal-divider">`;
-  }
-
-  // 3) 其餘帳戶：表格顯示（帳戶｜Posted｜Planned｜Sum）
-  let tableHTML = '';
-  if (restRows.length){
-    tableHTML += `<div class="bal-table-wrap"><table class="bal-table"><thead><tr>
-      <th>帳戶</th>
-      <th>Posted</th>
-      <th>Planned</th>
-      <th>Sum</th>
-    </tr></thead><tbody>`;
-    restRows.forEach(r=>{
-      tableHTML += `<tr>
-        <td class="name">${esc(r.account)}</td>
-        <td class="num">${moneyChip(r.posted,'posted')}</td>
-        <td class="num">${moneyChip(r.planned,'planned')}</td>
-        <td class="num">${moneyChip(r.sum,'sum')}</td>
-      </tr>`;
-    });
-    tableHTML += `</tbody></table></div>`;
-  } else if (!loanRows.length && !pinRows.length){
-    // 完全沒有資料
-    tableHTML = `<div class="bal-row empty">（無資料）</div>`;
-  }
-
-  // 4) 餘額總計：排除所有置頂帳戶（貸款 + 中信 + Cash）
-  const excluded = new Set([
-    ...loanRows.map(r => r.account),
-    ...pinRows.map(r => r.account)
-  ]);
-  let grandVal = 0;
-  allRows.forEach(r=>{
-    if (!excluded.has(r.account)){
-      grandVal += Number(r.sum) || 0;   // 非貸款帳戶仍使用「posted+planned」的 sum 定義
+      });
+      loanHTML += `</tbody></table></div><hr class="bal-divider">`;
     }
-  });
-  const grandTxt = Math.round(grandVal).toLocaleString('zh-Hant-TW');
-  const grandHTML =
-    `<hr class="bal-divider">` +
-    `<div class="grand-total-wrap">` +
+
+    // 2) 一般置頂帳戶（中信 / Cash）：帳戶｜Posted｜Planned｜Sum（沿用原本邏輯）
+    let topHTML = '';
+    if (pinRows.length) {
+      topHTML += `<div class="bal-table-wrap bal-top"><table class="bal-table"><thead><tr>
+      <th>帳戶</th>
+      <th>Posted</th>
+      <th>Planned</th>
+      <th>Sum</th>
+    </tr></thead><tbody>`;
+      pinRows.forEach(r => {
+        topHTML += `<tr>
+        <td class="name">${esc(r.account)}</td>
+        <td class="num">${moneyChip(r.posted, 'posted')}</td>
+        <td class="num">${moneyChip(r.planned, 'planned')}</td>
+        <td class="num">${moneyChip(r.sum, 'sum')}</td>
+      </tr>`;
+      });
+      topHTML += `</tbody></table></div><hr class="bal-divider">`;
+    }
+
+    // 3) 其餘帳戶：表格顯示（帳戶｜Posted｜Planned｜Sum）
+    let tableHTML = '';
+    if (restRows.length) {
+      tableHTML += `<div class="bal-table-wrap"><table class="bal-table"><thead><tr>
+      <th>帳戶</th>
+      <th>Posted</th>
+      <th>Planned</th>
+      <th>Sum</th>
+    </tr></thead><tbody>`;
+      restRows.forEach(r => {
+        tableHTML += `<tr>
+        <td class="name">${esc(r.account)}</td>
+        <td class="num">${moneyChip(r.posted, 'posted')}</td>
+        <td class="num">${moneyChip(r.planned, 'planned')}</td>
+        <td class="num">${moneyChip(r.sum, 'sum')}</td>
+      </tr>`;
+      });
+      tableHTML += `</tbody></table></div>`;
+    } else if (!loanRows.length && !pinRows.length) {
+      // 完全沒有資料
+      tableHTML = `<div class="bal-row empty">（無資料）</div>`;
+    }
+
+    // 4) 餘額總計：排除所有置頂帳戶（貸款 + 中信 + Cash）
+    const excluded = new Set([
+      ...loanRows.map(r => r.account),
+      ...pinRows.map(r => r.account)
+    ]);
+    let grandVal = 0;
+    allRows.forEach(r => {
+      if (!excluded.has(r.account)) {
+        grandVal += Number(r.sum) || 0;   // 非貸款帳戶仍使用「posted+planned」的 sum 定義
+      }
+    });
+    const grandTxt = Math.round(grandVal).toLocaleString('zh-Hant-TW');
+    const grandHTML =
+      `<hr class="bal-divider">` +
+      `<div class="grand-total-wrap">` +
       `<span class="grand-label">餘額</span>` +
       `<span class="bal-chip total mask-num" data-mask-str="＊＊＊">${grandTxt}</span>` +
-    `</div>`;
+      `</div>`;
 
-  cardEl.innerHTML = loanHTML + topHTML + tableHTML + grandHTML;
-}
+    cardEl.innerHTML = loanHTML + topHTML + tableHTML + grandHTML;
+  }
 
-function pickActiveAccount(){
-  return document.getElementById('txAccountPick')?.value
+  function pickActiveAccount() {
+    return document.getElementById('txAccountPick')?.value
       || document.getElementById('inAccount')?.value
       || '';
-}
-
-function updateBalanceCard(){
-  try{
-    const acct = pickActiveAccount();
-    renderBalanceCard(acct);
-  }catch(e){}
-}
-
-/* =========================================================
-   iOS 防自動放大（略：保留你原本版本）
-   ========================================================= */
-(function(){
-  const isIOS = /iP(ad|hone|od)/.test(navigator.platform) ||
-                (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
-  if (!isIOS) return;
-  let meta = document.querySelector('#app-viewport') ||
-             document.querySelector('meta[name="viewport"]');
-  if (!meta) {
-    meta = document.createElement('meta');
-    meta.id = 'app-viewport';
-    meta.name = 'viewport';
-    meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
-    document.head.appendChild(meta);
   }
-  const original = meta.getAttribute('content') || 'width=device-width, initial-scale=1, viewport-fit=cover';
-  const lockZoom = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
-  const unlockZoom = original
-    .replace(/\s*,?\s*maximum-scale=\d+(\.\d+)?/i, '')
-    .replace(/\s*,?\s*user-scalable=no/i, '')
-    .trim() || 'width=device-width, initial-scale=1, viewport-fit=cover';
 
-  const matchField = (el) => !!el && el.matches &&
-    el.matches('input.fx-field, textarea.fx-field, select.fx-select, input[type="date"].fx-field, input[type="number"].fx-field');
-
-  function prelock(){ meta.setAttribute('content', lockZoom); requestAnimationFrame(()=> meta.setAttribute('content', lockZoom)); }
-  document.addEventListener('touchstart', (e)=>{
-    if (matchField(e.target)) prelock();
-  }, { capture:true, passive:true });
-
-  document.addEventListener('focusin', (e)=>{
-    if (!matchField(e.target)) return;
-    prelock();
-    const cs = getComputedStyle(e.target);
-    const px = parseFloat(cs.fontSize) || 16;
-    if (px < 16){
-      e.target.dataset._origFontSize = e.target.style.fontSize || '';
-      e.target.style.fontSize = '16px';
-    }
-  }, { capture:true });
-
-  document.addEventListener('focusout', (e)=>{
-    if (!matchField(e.target)) return;
-    setTimeout(()=>{
-      const ae = document.activeElement;
-      const anyFocused = !!(ae && ae.matches && ae.matches('input, textarea, select'));
-      if (!anyFocused){
-        meta.setAttribute('content', unlockZoom);
-        requestAnimationFrame(()=> meta.setAttribute('content', unlockZoom));
-      }
-    }, 250);
-    if ('_origFontSize' in e.target.dataset){
-      e.target.style.fontSize = e.target.dataset._origFontSize;
-      delete e.target.dataset._origFontSize;
-    }
-  }, { capture:true });
-})();
-
-/* =========================================================
-   自動初始化 + 版面高度再平衡
-   ========================================================= */
-document.addEventListener('DOMContentLoaded', ()=>{
-  function rebalanceInputLayout(){
-    try{
-      const form = document.getElementById('inputFormCard');
-      const panel = document.querySelector('#page-input .tx-panel');
-      const toolbar = panel?.querySelector('.tx-toolbar');
-      const viewport = document.getElementById('txViewport');
-      if (!form || !panel || !toolbar || !viewport) return;
-
-      const isMobile = window.matchMedia('(max-width: 1024px)').matches;
-      const rect = form.getBoundingClientRect();
-      const cs = getComputedStyle(document.documentElement);
-      const hdrH = parseFloat(cs.getPropertyValue('--hdrH-mobile')) || 56;
-      const tabbarH = parseFloat(cs.getPropertyValue('--tabbarH')) || 56;
-
-      if (!isMobile){
-        const pv = Math.max(200, Math.floor(rect.height - toolbar.offsetHeight - 12));
-        viewport.style.height = pv + 'px';
-      }else{
-        const vh = window.innerHeight;
-        const pv = Math.max(120, Math.floor(vh - hdrH - rect.height - toolbar.offsetHeight - tabbarH - 36));
-        viewport.style.height = pv + 'px';
-        panel.style.marginBottom = '0px';
-      }
-    }catch(e){}
+  function updateBalanceCard() {
+    try {
+      const acct = pickActiveAccount();
+      renderBalanceCard(acct);
+    } catch (e) { }
   }
-  window.addEventListener('resize', rebalanceInputLayout, { passive:true });
 
-  App.modules.pageInput?.init?.();
-  rebalanceInputLayout();
-});
+  /* =========================================================
+     iOS 防自動放大（略：保留你原本版本）
+     ========================================================= */
+  (function () {
+    const isIOS = /iP(ad|hone|od)/.test(navigator.platform) ||
+      (navigator.userAgent.includes('Mac') && 'ontouchend' in document);
+    if (!isIOS) return;
+    let meta = document.querySelector('#app-viewport') ||
+      document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.id = 'app-viewport';
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+      document.head.appendChild(meta);
+    }
+    const original = meta.getAttribute('content') || 'width=device-width, initial-scale=1, viewport-fit=cover';
+    const lockZoom = 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover';
+    const unlockZoom = original
+      .replace(/\s*,?\s*maximum-scale=\d+(\.\d+)?/i, '')
+      .replace(/\s*,?\s*user-scalable=no/i, '')
+      .trim() || 'width=device-width, initial-scale=1, viewport-fit=cover';
+
+    const matchField = (el) => !!el && el.matches &&
+      el.matches('input.fx-field, textarea.fx-field, select.fx-select, input[type="date"].fx-field, input[type="number"].fx-field');
+
+    function prelock() { meta.setAttribute('content', lockZoom); requestAnimationFrame(() => meta.setAttribute('content', lockZoom)); }
+    document.addEventListener('touchstart', (e) => {
+      if (matchField(e.target)) prelock();
+    }, { capture: true, passive: true });
+
+    document.addEventListener('focusin', (e) => {
+      if (!matchField(e.target)) return;
+      prelock();
+      const cs = getComputedStyle(e.target);
+      const px = parseFloat(cs.fontSize) || 16;
+      if (px < 16) {
+        e.target.dataset._origFontSize = e.target.style.fontSize || '';
+        e.target.style.fontSize = '16px';
+      }
+    }, { capture: true });
+
+    document.addEventListener('focusout', (e) => {
+      if (!matchField(e.target)) return;
+      setTimeout(() => {
+        const ae = document.activeElement;
+        const anyFocused = !!(ae && ae.matches && ae.matches('input, textarea, select'));
+        if (!anyFocused) {
+          meta.setAttribute('content', unlockZoom);
+          requestAnimationFrame(() => meta.setAttribute('content', unlockZoom));
+        }
+      }, 250);
+      if ('_origFontSize' in e.target.dataset) {
+        e.target.style.fontSize = e.target.dataset._origFontSize;
+        delete e.target.dataset._origFontSize;
+      }
+    }, { capture: true });
+  })();
+
+  /* =========================================================
+     自動初始化 + 版面高度再平衡
+     ========================================================= */
+  document.addEventListener('DOMContentLoaded', () => {
+    function rebalanceInputLayout() {
+      try {
+        const form = document.getElementById('inputFormCard');
+        const panel = document.querySelector('#page-input .tx-panel');
+        const toolbar = panel?.querySelector('.tx-toolbar');
+        const viewport = document.getElementById('txViewport');
+        if (!form || !panel || !toolbar || !viewport) return;
+
+        const isMobile = window.matchMedia('(max-width: 1024px)').matches;
+        const rect = form.getBoundingClientRect();
+        const cs = getComputedStyle(document.documentElement);
+        const hdrH = parseFloat(cs.getPropertyValue('--hdrH-mobile')) || 56;
+        const tabbarH = parseFloat(cs.getPropertyValue('--tabbarH')) || 56;
+
+        if (!isMobile) {
+          const pv = Math.max(200, Math.floor(rect.height - toolbar.offsetHeight - 12));
+          viewport.style.height = pv + 'px';
+        } else {
+          const vh = window.innerHeight;
+          const pv = Math.max(120, Math.floor(vh - hdrH - rect.height - toolbar.offsetHeight - tabbarH - 36));
+          viewport.style.height = pv + 'px';
+          panel.style.marginBottom = '0px';
+        }
+      } catch (e) { }
+    }
+    window.addEventListener('resize', rebalanceInputLayout, { passive: true });
+
+    App.modules.pageInput?.init?.();
+    rebalanceInputLayout();
+  });
 </script>

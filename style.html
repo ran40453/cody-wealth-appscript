@@ -664,6 +664,29 @@
     color: #0b1526;
   }
 
+  /* 按鈕：圓形幽靈按鈕 */
+  .btn-ghost {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 50%;
+    /* 圓形 */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    /* 固定寬高 */
+    height: 32px;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .btn-ghost:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text);
+  }
+
   .ctbc-chip.active {
     background: var(--tint);
     border-color: var(--tint);
@@ -2899,20 +2922,98 @@
     }
   }
 
-  /* 桌機：四區塊 */
+  /* =========================================================
+   #17 page Dashmain
+   ========================================================= */
+
+  /* 頂部 Logo 按鈕修復 */
+  .app-logo {
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-drag: none;
+    /* 確保圖片本身不被選取 */
+    pointer-events: auto;
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.1s;
+  }
+
+  .app-logo:active {
+    transform: scale(0.96);
+    opacity: 0.8;
+  }
+
+  /* 全局按鈕回饋感（iOS 風格） */
+  button,
+  .btn-ghost,
+  .themeBtn,
+  .maskBtn,
+  .menuBtn,
+  .icon-btn {
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s, opacity 0.2s;
+  }
+
+  button:active,
+  .btn-ghost:active,
+  .themeBtn:active,
+  .maskBtn:active,
+  .menuBtn:active,
+  .icon-btn:active {
+    transform: scale(0.92);
+    opacity: 0.8;
+  }
+
+  /* 桌機：四區塊 - 四欄並排 */
   #page-dashmain .dashmain {
-    --gap: 8px;
+    --gap: 16px;
     display: grid;
     gap: var(--gap);
-    grid-template-columns: repeat(4, minmax(120px, 1fr));
-    grid-auto-rows: 1fr;
-    padding: 6px 8px;
-    /* 填滿螢幕高度，留少許底部空間 */
+    /* 定義 Grid Areas：四欄並排 */
+    grid-template-areas: "kpi planned ctbc accounts";
+    /* 四欄等寬 (使用 minmax(0, 1fr) 避免內容撐爆) */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* 單列填滿高度 */
+    grid-template-rows: 1fr;
+    padding: 16px;
+    /* 填滿螢幕高度，卡片內部捲動 */
     height: calc(100dvh - var(--header-h, 72px) - 16px);
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
+    /* 移除最大寬度限制，讓四欄能展延 */
+    margin: 0 auto;
   }
+
+  /* 統一 .cap.amt 樣式，使其與 .v 膠囊一致 */
+  #page-dashmain .cap.amt {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    line-height: 1;
+    border: 1px solid color-mix(in oklab, var(--tint) 24%, transparent);
+    background: color-mix(in oklab, var(--surface) 90%, transparent);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.95em;
+  }
+
+  /* 卡片對應 Grid Areas */
+  #page-dashmain .card.kpi {
+    grid-area: kpi;
+  }
+
+  #page-dashmain .card.ctbc {
+    grid-area: ctbc;
+  }
+
+  #page-dashmain .card.planned {
+    grid-area: planned;
+  }
+
+  #page-dashmain .card.accounts {
+    grid-area: accounts;
+  }
+
 
   /* 只在 Dashmain 頁，把 .app 的左右 padding 從 16px 降到 6px（不影響他頁） */
   #page-dashmain {
@@ -2923,16 +3024,42 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
+    /* iOS 風格圓角與陰影 */
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    /* 微弱邊框增加質感 */
+    background: var(--card);
+    /* 確保有背景色 */
+    overflow: hidden;
+    /* 確保內容不溢出圓角 */
+    transition: box-shadow 0.2s;
+  }
+
+  #page-dashmain .card:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    /* 懸停時加深陰影 */
   }
 
   #page-dashmain .card-hd {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
+    /* 縮減底部間距 */
     z-index: 1;
     position: relative;
-    border-radius: var(--radius);
+    padding: 8px 12px 0 12px;
+    /* 調整內距，縮減高度 */
+    min-height: 36px;
+    /* 限制最小高度 */
+  }
+
+  #page-dashmain .card-hd .title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    padding-left: 0;
   }
 
   #page-dashmain .card-bd,
@@ -2940,13 +3067,21 @@
     flex: 1;
     overflow: auto;
     min-height: 0;
+    /* 隱藏捲軸但可捲動 */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding: 0 8px 8px 8px;
+    /* 內容內縮 */
+  }
+
+  #page-dashmain .card-bd::-webkit-scrollbar,
+  #page-dashmain .list::-webkit-scrollbar {
+    display: none;
   }
 
   /* Dashmain 投資卡片（ctbc）：內容超出時在卡片內部捲動，而不是撐高整頁 */
   #page-dashmain .card.ctbc {
     min-height: 0;
-    overflow: hidden;
-    /* 外層卡片負責裁切，避免溢出 */
   }
 
   #page-dashmain .card.ctbc .card-bd {
@@ -3089,9 +3224,24 @@
     margin-bottom: 2px;
   }
 
+  /* 讓 label 和數值在同一行，但多組數據垂直堆疊 */
+  /* 修改 HTML 結構可能更乾淨，但先嘗試 CSS Grid */
   #plannedList .row-meta {
-    justify-content: space-between;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: auto auto;
+    /* Label | Value */
+    justify-content: end;
+    /* 整體靠右 */
+    gap: 4px 12px;
+    /* 行距 4px，列距 12px */
+    align-items: center;
+  }
+
+  #plannedList .row-meta .label {
+    text-align: left;
+    /* Label 靠左 */
+    color: var(--muted);
+    font-size: 0.85em;
   }
 
   /* 膠囊基礎 */
@@ -3147,76 +3297,81 @@
     background: color-mix(in oklab, var(--tint) 16%, transparent);
   }
 
-  /* 手機：2×2 等高格，卡片內滾動 */
+  /* 手機：Bento Grid 風格 */
   @media (max-width: 1024px) {
     #page-dashmain .dashmain {
-      --gap: 8px;
+      --gap: 12px;
       display: grid;
       gap: var(--gap);
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr 1fr;
-      /* 兩行等高 */
+      /* 自動行高，不再強制等高，讓內容決定高度，但限制最大高度 */
+      grid-template-rows: minmax(160px, auto) minmax(160px, auto) auto;
       padding: var(--gap);
       box-sizing: border-box;
-      grid-auto-rows: auto;
       height: calc(100dvh - var(--header-h, 56px) - var(--tabbar-h, 56px));
+      overflow-y: auto;
+      /* 允許整體捲動如果內容太多 */
     }
 
     #page-dashmain :where(.kpi-grid) {
       grid-template-columns: 1fr 1fr;
     }
 
-    /* 固定四張卡的位置（左上、右上、左下、右下） */
+    /* 卡片佈局優化：避免裁切 */
+    /* KPI (左上) */
     #page-dashmain .card.kpi {
       grid-column: 1;
       grid-row: 1;
     }
 
+    /* 投資 (右上) */
     #page-dashmain .card.ctbc {
       grid-column: 2;
       grid-row: 1;
     }
 
+    /* 近期 (佔滿整行，避免數字被切) */
     #page-dashmain .card.planned {
-      grid-column: 1;
+      grid-column: 1 / -1;
       grid-row: 2;
     }
 
+    /* 帳戶 (佔滿整行) */
     #page-dashmain .card.accounts {
-      grid-column: 2;
-      grid-row: 2;
+      grid-column: 1 / -1;
+      grid-row: 3;
     }
+  }
 
-    /* 卡片骨架：上方是 header，下方內容可滾動 */
-    #page-dashmain .card {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
+  /* 卡片骨架：上方是 header，下方內容可滾動 */
+  #page-dashmain .card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
 
-    #page-dashmain .card-bd {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: auto;
-    }
+  #page-dashmain .card-bd {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
 
-    /* 若你的卡片沒有 .card-bd，我們讓常見容器當滾動區 */
-    #page-dashmain :where(.card > .list, .card .list.slim, .card .kpi-grid, .card .rows) {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: auto;
-    }
+  /* 若你的卡片沒有 .card-bd，我們讓常見容器當滾動區 */
+  #page-dashmain :where(.card > .list, .card .list.slim, .card .kpi-grid, .card .rows) {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+  }
 
-    /* planned/accounts 的 list 已有虛擬清單支援，這裡只確保顯示 */
-    #page-dashmain .card.planned .list,
-    #page-dashmain .card.accounts .list {
-      overflow: auto;
-    }
+  /* planned/accounts 的 list 已有虛擬清單支援，這裡只確保顯示 */
+  #page-dashmain .card.planned .list,
+  #page-dashmain .card.accounts .list {
+    overflow: auto;
+  }
 
-    /* 避免卡片內部產生橫向捲軸 */
-    #page-dashmain .card .list {
-      overflow-x: hidden;
-    }
+  /* 避免卡片內部產生橫向捲軸 */
+  #page-dashmain .card .list {
+    overflow-x: hidden;
   }
 
   /* ===== [Patch] Dashmain 四卡片字級關節（安全附掛版，貼在最末尾） ===== */
