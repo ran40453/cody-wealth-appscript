@@ -274,4 +274,11 @@
   /* ====== 路由掛載：鍵名 acc（go('acc')） ====== */
   // acc_js.html 末尾改成函式
   App.routes["acc"] = () => App.modules.pageAcc.init();
+
+  // NEW: Register Page for App.js (Refresh)
+  App.pages = App.pages || {};
+  App.pages.acc = {
+    init: () => App.modules.pageAcc.init(),
+    refresh: () => App.modules.pageAcc.init()
+  };
 </script>

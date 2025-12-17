@@ -255,6 +255,63 @@
 
   .page.show {
     display: block;
+    animation: fadeUp 0.6s cubic-bezier(0.2, 0.0, 0, 1.0) forwards;
+    /* Material Standard Easing */
+  }
+
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Global Transition Damping */
+  * {
+    transition-timing-function: cubic-bezier(0.2, 0.0, 0, 1.0);
+    /* MD3 Standard */
+  }
+
+  /* Header Title Hover Effect */
+  header .title-wrap {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    /* No gap initially */
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    transition: all 0.4s cubic-bezier(0.2, 0.0, 0, 1.0);
+  }
+
+  header .title-wrap:hover {
+    background: color-mix(in oklab, var(--surface) 90%, var(--tint));
+    border-color: color-mix(in oklab, var(--tint) 30%, transparent);
+    padding-right: 16px;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  header .title-wrap .title {
+    max-width: 0;
+    opacity: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.2, 0.0, 0, 1.0);
+  }
+
+  header .title-wrap:hover .title {
+    max-width: 200px;
+    opacity: 1;
   }
 
   /* Mobile 全域：防 iOS 輸入放大；互動元件觸控優化 */
@@ -3037,8 +3094,9 @@
   }
 
   #page-dashmain .card:hover {
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
-    /* 懸停時加深陰影 */
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    transform: translateY(-2px);
+    transition: all 0.5s cubic-bezier(0.2, 0.0, 0, 1.0);
   }
 
   #page-dashmain .card-hd {
@@ -3055,11 +3113,77 @@
     /* 限制最小高度 */
   }
 
-  #page-dashmain .card-hd .title {
-    font-size: 1.1rem;
+  /* Title Pill (Icon + Expanding Text) */
+  .card-hd-pill {
+    display: flex;
+    align-items: center;
+    background: var(--surface);
+    border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+    border-radius: 999px;
+    /* Capsule */
+    padding: 4px;
+    padding-right: 0;
+    /* Text starts hidden */
+    transition: all 0.25s ease;
+    cursor: default;
+    overflow: hidden;
+    max-width: 36px;
+    /* Icon width + padding */
+  }
+
+  .card-hd-pill:hover,
+  .card-hd-pill:active,
+  .card-hd-pill.active {
+    padding-right: 12px;
+    max-width: 140px;
+    /* Expand */
+    background: color-mix(in oklab, var(--tint) 8%, var(--surface));
+    border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+  }
+
+  .card-hd-pill .ico {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: var(--text);
+  }
+
+  .card-hd-pill .txt {
+    font-size: 14px;
     font-weight: 700;
-    letter-spacing: -0.02em;
-    padding-left: 0;
+    white-space: nowrap;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: all 0.2s ease;
+    margin-left: 4px;
+  }
+
+  .card-hd-pill:hover .txt,
+  .card-hd-pill:active .txt,
+  .card-hd-pill.active .txt {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  /* Buttons in Header: Force Circle */
+  #page-dashmain .card-hd .btn-ghost {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+  }
+
+  /* Original Title override */
+  #page-dashmain .card-hd .title {
+    display: none;
+    /* Hide old title class */
   }
 
   #page-dashmain .card-bd,
@@ -3152,12 +3276,98 @@
   }
 
   /* Allow inner scroll for KPI & CTBC lists when zoomed */
-  #kpi-list,
-  #ctbc-list {
-    overflow: auto;
-    max-height: min(48vh, 560px);
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+  /* Dashmain Sub-cards */
+  .sub-card {
+    background: color-mix(in oklab, var(--card) 95%, var(--shadow));
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 12px;
+    border: 1px solid var(--ctbc-border);
+  }
+
+  .sub-caption {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  /* KPI Row Item (Title Left / Value Right) */
+  .kpi-list-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .kpi-row-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 4px;
+    border-bottom: 1px dashed var(--border, rgba(0, 0, 0, 0.05));
+  }
+
+  .kpi-row-item:last-child {
+    border-bottom: none;
+  }
+
+  .kpi-row-item .k {
+    font-size: 14px;
+    color: var(--text);
+    opacity: 0.8;
+  }
+
+  /* Recent Card: Stacking Layout for Posted/Sum */
+  #plannedList .item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+  }
+
+  #plannedList .meta-col {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    /* Space between Posted and Sum rows */
+    align-items: flex-end;
+    /* Align numbers to the right */
+  }
+
+  #plannedList .meta-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: color-mix(in oklab, var(--card) 95%, var(--shadow));
+    padding: 2px 6px;
+    border-radius: 99px;
+    border: 1px solid var(--border, rgba(0, 0, 0, 0.05));
+    min-width: 100px;
+    /* Ensure logical width */
+    justify-content: flex-end;
+  }
+
+  .label-ico {
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  /* Negative Value Pink Background */
+  .neg-bg {
+    background-color: #ffeef0 !important;
+    /* Light Pink */
+    color: #d60024 !important;
+    border-color: #ffccd4 !important;
+  }
+
+  :root:not(.light) .neg-bg {
+    background-color: #3e1a1f !important;
+    /* Dark Pink */
+    color: #ff8fa3 !important;
+    border-color: #5c2b33 !important;
   }
 
   /* 手機/平板：全部單欄，避免擠爆 */
@@ -3280,6 +3490,27 @@
   #plannedList .account[data-acc*="Cash"] {
     background: color-mix(in oklab, #29a864 18%, transparent);
     color: #0b3a22;
+  }
+
+  /* Dark Mode Overrides for Account Chips */
+  :root:not(.light) #plannedList .account[data-acc*="中信"] {
+    background: color-mix(in oklab, #1f8fff 25%, transparent);
+    color: #8ccbff;
+  }
+
+  :root:not(.light) #plannedList .account[data-acc*="台新"] {
+    background: color-mix(in oklab, #ff5d8f 25%, transparent);
+    color: #ffb3cc;
+  }
+
+  :root:not(.light) #plannedList .account[data-acc*="星展"] {
+    background: color-mix(in oklab, #ff8840 25%, transparent);
+    color: #ffccaa;
+  }
+
+  :root:not(.light) #plannedList .account[data-acc*="Cash"] {
+    background: color-mix(in oklab, #29a864 25%, transparent);
+    color: #8affc2;
   }
 
   /* 日期小字（不顯示年份） */

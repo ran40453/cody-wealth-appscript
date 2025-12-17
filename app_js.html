@@ -1,205 +1,205 @@
 <script>
-// =================== 全域狀態 ===================
-const App = {
-  drawerOpen: false,
-  routes: {},                      // pageKey -> onEnter()
-  pages: {},                       // pageKey -> { init?, refresh? }
-  titles: {
-    input:'記帳',
-    dashmain:'Dashboard', debt:'債務', record:'Database',
-    ctbc:'CTBC', policy:'定存保單', gcv:'GCV',
-    mrpt:'投資月報表', fortune:'年報表', stk:'股票總表',
-    grw:'Growin', anlys:'投資分析', charts:'Charts', links:'其他連結'
-  }
-};
-
-// =================== Utils ===================
-function esc(s){
-  const map = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":"&#39;" };
-  return String(s).replace(/[&<>"']/g, m => map[m]);
-}
-function byId(id){ return document.getElementById(id); }
-function setText(id, txt){ const el=byId(id); if (el) el.textContent = txt; }
-
-
-// ====== Mobile UX hooks ======
-function isMobile(){ return window.matchMedia('(max-width: 720px)').matches; }
-
-// =================== 主題 ===================
-function getSavedTheme(){
-  try { return localStorage.getItem('cw_theme') || 'dark'; } catch(e){ return 'dark'; }
-}
-function saveTheme(mode){
-  try { localStorage.setItem('cw_theme', mode); } catch(e){}
-}
-function applyTheme(mode){
-  // 同時支援你舊的 .light class 與 data-theme
-  const root = document.documentElement;
-  root.dataset.theme = mode;                // data-theme="light|dark"
-  root.classList.toggle('light', mode === 'light'); // 舊樣式保險
-  saveTheme(mode);
-  updateHeaderIcons(); // 切主題時換 icon
-}
-function initTheme(){
-  applyTheme(getSavedTheme());
-}
-function toggleTheme(){
-  const next = (document.documentElement.dataset.theme === 'dark') ? 'light' : 'dark';
-  applyTheme(next);
-}
-
-// =================== 數字遮罩 ===================
-const MASK_LS_KEY = 'moneyMasked';
-function getMaskOn(){ try { return localStorage.getItem(MASK_LS_KEY) === '1'; } catch(e){ return false; } }
-function saveMask(on){ try { localStorage.setItem(MASK_LS_KEY, on ? '1' : '0'); } catch(e){} }
-function applyMask(on){
-  document.body.classList.toggle('mask-on', on);           // 你原本的 body class
-  document.documentElement.dataset.moneyMasked = on ? '1' : '0'; // 也寫進 data 屬性
-  saveMask(on);
-  updateHeaderIcons(); // 切遮罩時換 icon
-}
-function toggleMask(){ applyMask(!getMaskOn()); }
-
-// =================== Drawer ===================
-function toggleDrawer(){
-  App.drawerOpen = !App.drawerOpen;
-  // 同時支援 id 或 class
-  const d = document.querySelector('#drawer, .drawer');
-  if (!d) {
-    console.warn('[toggleDrawer] drawer element not found. Expect #drawer or .drawer');
-    return;
-  }
-  d.classList.toggle('show', App.drawerOpen);
-  document.body.classList.toggle('drawer-open', App.drawerOpen);
-}
-
-function promoteDashboardInDrawer(){
-  const drawer = byId('drawer');
-  if (!drawer) return;
-  const items = drawer.querySelectorAll('.navItem');
-  if (!items.length) return;
-  const dash = Array.from(items).find(x => x.textContent.trim().startsWith('Dashboard'));
-  if (dash && items[0] !== dash) drawer.insertBefore(dash, items[0]);
-  if (dash) dash.classList.add('navItem--primary');
-}
-
-//==================================== Policy ===============================================
-App.modules = App.modules || {};
-App.modules.policy = (function(){
-  let rows = [];        // [[yyMM, age, bonus, draw, pl, invest]]
-  let years = [];       // ['25/08', '25/09', ...]
-  let curIdx = 0;
-  let chart = null;
-  let ctx = null;
-
-  function q(id){ return document.getElementById(id); }
-  const numFmt0 = v => Number(v||0).toLocaleString('zh-Hant-TW',{maximumFractionDigits:0});
-
-  function init(){
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
-    q('page-policy').classList.add('show');
-
-    // 綁事件
-    q('polBtnRefresh').onclick = load;
-    q('polPrev').onclick = ()=> setIndex(Math.max(0, curIdx-1));
-    q('polNext').onclick = ()=> setIndex(Math.min(years.length-1, curIdx+1));
-    q('polRange').oninput = (e)=> setIndex(Number(e.target.value));
-
-    // 初始化 chart ctx
-    ctx = q('polChart').getContext('2d');
-
-    // 載入 A1:B10 控制項
-    loadControlsAB10();
-
-    // 載入主資料
-    load();
-  }
-
-  function loadControlsAB10(){
-    const box = q('polCtrlBody');
-    box.innerHTML = `<div class="empty">載入中…</div>`;
-    google.script.run
-      .withSuccessHandler(arr=>{
-        if (!arr || !arr.length){ box.innerHTML = `<div class="empty">沒有資料</div>`; return; }
-        const html = [
-          '<table class="ctrl-table"><thead><tr><th>欄</th><th>值</th></tr></thead><tbody>',
-          ...arr.map((r,i)=>`<tr><td>${escapeHtml(r[0]??'')}</td><td>${escapeHtml(r[1]??'')}</td></tr>`),
-          '</tbody></table>'
-        ].join('');
-        box.innerHTML = html;
-      })
-      .withFailureHandler(err=>{
-        box.innerHTML = `<div class="empty">讀取失敗：${(err && err.message)||err}</div>`;
-        console.error('[policy] getPolicyControlsRange ERR', err);
-      })
-      .getPolicyControlsRange();
-  }
-
-  function load(){
-    q('polTbody').innerHTML = `<tr><td colspan="6" class="empty">載入中…</td></tr>`;
-    google.script.run
-      .withSuccessHandler(res=>{
-        // res: {headers, rows:[[yyMM,age,bonus,draw,pl,invest]...], years:['yy/MM'...]}
-        rows  = (res && res.rows)  || [];
-        years = (res && res.years) || rows.map(r=>r?.[0]);
-
-        // slider 設定
-        const rng = q('polRange');
-        rng.min = 0; rng.max = Math.max(0, rows.length-1); rng.value = rows.length-1;
-
-        q('polMinYear').textContent = years[0] ?? '--';
-        q('polMaxYear').textContent = years[years.length-1] ?? '--';
-
-        // 明細表
-        renderTable();
-
-        // 圖表先畫（不顯示數值）
-        renderChart();
-
-        // 設定目前點（觸發 KPI + readout）
-        setIndex(rows.length-1, true);
-      })
-      .withFailureHandler(err=>{
-        q('polTbody').innerHTML = `<tr><td colspan="6" class="empty">讀取失敗：${(err && err.message)||err}</td></tr>`;
-        console.error('[policy] load ERR', err);
-      })
-      .getPolicyGrowth();
-  }
-
-  function setIndex(i, skipChartUpdate=false){
-    curIdx = Math.max(0, Math.min(i, rows.length-1));
-    const cur = rows[curIdx] || [];
-    q('polRange').value = curIdx;
-    q('polCurYear').textContent = years[curIdx] ?? '--';
-
-    // KPI（用全站的膠囊風格：加上 .chip）
-    q('polKpiAge').textContent    = (cur[1] ?? '--');
-    q('polKpiBonus').textContent  = (cur[2] ?? '--');
-    q('polKpiDraw').textContent   = numFmt0(cur[3]);
-    q('polKpiPL').textContent     = numFmt0(cur[4]);
-    q('polKpiInvest').textContent = numFmt0(cur[5]);
-
-    // 圖表高亮 + 下方 readout（只顯示目前點數值 → 需求 2）
-    if (!skipChartUpdate && chart){
-      const idx = curIdx;
-      chart.data.datasets.forEach(ds=>{
-        ds.pointRadius = ds.data.map((_,j)=> j===idx ? 5 : 2);
-      });
-      chart.update('none');
+  // =================== 全域狀態 ===================
+  const App = {
+    drawerOpen: false,
+    routes: {},                      // pageKey -> onEnter()
+    pages: {},                       // pageKey -> { init?, refresh? }
+    titles: {
+      input: '記帳',
+      dashmain: 'Dashboard', debt: '債務', record: 'Database',
+      ctbc: 'CTBC', policy: '定存保單', gcv: 'GCV',
+      mrpt: '投資月報表', fortune: '年報表', stk: '股票總表',
+      grw: 'Growin', anlys: '投資分析', charts: 'Charts', links: '其他連結'
     }
-    q('polReadout').innerHTML = `
+  };
+
+  // =================== Utils ===================
+  function esc(s) {
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" };
+    return String(s).replace(/[&<>"']/g, m => map[m]);
+  }
+  function byId(id) { return document.getElementById(id); }
+  function setText(id, txt) { const el = byId(id); if (el) el.textContent = txt; }
+
+
+  // ====== Mobile UX hooks ======
+  function isMobile() { return window.matchMedia('(max-width: 720px)').matches; }
+
+  // =================== 主題 ===================
+  function getSavedTheme() {
+    try { return localStorage.getItem('cw_theme') || 'dark'; } catch (e) { return 'dark'; }
+  }
+  function saveTheme(mode) {
+    try { localStorage.setItem('cw_theme', mode); } catch (e) { }
+  }
+  function applyTheme(mode) {
+    // 同時支援你舊的 .light class 與 data-theme
+    const root = document.documentElement;
+    root.dataset.theme = mode;                // data-theme="light|dark"
+    root.classList.toggle('light', mode === 'light'); // 舊樣式保險
+    saveTheme(mode);
+    updateHeaderIcons(); // 切主題時換 icon
+  }
+  function initTheme() {
+    applyTheme(getSavedTheme());
+  }
+  function toggleTheme() {
+    const next = (document.documentElement.dataset.theme === 'dark') ? 'light' : 'dark';
+    applyTheme(next);
+  }
+
+  // =================== 數字遮罩 ===================
+  const MASK_LS_KEY = 'moneyMasked';
+  function getMaskOn() { try { return localStorage.getItem(MASK_LS_KEY) === '1'; } catch (e) { return false; } }
+  function saveMask(on) { try { localStorage.setItem(MASK_LS_KEY, on ? '1' : '0'); } catch (e) { } }
+  function applyMask(on) {
+    document.body.classList.toggle('mask-on', on);           // 你原本的 body class
+    document.documentElement.dataset.moneyMasked = on ? '1' : '0'; // 也寫進 data 屬性
+    saveMask(on);
+    updateHeaderIcons(); // 切遮罩時換 icon
+  }
+  function toggleMask() { applyMask(!getMaskOn()); }
+
+  // =================== Drawer ===================
+  function toggleDrawer() {
+    App.drawerOpen = !App.drawerOpen;
+    // 同時支援 id 或 class
+    const d = document.querySelector('#drawer, .drawer');
+    if (!d) {
+      console.warn('[toggleDrawer] drawer element not found. Expect #drawer or .drawer');
+      return;
+    }
+    d.classList.toggle('show', App.drawerOpen);
+    document.body.classList.toggle('drawer-open', App.drawerOpen);
+  }
+
+  function promoteDashboardInDrawer() {
+    const drawer = byId('drawer');
+    if (!drawer) return;
+    const items = drawer.querySelectorAll('.navItem');
+    if (!items.length) return;
+    const dash = Array.from(items).find(x => x.textContent.trim().startsWith('Dashboard'));
+    if (dash && items[0] !== dash) drawer.insertBefore(dash, items[0]);
+    if (dash) dash.classList.add('navItem--primary');
+  }
+
+  //==================================== Policy ===============================================
+  App.modules = App.modules || {};
+  App.modules.policy = (function () {
+    let rows = [];        // [[yyMM, age, bonus, draw, pl, invest]]
+    let years = [];       // ['25/08', '25/09', ...]
+    let curIdx = 0;
+    let chart = null;
+    let ctx = null;
+
+    function q(id) { return document.getElementById(id); }
+    const numFmt0 = v => Number(v || 0).toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 });
+
+    function init() {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('show'));
+      q('page-policy').classList.add('show');
+
+      // 綁事件
+      q('polBtnRefresh').onclick = load;
+      q('polPrev').onclick = () => setIndex(Math.max(0, curIdx - 1));
+      q('polNext').onclick = () => setIndex(Math.min(years.length - 1, curIdx + 1));
+      q('polRange').oninput = (e) => setIndex(Number(e.target.value));
+
+      // 初始化 chart ctx
+      ctx = q('polChart').getContext('2d');
+
+      // 載入 A1:B10 控制項
+      loadControlsAB10();
+
+      // 載入主資料
+      load();
+    }
+
+    function loadControlsAB10() {
+      const box = q('polCtrlBody');
+      box.innerHTML = `<div class="empty">載入中…</div>`;
+      google.script.run
+        .withSuccessHandler(arr => {
+          if (!arr || !arr.length) { box.innerHTML = `<div class="empty">沒有資料</div>`; return; }
+          const html = [
+            '<table class="ctrl-table"><thead><tr><th>欄</th><th>值</th></tr></thead><tbody>',
+            ...arr.map((r, i) => `<tr><td>${escapeHtml(r[0] ?? '')}</td><td>${escapeHtml(r[1] ?? '')}</td></tr>`),
+            '</tbody></table>'
+          ].join('');
+          box.innerHTML = html;
+        })
+        .withFailureHandler(err => {
+          box.innerHTML = `<div class="empty">讀取失敗：${(err && err.message) || err}</div>`;
+          console.error('[policy] getPolicyControlsRange ERR', err);
+        })
+        .getPolicyControlsRange();
+    }
+
+    function load() {
+      q('polTbody').innerHTML = `<tr><td colspan="6" class="empty">載入中…</td></tr>`;
+      google.script.run
+        .withSuccessHandler(res => {
+          // res: {headers, rows:[[yyMM,age,bonus,draw,pl,invest]...], years:['yy/MM'...]}
+          rows = (res && res.rows) || [];
+          years = (res && res.years) || rows.map(r => r?.[0]);
+
+          // slider 設定
+          const rng = q('polRange');
+          rng.min = 0; rng.max = Math.max(0, rows.length - 1); rng.value = rows.length - 1;
+
+          q('polMinYear').textContent = years[0] ?? '--';
+          q('polMaxYear').textContent = years[years.length - 1] ?? '--';
+
+          // 明細表
+          renderTable();
+
+          // 圖表先畫（不顯示數值）
+          renderChart();
+
+          // 設定目前點（觸發 KPI + readout）
+          setIndex(rows.length - 1, true);
+        })
+        .withFailureHandler(err => {
+          q('polTbody').innerHTML = `<tr><td colspan="6" class="empty">讀取失敗：${(err && err.message) || err}</td></tr>`;
+          console.error('[policy] load ERR', err);
+        })
+        .getPolicyGrowth();
+    }
+
+    function setIndex(i, skipChartUpdate = false) {
+      curIdx = Math.max(0, Math.min(i, rows.length - 1));
+      const cur = rows[curIdx] || [];
+      q('polRange').value = curIdx;
+      q('polCurYear').textContent = years[curIdx] ?? '--';
+
+      // KPI（用全站的膠囊風格：加上 .chip）
+      q('polKpiAge').textContent = (cur[1] ?? '--');
+      q('polKpiBonus').textContent = (cur[2] ?? '--');
+      q('polKpiDraw').textContent = numFmt0(cur[3]);
+      q('polKpiPL').textContent = numFmt0(cur[4]);
+      q('polKpiInvest').textContent = numFmt0(cur[5]);
+
+      // 圖表高亮 + 下方 readout（只顯示目前點數值 → 需求 2）
+      if (!skipChartUpdate && chart) {
+        const idx = curIdx;
+        chart.data.datasets.forEach(ds => {
+          ds.pointRadius = ds.data.map((_, j) => j === idx ? 5 : 2);
+        });
+        chart.update('none');
+      }
+      q('polReadout').innerHTML = `
       <div class="chip">累計提領：<b>${numFmt0(cur[3])}</b></div>
       <div class="chip">Total P/L：<b>${numFmt0(cur[4])}</b></div>
     `;
-  }
-
-  function renderTable(){
-    const tb = q('polTbody');
-    if (!rows.length){
-      tb.innerHTML = `<tr><td colspan="6" class="empty">沒有資料</td></tr>`;
-      return;
     }
-    tb.innerHTML = rows.map(r=>`
+
+    function renderTable() {
+      const tb = q('polTbody');
+      if (!rows.length) {
+        tb.innerHTML = `<tr><td colspan="6" class="empty">沒有資料</td></tr>`;
+        return;
+      }
+      tb.innerHTML = rows.map(r => `
       <tr>
         <td>${r[0] ?? '--'}</td>
         <td>${r[1] ?? '--'}</td>
@@ -209,345 +209,352 @@ App.modules.policy = (function(){
         <td class="num">${numFmt0(r[5])}</td>
       </tr>
     `).join('');
-  }
-
-  function renderChart(){
-    const labels = years;
-    const dDraw  = rows.map(r=>r[3]);
-    const dPL    = rows.map(r=>r[4]);
-
-    if (chart){ chart.destroy(); }
-    chart = new Chart(ctx,{
-      type:'line',
-      data:{
-        labels,
-        datasets:[
-          {label:'累計提領', data:dDraw, tension:.25, pointRadius:2},
-          {label:'Total P/L', data:dPL, tension:.25, pointRadius:2}
-        ]
-      },
-      options:{
-        responsive:true,
-        maintainAspectRatio:false,
-        interaction:{mode:'nearest', intersect:false},
-        plugins:{
-          legend:{position:'top'},
-          tooltip:{ enabled:false } // 預設不顯示任何數值（需求 2）
-        },
-        scales:{
-          y:{ticks:{callback:(v)=> numFmt0(v)}}
-        },
-        onClick:(_, els)=>{ if (els?.length){ setIndex(els[0].index); } }
-      }
-    });
-  }
-
-  function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
-
-  return { init };
-})();
-
-
-// =================== 路由 / 切頁 ===================
-function renderBreadcrumb(page){
-  const bc = byId('breadcrumb');
-  if (!bc) return;
-  const t = App.titles[page] || page;
-  bc.innerHTML = `<div class="crumb current">${esc(t)}</div>`;
-}
-function setHdrH(){
-  const hd = document.querySelector('header');
-  const h = hd ? Math.ceil(hd.getBoundingClientRect().height) : 72;
-  document.documentElement.style.setProperty('--hdrH', h + 'px');
-}
-function updateTabbarActive(page){
-  const bar = byId('tabbar');
-  if (!bar) return;
-  bar.querySelectorAll('.tabbtn').forEach(btn=>{
-    let p = btn.getAttribute('data-page');
-    if (!p) {
-      const to = btn.getAttribute('data-to') || '';
-      p = to.startsWith('page-') ? to.replace(/^page-/, '') : to;
     }
-    btn.classList.toggle('active', p && p === page);
-  });
-}
-function go(page){
-  // 顯示/隱藏 section
-  document.querySelectorAll('section[id^="page_"], .page').forEach(sec=>{
-    const id = sec.id || ''; // 兼容 .page.show
-    const key = id.replace(/^page[-_]/,'');
-    const isTarget = (id === 'page-' + page) || (id === 'page_' + page) || (key === page);
-    sec.classList.toggle('show', isTarget);
-    if ('style' in sec) sec.style.display = isTarget ? '' : 'none';
-  });
 
-  App.currentPage = page;
+    function renderChart() {
+      const labels = years;
+      const dDraw = rows.map(r => r[3]);
+      const dPL = rows.map(r => r[4]);
 
-  // 標題 + 麵包屑
-  setText('title', App.titles[page] || 'Cody Wealth');
-  renderBreadcrumb(page);
+      if (chart) { chart.destroy(); }
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: '累計提領', data: dDraw, tension: .25, pointRadius: 2 },
+            { label: 'Total P/L', data: dPL, tension: .25, pointRadius: 2 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'nearest', intersect: false },
+          plugins: {
+            legend: { position: 'top' },
+            tooltip: { enabled: false } // 預設不顯示任何數值（需求 2）
+          },
+          scales: {
+            y: { ticks: { callback: (v) => numFmt0(v) } }
+          },
+          onClick: (_, els) => { if (els?.length) { setIndex(els[0].index); } }
+        }
+      });
+    }
 
-  // NOW bar 僅 input 顯示
-  const nb = byId('nowbar');
-  if (nb) nb.style.display = (page==='input' ? '' : 'none');
+    function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
 
-  // Page hook
-  if (typeof App.routes[page] === 'function') App.routes[page]();
+    return { init };
+  })();
 
-  // 手機 UX：關抽屜 + tab 高亮
-  if (isMobile() && App.drawerOpen) toggleDrawer();
-  updateTabbarActive(page);
-}
-window.go = go;                 // 給 HTML onClick 用
-window.toggleTheme = toggleTheme;
-window.toggleDrawer = toggleDrawer;
-window.toggleSubmenu = toggleSubmenu; // 讓 HTML onclick 可用
-
-let openSubmenuId = null;
-function toggleSubmenu(id){
-  const target = document.getElementById(id);
-  if (!target) return;
-
-  // 關閉別的
-  if (openSubmenuId && openSubmenuId !== id){
-    const prev = document.getElementById(openSubmenuId);
-    prev && prev.classList.remove('show');
-  }
-
-  const willShow = !target.classList.contains('show');
-  target.classList.toggle('show', willShow);
-  openSubmenuId = willShow ? id : null;
-}
-
-// =================== Header 按鈕（集中綁定） ===================
-function updateHeaderIcons(){
-  // theme：dark -> 顯示太陽；light -> 顯示月亮
-  const themeIco = document.querySelector('#btnTheme .material-symbols-outlined');
-  if (themeIco){
-    const mode = document.documentElement.dataset.theme || 'dark';
-    themeIco.textContent = (mode === 'dark') ? 'light_mode' : 'dark_mode';
-    themeIco.setAttribute('aria-label', mode === 'dark' ? '切換為淺色主題' : '切換為深色主題');
-  }
-  // mask：on -> visibility_off；off -> visibility
-  const maskIco = document.querySelector('#btnMask .material-symbols-outlined');
-  if (maskIco){
-    const on = getMaskOn();
-    maskIco.textContent = on ? 'visibility_off' : 'visibility';
-    maskIco.setAttribute('aria-pressed', on ? 'true' : 'false');
-  }
-}
-function bindHeaderBtns(){
-  const btn = (id)=>byId(id);
-
-  // 滑過/按下視覺回饋（加/移除 press 狀態）
-  const attachFX = (el)=>{
-    if (!el || el.__fxBound) return;
-    el.addEventListener('pointerdown', ()=> el.classList.add('is-press'));
-    ['pointerup','pointerleave','blur'].forEach(evt=> el.addEventListener(evt, ()=> el.classList.remove('is-press')));
-    el.__fxBound = true;
+  // NEW: Register Page for App.js (Refresh)
+  App.pages = App.pages || {};
+  App.pages.policy = {
+    init: () => App.modules.policy.init(),
+    refresh: () => App.modules.policy.init()
   };
 
-  // 重新整理（優先當前頁 refresh；退而重載 dashmain；最後整頁 reload）
-  const refresh = byId('btnRefresh');
-  if (refresh && !refresh.__bound){
-    refresh.addEventListener('click', ()=>{
-      // 旋轉回饋
-      const ico = refresh.querySelector('.material-symbols-outlined');
-      if (ico){
-        ico.classList.remove('btnSpinOnce'); // 連點時可重觸發
-        // 強制重排以重新觸發動畫
-        // eslint-disable-next-line no-unused-expressions
-        ico.offsetWidth;
-        ico.classList.add('btnSpinOnce');
-        setTimeout(()=> ico.classList.remove('btnSpinOnce'), 220);
-      }
 
-      const p = App.currentPage;
-      if (p && App.pages[p]?.refresh){
-        try { App.pages[p].refresh(); return; } catch(e){ console.error(e); }
+  // =================== 路由 / 切頁 ===================
+  function renderBreadcrumb(page) {
+    const bc = byId('breadcrumb');
+    if (!bc) return;
+    const t = App.titles[page] || page;
+    bc.innerHTML = `<div class="crumb current">${esc(t)}</div>`;
+  }
+  function setHdrH() {
+    const hd = document.querySelector('header');
+    const h = hd ? Math.ceil(hd.getBoundingClientRect().height) : 72;
+    document.documentElement.style.setProperty('--hdrH', h + 'px');
+  }
+  function updateTabbarActive(page) {
+    const bar = byId('tabbar');
+    if (!bar) return;
+    bar.querySelectorAll('.tabbtn').forEach(btn => {
+      let p = btn.getAttribute('data-page');
+      if (!p) {
+        const to = btn.getAttribute('data-to') || '';
+        p = to.startsWith('page-') ? to.replace(/^page-/, '') : to;
       }
-      if (App.pages.dashmain?.refresh){
-        try { App.pages.dashmain.refresh(); return; } catch(e){ console.error(e); }
-      }
-      location.reload();
+      btn.classList.toggle('active', p && p === page);
     });
-    attachFX(refresh);
-    refresh.__bound = true;
   }
+  function go(page) {
+    // 顯示/隱藏 section
+    document.querySelectorAll('section[id^="page_"], .page').forEach(sec => {
+      const id = sec.id || ''; // 兼容 .page.show
+      const key = id.replace(/^page[-_]/, '');
+      const isTarget = (id === 'page-' + page) || (id === 'page_' + page) || (key === page);
+      sec.classList.toggle('show', isTarget);
+      if ('style' in sec) sec.style.display = isTarget ? '' : 'none';
+    });
 
-  // 隱藏金額
-  const mask = btn('btnMask');
-  if (mask && !mask.__bound){
-    mask.addEventListener('click', toggleMask);
-    attachFX(mask);
-    mask.__bound = true;
+    App.currentPage = page;
+
+    // 標題 + 麵包屑
+    setText('title', App.titles[page] || 'Cody Wealth');
+    renderBreadcrumb(page);
+
+    // NOW bar 僅 input 顯示
+    const nb = byId('nowbar');
+    if (nb) nb.style.display = (page === 'input' ? '' : 'none');
+
+    // Page hook
+    if (typeof App.routes[page] === 'function') App.routes[page]();
+
+    // 手機 UX：關抽屜 + tab 高亮
+    if (isMobile() && App.drawerOpen) toggleDrawer();
+    updateTabbarActive(page);
   }
+  window.go = go;                 // 給 HTML onClick 用
+  window.toggleTheme = toggleTheme;
+  window.toggleDrawer = toggleDrawer;
+  window.toggleSubmenu = toggleSubmenu; // 讓 HTML onclick 可用
 
-  // 主題
-  const theme = btn('btnTheme');
-  if (theme && !theme.__bound){
-    theme.addEventListener('click', toggleTheme);
-    attachFX(theme);
-    theme.__bound = true;
-  }
-
-  // 設定
-  const settings = btn('openSettings') || btn('btnSettings');
-  if (settings && !settings.__bound){
-    settings.addEventListener('click', ()=> go('settings'));
-    attachFX(settings);
-    settings.__bound = true;
-  }
-
-  // Menu（若存在）
-  const menu = btn('btnMenu');
-  if (menu && !menu.__bound){
-    menu.addEventListener('click', toggleDrawer);
-    attachFX(menu);
-    menu.__bound = true;
-  }
-
-  // Logo（若存在）
-  const logo = btn('btnLogo');
-  if (logo && !logo.__bound){
-    logo.addEventListener('click', ()=> go('dashmain'));
-    logo.__bound = true;
-  }
-}
-
-// =================== 初始化 ===================
-function initFromPrefs(){
-  // 主題
-  initTheme();
-  // 遮罩
-  applyMask(getMaskOn());
-  // header icon 依狀態更新
-  updateHeaderIcons();
-}
-function appStart(){
-  setHdrH();
-  window.addEventListener('resize', setHdrH);
-
-  promoteDashboardInDrawer();
-  bindHeaderBtns();
-  initFromPrefs();
-
-  // 起始頁：hash > 預設 dashmain
-  const first = (location.hash || '').replace(/^#/, '') || 'dashmain';
-  go(first);
-
-  // 若 dashmain 有進場初始化
-  if (first === 'dashmain'){
-    try {
-      if (App.pages.dashmain?.init) App.pages.dashmain.init();
-      else if (typeof loadDashboard === 'function') loadDashboard(); // 後備
-    } catch(e){ console.error(e); }
-  }
-
-  // data-go 一次代理
-  document.addEventListener('click', (e)=>{
-    const trg = e.target.closest('[data-go]');
-    if (!trg) return;
-    const p = (trg.getAttribute('data-go') || '').replace(/^page[-_]/,'');
-    if (p) go(p);
-  });
-}
-
-// 啟動
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', appStart);
-else appStart();
-
-(function(){
-  const wrap = document.getElementById('hdrFabWrap');
-  if (!wrap) return;
-
-  const btn = document.getElementById('hdrFab');
-  const menu = document.getElementById('hdrFabMenu');
-
-  function close(){
-    document.body.classList.remove('hdr-fab-open');
-    if (btn) btn.setAttribute('aria-expanded','false');
-  }
-  function open(){
-    document.body.classList.add('hdr-fab-open');
-    if (btn) btn.setAttribute('aria-expanded','true');
-  }
-
-  btn?.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    const opened = document.body.classList.contains('hdr-fab-open');
-    opened ? close() : open();
-  });
-
-  // 依你的既有邏輯呼叫對應功能（最小侵入）
-  menu?.addEventListener('click', (e)=>{
-    const b = e.target.closest('button[data-act]'); if (!b) return;
-    const a = b.dataset.act;
-    switch(a){
-      case 'refresh': {
-      const p = App.currentPage;
-      if (p && App.pages[p]?.refresh) { App.pages[p].refresh(); }
-      else if (App.pages.dashmain?.refresh) { App.pages.dashmain.refresh(); }
-      else if (typeof window.loadDashboard === 'function') { loadDashboard(); }
-      else { location.reload(); }
-      break;
-      }
-      case 'mask':
-        toggleMask();
-        break;
-      case 'theme':
-        toggleTheme(); 
-        break;
-      case 'settings':
-        // 走你原本的設定頁導航
-        if (typeof window.go === 'function') go('settings'); 
-        break;
-    }
-  });
-})();
-
-// 讓動態插入的 header 按鈕也會綁上事件（安全版）
-(function(){
-  function safeBind(){ try{ window.bindHeaderBtns?.(); }catch(e){ console.error(e); } }
-
-  function startObserver(){
-    const target = document.body || document.documentElement;
+  let openSubmenuId = null;
+  function toggleSubmenu(id) {
+    const target = document.getElementById(id);
     if (!target) return;
-    const mo = new MutationObserver(()=> safeBind());
-    mo.observe(target, { childList:true, subtree:true });
-    // 先跑一次，避免剛進來沒有綁
-    safeBind();
+
+    // 關閉別的
+    if (openSubmenuId && openSubmenuId !== id) {
+      const prev = document.getElementById(openSubmenuId);
+      prev && prev.classList.remove('show');
+    }
+
+    const willShow = !target.classList.contains('show');
+    target.classList.toggle('show', willShow);
+    openSubmenuId = willShow ? id : null;
   }
 
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', startObserver, { once:true });
-  }else{
-    startObserver();
+  // =================== Header 按鈕（集中綁定） ===================
+  function updateHeaderIcons() {
+    // theme：dark -> 顯示太陽；light -> 顯示月亮
+    const themeIco = document.querySelector('#btnTheme .material-symbols-outlined');
+    if (themeIco) {
+      const mode = document.documentElement.dataset.theme || 'dark';
+      themeIco.textContent = (mode === 'dark') ? 'light_mode' : 'dark_mode';
+      themeIco.setAttribute('aria-label', mode === 'dark' ? '切換為淺色主題' : '切換為深色主題');
+    }
+    // mask：on -> visibility_off；off -> visibility
+    const maskIco = document.querySelector('#btnMask .material-symbols-outlined');
+    if (maskIco) {
+      const on = getMaskOn();
+      maskIco.textContent = on ? 'visibility_off' : 'visibility';
+      maskIco.setAttribute('aria-pressed', on ? 'true' : 'false');
+    }
   }
-})();
+  function bindHeaderBtns() {
+    const btn = (id) => byId(id);
 
-// ===== Card zoom touch helpers (global, reusable) =====
-(function(){
-  const SCOPE = '.cards-zoom-scope';
-  function onTouchStart(e){
-    const card = e.target.closest('.card');
-    if (!card) return;
-    const scope = card.closest(SCOPE);
-    if (!scope) return;
-    scope.classList.add('is-touching');
-    scope.querySelectorAll('.card--hot').forEach(c => c.classList.remove('card--hot'));
-    card.classList.add('card--hot');
+    // 滑過/按下視覺回饋（加/移除 press 狀態）
+    const attachFX = (el) => {
+      if (!el || el.__fxBound) return;
+      el.addEventListener('pointerdown', () => el.classList.add('is-press'));
+      ['pointerup', 'pointerleave', 'blur'].forEach(evt => el.addEventListener(evt, () => el.classList.remove('is-press')));
+      el.__fxBound = true;
+    };
+
+    // 重新整理（優先當前頁 refresh；退而重載 dashmain；最後整頁 reload）
+    const refresh = byId('btnRefresh');
+    if (refresh && !refresh.__bound) {
+      refresh.addEventListener('click', () => {
+        // 旋轉回饋
+        const ico = refresh.querySelector('.material-symbols-outlined');
+        if (ico) {
+          ico.classList.remove('btnSpinOnce'); // 連點時可重觸發
+          // 強制重排以重新觸發動畫
+          // eslint-disable-next-line no-unused-expressions
+          ico.offsetWidth;
+          ico.classList.add('btnSpinOnce');
+          setTimeout(() => ico.classList.remove('btnSpinOnce'), 220);
+        }
+
+        const p = App.currentPage;
+        if (p && App.pages[p]?.refresh) {
+          try { App.pages[p].refresh(); return; } catch (e) { console.error(e); }
+        }
+        if (App.pages.dashmain?.refresh) {
+          try { App.pages.dashmain.refresh(); return; } catch (e) { console.error(e); }
+        }
+        location.reload();
+      });
+      attachFX(refresh);
+      refresh.__bound = true;
+    }
+
+    // 隱藏金額
+    const mask = btn('btnMask');
+    if (mask && !mask.__bound) {
+      mask.addEventListener('click', toggleMask);
+      attachFX(mask);
+      mask.__bound = true;
+    }
+
+    // 主題
+    const theme = btn('btnTheme');
+    if (theme && !theme.__bound) {
+      theme.addEventListener('click', toggleTheme);
+      attachFX(theme);
+      theme.__bound = true;
+    }
+
+    // 設定
+    const settings = btn('openSettings') || btn('btnSettings');
+    if (settings && !settings.__bound) {
+      settings.addEventListener('click', () => go('settings'));
+      attachFX(settings);
+      settings.__bound = true;
+    }
+
+    // Menu（若存在）
+    const menu = btn('btnMenu');
+    if (menu && !menu.__bound) {
+      menu.addEventListener('click', toggleDrawer);
+      attachFX(menu);
+      menu.__bound = true;
+    }
+
+    // Logo（若存在）
+    const logo = btn('btnLogo');
+    if (logo && !logo.__bound) {
+      logo.addEventListener('click', () => go('dashmain'));
+      logo.__bound = true;
+    }
   }
-  function clearTouch(){
-    document.querySelectorAll(SCOPE).forEach(scope => {
-      scope.classList.remove('is-touching');
-      scope.querySelectorAll('.card--hot').forEach(c => c.classList.remove('card--hot'));
+
+  // =================== 初始化 ===================
+  function initFromPrefs() {
+    // 主題
+    initTheme();
+    // 遮罩
+    applyMask(getMaskOn());
+    // header icon 依狀態更新
+    updateHeaderIcons();
+  }
+  function appStart() {
+    setHdrH();
+    window.addEventListener('resize', setHdrH);
+
+    promoteDashboardInDrawer();
+    bindHeaderBtns();
+    initFromPrefs();
+
+    // 起始頁：hash > 預設 dashmain
+    const first = (location.hash || '').replace(/^#/, '') || 'dashmain';
+    go(first);
+
+    // 若 dashmain 有進場初始化
+    if (first === 'dashmain') {
+      try {
+        if (App.pages.dashmain?.init) App.pages.dashmain.init();
+        else if (typeof loadDashboard === 'function') loadDashboard(); // 後備
+      } catch (e) { console.error(e); }
+    }
+
+    // data-go 一次代理
+    document.addEventListener('click', (e) => {
+      const trg = e.target.closest('[data-go]');
+      if (!trg) return;
+      const p = (trg.getAttribute('data-go') || '').replace(/^page[-_]/, '');
+      if (p) go(p);
     });
   }
-  document.addEventListener('touchstart', onTouchStart, { passive: true });
-  document.addEventListener('touchend',   clearTouch,    { passive: true });
-  document.addEventListener('touchcancel',clearTouch,    { passive: true });
-})();
+
+  // 啟動
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', appStart);
+  else appStart();
+
+  (function () {
+    const wrap = document.getElementById('hdrFabWrap');
+    if (!wrap) return;
+
+    const btn = document.getElementById('hdrFab');
+    const menu = document.getElementById('hdrFabMenu');
+
+    function close() {
+      document.body.classList.remove('hdr-fab-open');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+    function open() {
+      document.body.classList.add('hdr-fab-open');
+      if (btn) btn.setAttribute('aria-expanded', 'true');
+    }
+
+    btn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const opened = document.body.classList.contains('hdr-fab-open');
+      opened ? close() : open();
+    });
+
+    // 依你的既有邏輯呼叫對應功能（最小侵入）
+    menu?.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-act]'); if (!b) return;
+      const a = b.dataset.act;
+      switch (a) {
+        case 'refresh': {
+          const p = App.currentPage;
+          if (p && App.pages[p]?.refresh) { App.pages[p].refresh(); }
+          else if (App.pages.dashmain?.refresh) { App.pages.dashmain.refresh(); }
+          else if (typeof window.loadDashboard === 'function') { loadDashboard(); }
+          else { location.reload(); }
+          break;
+        }
+        case 'mask':
+          toggleMask();
+          break;
+        case 'theme':
+          toggleTheme();
+          break;
+        case 'settings':
+          // 走你原本的設定頁導航
+          if (typeof window.go === 'function') go('settings');
+          break;
+      }
+    });
+  })();
+
+  // 讓動態插入的 header 按鈕也會綁上事件（安全版）
+  (function () {
+    function safeBind() { try { window.bindHeaderBtns?.(); } catch (e) { console.error(e); } }
+
+    function startObserver() {
+      const target = document.body || document.documentElement;
+      if (!target) return;
+      const mo = new MutationObserver(() => safeBind());
+      mo.observe(target, { childList: true, subtree: true });
+      // 先跑一次，避免剛進來沒有綁
+      safeBind();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startObserver, { once: true });
+    } else {
+      startObserver();
+    }
+  })();
+
+  // ===== Card zoom touch helpers (global, reusable) =====
+  (function () {
+    const SCOPE = '.cards-zoom-scope';
+    function onTouchStart(e) {
+      const card = e.target.closest('.card');
+      if (!card) return;
+      const scope = card.closest(SCOPE);
+      if (!scope) return;
+      scope.classList.add('is-touching');
+      scope.querySelectorAll('.card--hot').forEach(c => c.classList.remove('card--hot'));
+      card.classList.add('card--hot');
+    }
+    function clearTouch() {
+      document.querySelectorAll(SCOPE).forEach(scope => {
+        scope.classList.remove('is-touching');
+        scope.querySelectorAll('.card--hot').forEach(c => c.classList.remove('card--hot'));
+      });
+    }
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchend', clearTouch, { passive: true });
+    document.addEventListener('touchcancel', clearTouch, { passive: true });
+  })();
 
 </script>

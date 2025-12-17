@@ -480,9 +480,24 @@
     return {
       init,
       __getRows: () => vs.rows,
-      reloadList: () => loadTx(document.getElementById('txAccountPick')?.value || '')
+      reloadList: () => loadTx(document.getElementById('txAccountPick')?.value || ''),
+      updateBalanceCard
     };
   })();
+
+  App.pages = App.pages || {};
+  App.pages.input = {
+    init: () => App.modules.pageInput.init(),
+    refresh: () => {
+      App.modules.pageInput.reloadList();
+      App.modules.pageInput.updateBalanceCard();
+      // Optional: Refresh Meta (Accounts)
+      if (google?.script?.run) {
+        // Re-fetch accounts might be overkill but ensures consistency
+        // google.script.run.withSuccessHandler(meta => ...).getMeta();
+      }
+    }
+  };
 
   /* ===== 帳戶餘額：計算工具 (Server-Side) ===== */
 

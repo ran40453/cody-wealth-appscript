@@ -3,73 +3,109 @@
     <!-- A：總覽 KPI -->
     <section class="card kpi">
       <header class="card-hd">
-        <div class="title">總覽</div>
+        <div class="card-hd-pill" data-go="record">
+          <span class="material-symbols-outlined ico">dashboard</span>
+          <span class="txt">Summary</span>
+        </div>
         <span id="dashPnlPill" class="pnl-pill">–</span>
-        <button class="btn-ghost" data-go="record" title="明細"><span class="material-symbols-outlined">receipt_long</span></button>
       </header>
       <div class="kpi-list">
-        <div class="kpi-item"><div class="k">總資產</div><div id="kpiTotal" class="v money capsule">—</div></div>
-        <div class="kpi-item"><div class="k">淨資產</div><div id="kpiNet" class="v money capsule">—</div></div>
-        <div class="kpi-item"><div class="k">現金</div><div id="kpiCash" class="v money capsule">—</div></div>
-        <div class="kpi-item"><div class="k">可動用</div><div id="kpiAvail" class="v money capsule">—</div></div>
-        <div class="kpi-item"><div class="k">USD</div><div id="kpiUSD" class="v money capsule"></div></div>
-        <div class="kpi-item"><div class="k">更新日</div><div id="kpiDate" class="v capsule">—</div></div>
+        <div class="kpi-item">
+          <div class="k">總資產</div>
+          <div id="kpiTotal" class="v money capsule">—</div>
+        </div>
+        <div class="kpi-item">
+          <div class="k">淨資產</div>
+          <div id="kpiNet" class="v money capsule">—</div>
+        </div>
+        <div class="kpi-item">
+          <div class="k">現金</div>
+          <div id="kpiCash" class="v money capsule">—</div>
+        </div>
+        <div class="kpi-item">
+          <div class="k">可動用</div>
+          <div id="kpiAvail" class="v money capsule">—</div>
+        </div>
+        <div class="kpi-item">
+          <div class="k">USD</div>
+          <div id="kpiUSD" class="v money capsule"></div>
+        </div>
+        <div class="kpi-item">
+          <div class="k">更新日</div>
+          <div id="kpiDate" class="v capsule">—</div>
+        </div>
       </div>
     </section>
 
     <!-- B：投資總覽（CTBC） -->
     <section class="card ctbc">
       <header class="card-hd">
-        <div class="title">投資</div>
+        <div class="card-hd-pill" data-go="ctbc">
+          <span class="material-symbols-outlined ico">trending_up</span>
+          <span class="txt">Invest</span>
+        </div>
         <span id="ctRetPill" class="pnl-pill">—</span>
-        <button class="btn-ghost" data-go="ctbc" title="去記帳頁"><span class="material-symbols-outlined">savings</span></button>
-        <button class="btn-ghost" data-go="stk" title="股票 (STK)"><span class="material-symbols-outlined">payments</span></button>
+        <!-- Keep only Stock button, ensure it stays circular -->
+        <button class="btn-ghost" data-go="stk" style="border-radius:50%; width:32px; height:32px;"
+          title="股票 (STK)"><span class="material-symbols-outlined">payments</span></button>
       </header>
       <div class="card-bd ctbc-body">
-        <!-- 左上註解：基金 -->
-        <div class="list-caption">基金</div>
-        <div class="ctbc-list">
-          <div class="kpi-item"><div class="k">含息損益</div><div id="ctPnl" class="v money capsule">—</div></div>
-          <div class="kpi-item"><div class="k">已領利息</div><div id="ctInt" class="v money capsule">—</div></div>
-          <div class="kpi-item">
-            <div class="k">基金</div>
-            <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
-              <span class="money capsule" id="ctFundVal">—</span>
-              <span id="ctFundROI"></span>
+
+        <!-- Fund Section (Sub-card) -->
+        <div class="sub-card">
+          <div class="sub-caption">基金</div>
+          <div class="kpi-list-rows">
+            <div class="kpi-row-item">
+              <span class="k">含息損益</span>
+              <span id="ctPnl" class="v money capsule">—</span>
+            </div>
+            <div class="kpi-row-item">
+              <span class="k">已領利息</span>
+              <span id="ctInt" class="v money capsule">—</span>
+            </div>
+            <div class="kpi-row-item">
+              <span class="k">基金現值</span>
+              <div class="v kpi-valroi" style="display:flex;align-items:center;gap:6px;">
+                <span class="money capsule" id="ctFundVal">—</span>
+                <span id="ctFundROI"></span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- 左上註解：股票 -->
-        <div class="list-caption">股票</div>
-        <div class="ctbc-list markets" id="ctbcMarketsBlock">
-          <div id="ctbcMarketsList"></div>
+        <!-- Stock Section (Sub-card) -->
+        <div class="sub-card">
+          <div class="sub-caption">股票</div>
+          <div class="ctbc-list markets" id="ctbcMarketsBlock">
+            <div id="ctbcMarketsList"></div>
+          </div>
         </div>
+
       </div>
     </section>
 
     <!-- C：Plan（把標題改 Plan，右邊放 pill） -->
-      <section class="card planned">
-        <header class="card-hd">
-          <div class="title">近期</div>
-          <span id="planPnlPill" class="pnl-pill">–</span>
-          <button class="btn-ghost" data-go="input" title="歷史數據">
-            <span class="material-symbols-outlined">edit</span>
-          </button>
-        </header>
-        <div id="plannedList" class="list slim"></div>
-      </section>
+    <section class="card planned">
+      <header class="card-hd">
+        <div class="card-hd-pill" data-go="input">
+          <span class="material-symbols-outlined ico">schedule</span>
+          <span class="txt">Recent</span>
+        </div>
+        <span id="planPnlPill" class="pnl-pill">–</span>
+      </header>
+      <div id="plannedList" class="list slim"></div>
+    </section>
 
-      <!-- D：帳戶餘額（右邊放總和 pill） -->
-      <section class="card accounts">
-        <header class="card-hd">
-          <div class="title">帳戶</div>
-          <span id="accSumPill" class="pnl-pill">–</span>
-          <button class="btn-ghost" data-go="acc" title="管理帳戶">
-            <span class="material-symbols-outlined">toll</span>
-          </button>
-        </header>
-        <div id="accList" class="list slim"></div>
-      </section>
+    <!-- D：帳戶餘額（右邊放總和 pill） -->
+    <section class="card accounts">
+      <header class="card-hd">
+        <div class="card-hd-pill" data-go="acc">
+          <span class="material-symbols-outlined ico">account_balance_wallet</span>
+          <span class="txt">Accounts</span>
+        </div>
+        <span id="accSumPill" class="pnl-pill">–</span>
+      </header>
+      <div id="accList" class="list slim"></div>
+    </section>
   </div>
 </section>

@@ -691,4 +691,11 @@
     return { init };
   })();
 
+  // NEW: Register Page for App.js (Refresh)
+  App.pages = App.pages || {};
+  App.pages.ctbc = {
+    init: () => App.modules.ctbc.init(),
+    refresh: () => App.modules.ctbc.init()
+  };
+
 </script>

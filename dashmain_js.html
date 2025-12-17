@@ -115,16 +115,25 @@
         const acc = (r.account || '').trim();
         const posted = numOr(r.posted);
         const sum = numOr(r.sum);
+        // Icons
+        const icoPosted = '<span class="material-symbols-outlined" title="Posted" style="font-size:16px;vertical-align:middle;margin-right:2px;">check_circle</span>';
+        const icoSum = '<span class="material-symbols-outlined" title="Sum" style="font-size:16px;vertical-align:middle;margin-right:2px;">functions</span>';
+
+        // Classes for negative values (Pink bg)
+        const postedCls = posted < 0 ? 'v money capsule mask-num neg-bg' : 'v money capsule mask-num';
+        const sumCls = sum < 0 ? 'v money capsule mask-num neg-bg' : 'v money capsule mask-num';
+
         return `
         <div class="item">
-          <div class="row row-acc">
+          <div class="item-row">
             <span class="cap account" data-acc="${acc}">${acc || '-'}</span>
-          </div>
-          <div class="row row-meta">
-            <span class="label">Posted</span>
-            <span class="cap amt mask-num" data-mask-str="＊＊＊">${fmt(posted, 0)}</span>
-            <span class="label" style="margin-left:8px;">Sum</span>
-            <span class="cap amt mask-num" data-mask-str="＊＊＊">${fmt(sum, 0)}</span>
+            <div class="meta-group">
+              <span class="label-ico">${icoPosted}</span>
+              <span class="${postedCls}" data-mask-str="＊＊＊">${fmt(posted, 0)}</span>
+              <span class="vr-sep"></span>
+              <span class="label-ico">${icoSum}</span>
+              <span class="${sumCls}" data-mask-str="＊＊＊">${fmt(sum, 0)}</span>
+            </div>
           </div>
         </div>`;
       }).join('');

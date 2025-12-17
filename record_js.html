@@ -1,416 +1,428 @@
 <script>
-(function(){
-  window.App = window.App || {};
-  App.state  = App.state || {};
-  App.state.dbOpen = { rowIndex: null };
+  (function () {
+    window.App = window.App || {};
+    App.state = App.state || {};
+    App.state.dbOpen = { rowIndex: null };
 
-  // —— 數字與膠囊 ——
-  function fmtNumTW(n, opt={minimumFractionDigits:1, maximumFractionDigits:1}){
-    return Number(n||0).toLocaleString('zh-Hant-TW', opt);
-  }
-  function maskHTML(v){ return `<span class="mask-num" data-mask-str="＊＊＊">${v}</span>`; }
-  function pnlBadgeHTML(v){
-    const n = Number(v||0);
-    const cls = n>0 ? 'roi-badge pos' : n<0 ? 'roi-badge neg' : 'roi-badge zero';
-    const sign = n>0 ? '+' : '';
-    return `<span class="${cls}">${maskHTML(sign + fmtNumTW(n))}</span>`;
-  }
-
-  // —— 虛擬表 ——
-  function createVirtualTable({viewportId, spacerId, theadId, tbodyId, fetcher, pageSize=100}){
-    const state = {
-      rowHeight: 40,
-      pageSize,
-      pageCache: new Map(),
-      total: 0,
-      headers: [],
-      viewport: document.getElementById(viewportId),
-      spacer:   document.getElementById(spacerId),
-      thead:    document.getElementById(theadId),
-      tbody:    document.getElementById(tbodyId),
-      viewportH: 0,
-      lastRange: [-1,-1],
-      fetching: new Set(),
-      pnlColIdx: -1,
-      dateColIdx: 0
-    };
-    function isNumericLike(x){
-      if (typeof x === 'number') return true;
-      if (typeof x !== 'string') return false;
-      if (x.indexOf('<') !== -1) return false; // 已含 HTML，不再包
-      return /[0-9]/.test(x);
+    // —— 數字與膠囊 ——
+    function fmtNumTW(n, opt = { minimumFractionDigits: 1, maximumFractionDigits: 1 }) {
+      return Number(n || 0).toLocaleString('zh-Hant-TW', opt);
     }
-    function wrapCell(x){ return isNumericLike(x) ? maskHTML(String(x)) : String(x); }
-    function renderCell(c, colIdx){
-      if (state.pnlColIdx === colIdx) {
-        return pnlBadgeHTML(c);
-      }
-      if (state.dateColIdx === colIdx){
-        // 日期欄直接輸出文字，不套遮罩
-        return String(c ?? '');
-      }
-      return wrapCell(c);
-    }
-    function onResize(){ state.viewportH = state.viewport.clientHeight; render(); }
-    let tick = null;
-    function onScroll(){ if (tick) return; tick = requestAnimationFrame(()=>{ render(); tick=null; }); }
-
-    function render(){
-      const top = state.viewport.scrollTop;
-      const start = Math.max(0, Math.floor(top / state.rowHeight) - 20);
-      const need  = Math.ceil(state.viewportH / state.rowHeight) + 40;
-      const end   = Math.min(state.total, start + need);
-
-      const p1 = Math.floor(start / state.pageSize);
-      const p2 = Math.floor(Math.max(0, end-1) / state.pageSize);
-      for (let p=p1; p<=p2; p++){
-        if (!state.pageCache.has(p)) fetchPage(p);
-      }
-      if (state.lastRange[0]===start && state.lastRange[1]===end) return;
-      state.lastRange=[start,end];
-
-      const rows=[];
-      for (let i=start;i<end;i++){
-        const p = Math.floor(i / state.pageSize);
-        const j = i % state.pageSize;
-        const page = state.pageCache.get(p);
-        rows.push(page && page[j] ? page[j] : null);
-      }
-
-      state.tbody.style.transform = `translateY(${start*state.rowHeight}px)`;
-      state.tbody.innerHTML = rows.map((r, idx)=>{
-        const isLatest = (start + idx === 0); // 第一筆 = 最新
-        const trCls = isLatest ? 'is-latest' : '';
-        if (!r) return `<tr class="${trCls}" style="height:${state.rowHeight}px"><td colspan="${state.headers.length||1}">載入中…</td></tr>`;
-        const monthMeta = (Array.isArray(r) && r.length>6) ? (r[6]||'') : '';
-        const gidx = start + idx; // 0=視圖最上面那筆（最新）
-        const sheetRow = state.lastUsedRow ? (state.lastUsedRow - gidx) : '';
-        const cellsHTML = r.slice(0,6).map((c, colIdx)=>`<td>${renderCell(c, colIdx)}</td>`).join('');
-        return `<tr class="${trCls}" data-row="${gidx}" data-rownum="${sheetRow}" data-month="${String(monthMeta).replace(/"/g,'&quot;')}" style="height:${state.rowHeight}px">${cellsHTML}</tr>`;
-      }).join('');
+    function maskHTML(v) { return `<span class="mask-num" data-mask-str="＊＊＊">${v}</span>`; }
+    function pnlBadgeHTML(v) {
+      const n = Number(v || 0);
+      const cls = n > 0 ? 'roi-badge pos' : n < 0 ? 'roi-badge neg' : 'roi-badge zero';
+      const sign = n > 0 ? '+' : '';
+      return `<span class="${cls}">${maskHTML(sign + fmtNumTW(n))}</span>`;
     }
 
-    function fetchPage(pageIndex){
-      if (state.fetching.has(pageIndex)) return;
-      state.fetching.add(pageIndex);
-      const offset = pageIndex * state.pageSize;
-      fetcher({offset, limit: state.pageSize}, (res)=>{
-        state.fetching.delete(pageIndex);
-        if (!res){ console.warn('[record] 空頁回傳'); return; }
-        state.lastUsedRow = Number(res.lastUsedRow || 0) || state.lastUsedRow || 0;
-        // 只顯示 A/C/D/E/F/G 六欄，固定表頭
-        state.headers = ['日期','總金額','總金額-含dad','可動用','損益','可用現金'];
-        state.thead.innerHTML = `<tr>${state.headers.map(h=>`<th>${h||''}</th>`).join('')}</tr>`;
-        state.dateColIdx = 0; // 日期固定第一欄
-        state.pnlColIdx  = 4; // 損益固定第 5 欄
-        if (typeof res.total==='number'){
-          state.total = res.total;
-          state.spacer.style.height = (state.total * state.rowHeight) + 'px';
+    // —— 虛擬表 ——
+    function createVirtualTable({ viewportId, spacerId, theadId, tbodyId, fetcher, pageSize = 100 }) {
+      const state = {
+        rowHeight: 40,
+        pageSize,
+        pageCache: new Map(),
+        total: 0,
+        headers: [],
+        viewport: document.getElementById(viewportId),
+        spacer: document.getElementById(spacerId),
+        thead: document.getElementById(theadId),
+        tbody: document.getElementById(tbodyId),
+        viewportH: 0,
+        lastRange: [-1, -1],
+        fetching: new Set(),
+        pnlColIdx: -1,
+        dateColIdx: 0
+      };
+      function isNumericLike(x) {
+        if (typeof x === 'number') return true;
+        if (typeof x !== 'string') return false;
+        if (x.indexOf('<') !== -1) return false; // 已含 HTML，不再包
+        return /[0-9]/.test(x);
+      }
+      function wrapCell(x) { return isNumericLike(x) ? maskHTML(String(x)) : String(x); }
+      function renderCell(c, colIdx) {
+        if (state.pnlColIdx === colIdx) {
+          return pnlBadgeHTML(c);
         }
-        if (!state.lastUsedRow && typeof state.total === 'number'){
-          // 資料從第 3 列開始 → 實際最後一列 = total + 2
-          state.lastUsedRow = 2 + state.total;
+        if (state.dateColIdx === colIdx) {
+          // 日期欄直接輸出文字，不套遮罩
+          return String(c ?? '');
         }
-        const allRows = Array.isArray(res.rows) ? res.rows : [];
-        // 取 A/C/D/E/F/G，並把 B(月份) 放在索引 6 作為隱藏欄位
-        const trimmedRows = allRows.map(r => [r[0], r[2], r[3], r[4], r[5], r[6], r[1]]);
-        state.pageCache.set(pageIndex, trimmedRows);
-        render();
-        const meta = document.getElementById('dbMeta');
-        if (meta) meta.textContent = `總筆數：${(state.total||0).toLocaleString('zh-Hant-TW')}　每頁載入：${state.pageSize}　欄位數：${state.headers.length}`;
+        return wrapCell(c);
+      }
+      function onResize() { state.viewportH = state.viewport.clientHeight; render(); }
+      let tick = null;
+      function onScroll() { if (tick) return; tick = requestAnimationFrame(() => { render(); tick = null; }); }
+
+      function render() {
+        const top = state.viewport.scrollTop;
+        const start = Math.max(0, Math.floor(top / state.rowHeight) - 20);
+        const need = Math.ceil(state.viewportH / state.rowHeight) + 40;
+        const end = Math.min(state.total, start + need);
+
+        const p1 = Math.floor(start / state.pageSize);
+        const p2 = Math.floor(Math.max(0, end - 1) / state.pageSize);
+        for (let p = p1; p <= p2; p++) {
+          if (!state.pageCache.has(p)) fetchPage(p);
+        }
+        if (state.lastRange[0] === start && state.lastRange[1] === end) return;
+        state.lastRange = [start, end];
+
+        const rows = [];
+        for (let i = start; i < end; i++) {
+          const p = Math.floor(i / state.pageSize);
+          const j = i % state.pageSize;
+          const page = state.pageCache.get(p);
+          rows.push(page && page[j] ? page[j] : null);
+        }
+
+        state.tbody.style.transform = `translateY(${start * state.rowHeight}px)`;
+        state.tbody.innerHTML = rows.map((r, idx) => {
+          const isLatest = (start + idx === 0); // 第一筆 = 最新
+          const trCls = isLatest ? 'is-latest' : '';
+          if (!r) return `<tr class="${trCls}" style="height:${state.rowHeight}px"><td colspan="${state.headers.length || 1}">載入中…</td></tr>`;
+          const monthMeta = (Array.isArray(r) && r.length > 6) ? (r[6] || '') : '';
+          const gidx = start + idx; // 0=視圖最上面那筆（最新）
+          const sheetRow = state.lastUsedRow ? (state.lastUsedRow - gidx) : '';
+          const cellsHTML = r.slice(0, 6).map((c, colIdx) => `<td>${renderCell(c, colIdx)}</td>`).join('');
+          return `<tr class="${trCls}" data-row="${gidx}" data-rownum="${sheetRow}" data-month="${String(monthMeta).replace(/"/g, '&quot;')}" style="height:${state.rowHeight}px">${cellsHTML}</tr>`;
+        }).join('');
+      }
+
+      function fetchPage(pageIndex) {
+        if (state.fetching.has(pageIndex)) return;
+        state.fetching.add(pageIndex);
+        const offset = pageIndex * state.pageSize;
+        fetcher({ offset, limit: state.pageSize }, (res) => {
+          state.fetching.delete(pageIndex);
+          if (!res) { console.warn('[record] 空頁回傳'); return; }
+          state.lastUsedRow = Number(res.lastUsedRow || 0) || state.lastUsedRow || 0;
+          // 只顯示 A/C/D/E/F/G 六欄，固定表頭
+          state.headers = ['日期', '總金額', '總金額-含dad', '可動用', '損益', '可用現金'];
+          state.thead.innerHTML = `<tr>${state.headers.map(h => `<th>${h || ''}</th>`).join('')}</tr>`;
+          state.dateColIdx = 0; // 日期固定第一欄
+          state.pnlColIdx = 4; // 損益固定第 5 欄
+          if (typeof res.total === 'number') {
+            state.total = res.total;
+            state.spacer.style.height = (state.total * state.rowHeight) + 'px';
+          }
+          if (!state.lastUsedRow && typeof state.total === 'number') {
+            // 資料從第 3 列開始 → 實際最後一列 = total + 2
+            state.lastUsedRow = 2 + state.total;
+          }
+          const allRows = Array.isArray(res.rows) ? res.rows : [];
+          // 取 A/C/D/E/F/G，並把 B(月份) 放在索引 6 作為隱藏欄位
+          const trimmedRows = allRows.map(r => [r[0], r[2], r[3], r[4], r[5], r[6], r[1]]);
+          state.pageCache.set(pageIndex, trimmedRows);
+          render();
+          const meta = document.getElementById('dbMeta');
+          if (meta) meta.textContent = `總筆數：${(state.total || 0).toLocaleString('zh-Hant-TW')}　每頁載入：${state.pageSize}　欄位數：${state.headers.length}`;
+        });
+      }
+
+      state.viewport.addEventListener('scroll', onScroll);
+      window.addEventListener('resize', onResize);
+      onResize();
+      fetchPage(0);
+
+      // 點擊主列 → 開/收子清單
+      state.tbody.addEventListener('click', (ev) => {
+        const tr = ev.target.closest('tr');
+        if (!tr || tr.classList.contains('db-detail-row')) return; // 忽略明細列
+        const rowIndex = Number(tr.getAttribute('data-row')) || 0;
+
+        // 若已開啟且再次點擊同一列 → 收合
+        if (App.state.dbOpen.rowIndex === rowIndex) {
+          const nxt = tr.nextElementSibling;
+          if (nxt && nxt.classList.contains('db-detail-row')) nxt.remove();
+          App.state.dbOpen.rowIndex = null;
+          return;
+        }
+        // 先關掉舊的
+        const openTr = state.tbody.querySelector('tr.db-detail-row');
+        if (openTr) openTr.previousElementSibling?.classList.remove('is-open');
+        openTr?.remove();
+
+        // 插入占位明細列
+        tr.classList.add('is-open');
+        const colSpan = Math.max(1, state.headers.length || tr.children.length);
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'db-detail-row';
+        detailTr.innerHTML = `<td colspan="${colSpan}"><div class="db-detail-grid"><div class="db-detail-item">載入中…</div></div></td>`;
+        tr.after(detailTr);
+        App.state.dbOpen.rowIndex = rowIndex;
+
+        // 取得日期值，fallback 第一欄
+        const tds = Array.from(tr.children);
+        const dateCell = tds[state.dateColIdx] || tds[0];
+        const rawDateStr = dateCell ? dateCell.textContent.trim() : '';
+        let dateText = rawDateStr;
+        // 先嘗試直接抓到 yyyyMMdd（以原始顯示字串為準）
+        let ymd = (rawDateStr || '').replace(/\D+/g, '').slice(0, 8);
+        if (!(ymd && ymd.length === 8)) {
+          // A 欄只有 M/D 的情況：用 data-month 推回年份
+          const monthMeta = tr.getAttribute('data-month') || '';
+          const mdDigits = (rawDateStr || '').replace(/\D+/g, '');
+          let mm = '', dd = '';
+          if (mdDigits.length >= 3) {
+            // 3~4 碼：前兩碼當月，後兩碼當日（1 位數月/日以左側補 0）
+            if (mdDigits.length === 3) { mm = mdDigits.slice(0, 1); dd = mdDigits.slice(1); }
+            else { mm = mdDigits.slice(0, 2); dd = mdDigits.slice(2); }
+          }
+          if (mm) { mm = mm.padStart(2, '0'); }
+          if (dd) { dd = dd.padStart(2, '0'); }
+          // 從月份欄抓年份：支援 2025-10、2025/10、25-10、25/10 等
+          let yy = '';
+          const y4 = (monthMeta.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
+          const y2 = (!y4 && (monthMeta.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
+          if (y4) { yy = y4; }
+          else if (y2) { yy = (Number(y2) < 70 ? '20' : '19') + y2; } // 00~69 視為 2000 後
+          if (yy && mm && dd) { ymd = yy + mm + dd; }
+        }
+        if (ymd && ymd.length === 8) dateText = ymd;
+
+        // 多格式嘗試：優先 yyyymmdd → yyyy-MM-dd → M/D/YYYY（由 data-month 推回年份）
+        const tryDates = [];
+        if (ymd && ymd.length === 8) tryDates.push(ymd);
+        // yyyy-MM-dd
+        if (ymd && ymd.length === 8) {
+          tryDates.push(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`);
+        }
+        // M/D/YYYY（用 data-month 年份 + A 欄 M/D）
+        (function () {
+          const monthMeta = tr.getAttribute('data-month') || '';
+          const y4 = (monthMeta.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
+          const y2 = (!y4 && (monthMeta.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
+          const YY = y4 ? y4 : (y2 ? ((Number(y2) < 70 ? '20' : '19') + y2) : '');
+          const md = (rawDateStr || '').replace(/\D+/g, '');
+          let MM = '', DD = '';
+          if (md.length >= 3) {
+            if (md.length === 3) { MM = md.slice(0, 1); DD = md.slice(1); }
+            else { MM = md.slice(0, 2); DD = md.slice(2); }
+          }
+          if (YY && MM && DD) { tryDates.push(`${Number(MM)}/${Number(DD)}/${YY}`); }
+        })();
+
+        function renderDetails(items, used) {
+          const grid = detailTr.querySelector('.db-detail-grid');
+          try {
+            const arr = Array.isArray(items) ? items.slice().sort((a, b) => (a.col_index || 0) - (b.col_index || 0)) : [];
+            const html = (arr.length)
+              ? arr.map(it => {
+                const label = (it && it.label) || '';
+                const val = (it && it.value);
+                const vHtml = (typeof val === 'number') ? maskHTML(fmtNumTW(val)) : maskHTML(String(val || ''));
+                return `<div class="db-detail-item"><div class="lbl">${label}</div><div class="val">${vHtml}</div></div>`;
+              }).join('')
+              : `<div class="db-detail-item"><div class="lbl">查無資料</div><div class="val">${used}</div></div>`;
+            if (grid) grid.innerHTML = html;
+            console.debug('[record] detail items', used, arr.length, tryDates);
+          } catch (e) {
+            if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">渲染錯誤</div><div class="val">${e && e.message || e}</div></div>`;
+            console.error('detail render error', e);
+          }
+        }
+
+        function tryNext(i) {
+          if (i >= tryDates.length) {
+            renderDetails([], dateText);
+            return;
+          }
+          const d = tryDates[i];
+          google.script.run
+            .withSuccessHandler(list => {
+              if (Array.isArray(list) && list.length) {
+                renderDetails(list, d);
+              } else {
+                tryNext(i + 1);
+              }
+            })
+            .withFailureHandler(err => {
+              const grid = detailTr.querySelector('.db-detail-grid');
+              const msg = (err && (err.message || err)) || '未知錯誤';
+              if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">讀取失敗</div><div class="val">${msg}</div></div>`;
+              console.error('detail fetch error', d, err);
+            })
+            .getRecordDetailsByDate(d);
+        }
+
+        function tryByRowNumber() {
+          const rowNumAttr = tr.getAttribute('data-rownum');
+          const rowNum = Number(rowNumAttr || 0);
+          const grid = detailTr.querySelector('.db-detail-grid');
+          if (!rowNum) {
+            if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">查無列號</div><div class="val">—</div></div>`;
+            return;
+          }
+          google.script.run
+            .withSuccessHandler(list => {
+              if (Array.isArray(list) && list.length) {
+                renderDetails(list, `rowNum#${rowNum}`);
+              } else {
+                if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">查無資料</div><div class="val">row ${rowNum}</div></div>`;
+              }
+            })
+            .withFailureHandler(err => {
+              const msg = (err && (err.message || err)) || '未知錯誤';
+              if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">讀取失敗</div><div class="val">${msg}</div></div>`;
+              console.warn('detail by rowNumber failed', err);
+            })
+            .getRecordDetailsByRowNumber(rowNum);
+        }
+        // 只用「列號」精準取，失敗再走日期多格式
+        tryByRowNumber();
+      });
+
+      // 對外 refresh
+      state.refresh = function () {
+        state.pageCache.clear();
+        state.total = 0;
+        state.headers = ['日期', '總金額', '總金額-含dad', '可動用', '損益', '可用現金'];
+        state.spacer.style.height = '0px';
+        state.tbody.innerHTML = '';
+        state.thead.innerHTML = '';
+        state.viewport.scrollTop = 0;
+        state.lastRange = [-1, -1];
+        fetchPage(0);
+      };
+      return state;
+    }
+
+    // —— 最新摘要卡 ——（同步 dash KPI 用於保險起見）
+    function loadRecordLatest() {
+      const box = document.getElementById('dbLatestBox');
+      if (box) box.innerHTML = `<div class="empty">載入中…</div>`;
+      google.script.run
+        .withSuccessHandler(res => {
+          if (!res) { box.innerHTML = `<div class="empty">沒有資料</div>`; return; }
+          const rows = [
+            ['日期', (res && res.date) || '-'],
+            ['總資產', maskHTML(fmtNumTW(res.C))],
+            ['加上爸爸', maskHTML(fmtNumTW(res.D))],
+            ['可動用', maskHTML(fmtNumTW(res.E))],
+            ['當日損益', pnlBadgeHTML(res.F)],
+            ['現金', maskHTML(fmtNumTW(res.G))],
+            ['債務', maskHTML(fmtNumTW(res.BA))],
+            ['持有 USD', maskHTML(fmtNumTW(res.CU))]
+          ];
+          box.innerHTML = rows.map(([k, v]) => `<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+          syncKpiFromLatest(res); // 若 dash KPI 容器存在就同步
+        })
+        .withFailureHandler(err => {
+          console.error('[record] getRecordLatest ERR', err && err.message || err);
+          if (box) box.innerHTML = `<div class="empty">讀取失敗：${(err && err.message) || err}</div>`;
+        })
+        .getRecordLatest();
+    }
+
+    // —— 同步 dash KPI（只在 .kpi-list 存在時更新，不覆寫現有渲染流程）——
+    function syncKpiFromLatest(latest) {
+      const kpiList = document.querySelector('.kpi-list');
+      if (!kpiList) return; // dashboard 不在畫面就略過
+
+      const map = {
+        kpiTotal: latest.C,
+        kpiNet: latest.D,     // 以 D 欄 Whole Assets 為淨資產
+        kpiCash: latest.G,
+        kpiAvail: latest.E,
+        kpiUSD: latest.CU     // 新增 USD；前端需有 id="kpiUSD"
+        // 不再同步 kpiDebt
+      };
+      Object.entries(map).forEach(([id, val]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = fmtNumTW(val);
+      });
+      const d = document.getElementById('kpiDate');
+      if (d) d.textContent = latest.date || '—';
+      const pnlEl = document.getElementById('dashPnlPill');
+      if (pnlEl) {
+        const n = Number(latest.F || 0);
+        const sign = n > 0 ? '+' : '';
+        pnlEl.textContent = sign + fmtNumTW(n);
+        pnlEl.classList.remove('pos', 'neg', 'zero');
+        if (n > 0) pnlEl.classList.add('pos'); else if (n < 0) pnlEl.classList.add('neg'); else pnlEl.classList.add('zero');
+      }
+    }
+
+    // —— 重建表格（呼叫 createVirtualTable）——
+    function rebuildDbTable() {
+      const tbody = document.getElementById('dbTbody');
+      const thead = document.getElementById('dbThead');
+      const spacer = document.getElementById('dbSpacer');
+      if (tbody) tbody.innerHTML = '';
+      if (thead) thead.innerHTML = '';
+      if (spacer) spacer.style.height = '0px';
+
+      App.state.dbView = createVirtualTable({
+        viewportId: 'dbViewport',
+        spacerId: 'dbSpacer',
+        theadId: 'dbThead',
+        tbodyId: 'dbTbody',
+        pageSize: 100,
+        fetcher: (q, cb) => {
+          q.order = 'desc';
+          google.script.run
+            .withSuccessHandler(cb)
+            .withFailureHandler(err => {
+              console.error('[record] getDatabaseRows ERR', err && err.message || err);
+              const meta = document.getElementById('dbMeta');
+              if (meta) meta.textContent = '讀取失敗：' + (err && err.message || err);
+            })
+            .getDatabaseRows(q);
+        }
       });
     }
 
-    state.viewport.addEventListener('scroll', onScroll);
-    window.addEventListener('resize', onResize);
-    onResize();
-    fetchPage(0);
+    // —— 綁操作列（保留原本按鈕；新的狀態列不再包含這兩顆）——
+    function initDatabaseView() {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('show'));
+      document.getElementById('page-record')?.classList.add('show');
 
-    // 點擊主列 → 開/收子清單
-    state.tbody.addEventListener('click', (ev)=>{
-      const tr = ev.target.closest('tr');
-      if (!tr || tr.classList.contains('db-detail-row')) return; // 忽略明細列
-      const rowIndex = Number(tr.getAttribute('data-row')) || 0;
+      const btnReload = document.getElementById('btnRecordReload');
+      const btnAdd = document.getElementById('btnRecordAddRow');
 
-      // 若已開啟且再次點擊同一列 → 收合
-      if (App.state.dbOpen.rowIndex === rowIndex) {
-        const nxt = tr.nextElementSibling;
-        if (nxt && nxt.classList.contains('db-detail-row')) nxt.remove();
-        App.state.dbOpen.rowIndex = null;
-        return;
-      }
-      // 先關掉舊的
-      const openTr = state.tbody.querySelector('tr.db-detail-row');
-      if (openTr) openTr.previousElementSibling?.classList.remove('is-open');
-      openTr?.remove();
+      if (btnReload) btnReload.onclick = () => {
+        const pill = document.getElementById('dbStatusPill');
+        if (pill) { pill.style.display = 'inline-block'; pill.textContent = '重新載入中…'; pill.className = 'pill zero'; }
+        loadRecordLatest();
+        rebuildDbTable();
+        if (pill) setTimeout(() => { pill.style.display = 'none'; }, 800);
+      };
 
-      // 插入占位明細列
-      tr.classList.add('is-open');
-      const colSpan = Math.max(1, state.headers.length || tr.children.length);
-      const detailTr = document.createElement('tr');
-      detailTr.className = 'db-detail-row';
-      detailTr.innerHTML = `<td colspan="${colSpan}"><div class="db-detail-grid"><div class="db-detail-item">載入中…</div></div></td>`;
-      tr.after(detailTr);
-      App.state.dbOpen.rowIndex = rowIndex;
-
-      // 取得日期值，fallback 第一欄
-      const tds = Array.from(tr.children);
-      const dateCell = tds[state.dateColIdx] || tds[0];
-      const rawDateStr = dateCell ? dateCell.textContent.trim() : '';
-      let dateText = rawDateStr;
-      // 先嘗試直接抓到 yyyyMMdd（以原始顯示字串為準）
-      let ymd = (rawDateStr||'').replace(/\D+/g,'').slice(0,8);
-      if (!(ymd && ymd.length===8)){
-        // A 欄只有 M/D 的情況：用 data-month 推回年份
-        const monthMeta = tr.getAttribute('data-month') || '';
-        const mdDigits = (rawDateStr||'').replace(/\D+/g,'');
-        let mm = '', dd='';
-        if (mdDigits.length>=3){
-          // 3~4 碼：前兩碼當月，後兩碼當日（1 位數月/日以左側補 0）
-          if (mdDigits.length===3){ mm = mdDigits.slice(0,1); dd = mdDigits.slice(1); }
-          else { mm = mdDigits.slice(0,2); dd = mdDigits.slice(2); }
-        }
-        if (mm){ mm = mm.padStart(2,'0'); }
-        if (dd){ dd = dd.padStart(2,'0'); }
-        // 從月份欄抓年份：支援 2025-10、2025/10、25-10、25/10 等
-        let yy = '';
-        const y4 = (monthMeta.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
-        const y2 = (!y4 && (monthMeta.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
-        if (y4){ yy = y4; }
-        else if (y2){ yy = (Number(y2) < 70 ? '20' : '19') + y2; } // 00~69 視為 2000 後
-        if (yy && mm && dd){ ymd = yy + mm + dd; }
-      }
-      if (ymd && ymd.length === 8) dateText = ymd;
-
-      // 多格式嘗試：優先 yyyymmdd → yyyy-MM-dd → M/D/YYYY（由 data-month 推回年份）
-      const tryDates = [];
-      if (ymd && ymd.length===8) tryDates.push(ymd);
-      // yyyy-MM-dd
-      if (ymd && ymd.length===8){
-        tryDates.push(`${ymd.slice(0,4)}-${ymd.slice(4,6)}-${ymd.slice(6,8)}`);
-      }
-      // M/D/YYYY（用 data-month 年份 + A 欄 M/D）
-      (function(){
-        const monthMeta = tr.getAttribute('data-month') || '';
-        const y4 = (monthMeta.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
-        const y2 = (!y4 && (monthMeta.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
-        const YY = y4 ? y4 : (y2 ? ((Number(y2)<70?'20':'19') + y2) : '');
-        const md = (rawDateStr||'').replace(/\D+/g,'');
-        let MM='', DD='';
-        if (md.length>=3){
-          if (md.length===3){ MM = md.slice(0,1); DD = md.slice(1); }
-          else { MM = md.slice(0,2); DD = md.slice(2); }
-        }
-        if (YY && MM && DD){ tryDates.push(`${Number(MM)}/${Number(DD)}/${YY}`); }
-      })();
-
-      function renderDetails(items, used){
-        const grid = detailTr.querySelector('.db-detail-grid');
-        try{
-          const arr = Array.isArray(items) ? items.slice().sort((a,b)=> (a.col_index||0)-(b.col_index||0)) : [];
-          const html = (arr.length)
-            ? arr.map(it=>{
-                const label = (it && it.label) || '';
-                const val = (it && it.value);
-                const vHtml = (typeof val === 'number') ? maskHTML(fmtNumTW(val)) : maskHTML(String(val||''));
-                return `<div class="db-detail-item"><div class="lbl">${label}</div><div class="val">${vHtml}</div></div>`;
-              }).join('')
-            : `<div class="db-detail-item"><div class="lbl">查無資料</div><div class="val">${used}</div></div>`;
-          if (grid) grid.innerHTML = html;
-          console.debug('[record] detail items', used, arr.length, tryDates);
-        }catch(e){
-          if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">渲染錯誤</div><div class="val">${e && e.message || e}</div></div>`;
-          console.error('detail render error', e);
-        }
-      }
-
-      function tryNext(i){
-        if (i>=tryDates.length){
-          renderDetails([], dateText);
-          return;
-        }
-        const d = tryDates[i];
+      if (btnAdd) btnAdd.onclick = () => {
+        const pill = document.getElementById('dbStatusPill');
+        if (pill) { pill.style.display = 'inline-block'; pill.textContent = '處理中…'; pill.className = 'pill zero'; }
         google.script.run
-          .withSuccessHandler(list =>{
-            if (Array.isArray(list) && list.length){
-              renderDetails(list, d);
-            } else {
-              tryNext(i+1);
-            }
+          .withSuccessHandler((res) => {
+            if (pill) { pill.textContent = (res && res.msg) || '已新增一列'; pill.className = 'pill pos'; setTimeout(() => { pill.style.display = 'none'; }, 1500); }
+            loadRecordLatest();
+            rebuildDbTable();
           })
-          .withFailureHandler(err=>{
-            const grid = detailTr.querySelector('.db-detail-grid');
-            const msg = (err && (err.message || err)) || '未知錯誤';
-            if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">讀取失敗</div><div class="val">${msg}</div></div>`;
-            console.error('detail fetch error', d, err);
+          .withFailureHandler(err => {
+            if (pill) { pill.textContent = '新增失敗：' + ((err && err.message) || err); pill.className = 'pill neg'; }
           })
-          .getRecordDetailsByDate(d);
-      }
+          .runRecordAddRow();
+      };
 
-      function tryByRowNumber(){
-        const rowNumAttr = tr.getAttribute('data-rownum');
-        const rowNum = Number(rowNumAttr||0);
-        const grid = detailTr.querySelector('.db-detail-grid');
-        if (!rowNum){
-          if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">查無列號</div><div class="val">—</div></div>`;
-          return;
-        }
-        google.script.run
-          .withSuccessHandler(list =>{
-            if (Array.isArray(list) && list.length){
-              renderDetails(list, `rowNum#${rowNum}`);
-            } else {
-              if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">查無資料</div><div class="val">row ${rowNum}</div></div>`;
-            }
-          })
-          .withFailureHandler(err=>{
-            const msg = (err && (err.message || err)) || '未知錯誤';
-            if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">讀取失敗</div><div class="val">${msg}</div></div>`;
-            console.warn('detail by rowNumber failed', err);
-          })
-          .getRecordDetailsByRowNumber(rowNum);
-      }
-      // 只用「列號」精準取，失敗再走日期多格式
-      tryByRowNumber();
-    });
-
-    // 對外 refresh
-    state.refresh = function(){
-      state.pageCache.clear();
-      state.total = 0;
-      state.headers = ['日期','總金額','總金額-含dad','可動用','損益','可用現金'];
-      state.spacer.style.height = '0px';
-      state.tbody.innerHTML = '';
-      state.thead.innerHTML = '';
-      state.viewport.scrollTop = 0;
-      state.lastRange = [-1,-1];
-      fetchPage(0);
-    };
-    return state;
-  }
-
-  // —— 最新摘要卡 ——（同步 dash KPI 用於保險起見）
-  function loadRecordLatest(){
-    const box = document.getElementById('dbLatestBox');
-    if (box) box.innerHTML = `<div class="empty">載入中…</div>`;
-    google.script.run
-      .withSuccessHandler(res=>{
-        if (!res){ box.innerHTML = `<div class="empty">沒有資料</div>`; return; }
-        const rows = [
-          ['日期', (res && res.date) || '-'],
-          ['總資產', maskHTML(fmtNumTW(res.C))],
-          ['加上爸爸', maskHTML(fmtNumTW(res.D))],
-          ['可動用', maskHTML(fmtNumTW(res.E))],
-          ['當日損益', pnlBadgeHTML(res.F)],
-          ['現金', maskHTML(fmtNumTW(res.G))],
-          ['債務', maskHTML(fmtNumTW(res.BA))],
-          ['持有 USD', maskHTML(fmtNumTW(res.CU))]
-        ];
-        box.innerHTML = rows.map(([k,v])=>`<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
-        syncKpiFromLatest(res); // 若 dash KPI 容器存在就同步
-      })
-      .withFailureHandler(err=>{
-        console.error('[record] getRecordLatest ERR', err && err.message || err);
-        if (box) box.innerHTML = `<div class="empty">讀取失敗：${(err && err.message)||err}</div>`;
-      })
-      .getRecordLatest();
-  }
-
-  // —— 同步 dash KPI（只在 .kpi-list 存在時更新，不覆寫現有渲染流程）——
-  function syncKpiFromLatest(latest){
-    const kpiList = document.querySelector('.kpi-list');
-    if (!kpiList) return; // dashboard 不在畫面就略過
-
-    const map = {
-      kpiTotal: latest.C,
-      kpiNet:   latest.D,     // 以 D 欄 Whole Assets 為淨資產
-      kpiCash:  latest.G,
-      kpiAvail: latest.E,
-      kpiUSD:   latest.CU     // 新增 USD；前端需有 id="kpiUSD"
-      // 不再同步 kpiDebt
-    };
-    Object.entries(map).forEach(([id, val])=>{
-      const el = document.getElementById(id);
-      if (el) el.textContent = fmtNumTW(val);
-    });
-    const d = document.getElementById('kpiDate');
-    if (d) d.textContent = latest.date || '—';
-    const pnlEl = document.getElementById('dashPnlPill');
-    if (pnlEl){
-      const n = Number(latest.F||0);
-      const sign = n>0?'+':'';
-      pnlEl.textContent = sign + fmtNumTW(n);
-      pnlEl.classList.remove('pos','neg','zero');
-      if (n>0) pnlEl.classList.add('pos'); else if (n<0) pnlEl.classList.add('neg'); else pnlEl.classList.add('zero');
-    }
-  }
-
-  // —— 重建表格（呼叫 createVirtualTable）——
-  function rebuildDbTable(){
-    const tbody = document.getElementById('dbTbody');
-    const thead = document.getElementById('dbThead');
-    const spacer= document.getElementById('dbSpacer');
-    if (tbody) tbody.innerHTML = '';
-    if (thead) thead.innerHTML = '';
-    if (spacer) spacer.style.height = '0px';
-
-    App.state.dbView = createVirtualTable({
-      viewportId:'dbViewport',
-      spacerId:'dbSpacer',
-      theadId:'dbThead',
-      tbodyId:'dbTbody',
-      pageSize:100,
-      fetcher: (q, cb)=>{
-        q.order = 'desc';
-        google.script.run
-          .withSuccessHandler(cb)
-          .withFailureHandler(err=>{
-            console.error('[record] getDatabaseRows ERR', err && err.message || err);
-            const meta = document.getElementById('dbMeta');
-            if (meta) meta.textContent = '讀取失敗：' + (err && err.message || err);
-          })
-          .getDatabaseRows(q);
-      }
-    });
-  }
-
-  // —— 綁操作列（保留原本按鈕；新的狀態列不再包含這兩顆）——
-  function initDatabaseView(){
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
-    document.getElementById('page-record')?.classList.add('show');
-
-    const btnReload = document.getElementById('btnRecordReload');
-    const btnAdd    = document.getElementById('btnRecordAddRow');
-
-    if (btnReload) btnReload.onclick = ()=>{
-      const pill = document.getElementById('dbStatusPill');
-      if (pill){ pill.style.display='inline-block'; pill.textContent='重新載入中…'; pill.className='pill zero'; }
       loadRecordLatest();
       rebuildDbTable();
-      if (pill) setTimeout(()=>{ pill.style.display='none'; }, 800);
+    }
+
+    // —— 對外註冊 —— 
+    window.initDatabaseView = initDatabaseView;
+    window.loadRecordLatest = loadRecordLatest;
+
+    // 對外註冊 App.pages.record
+    App.pages = App.pages || {};
+    App.pages.record = {
+      init: initDatabaseView,
+      refresh: () => {
+        // 模擬 btnRecordReload 行為
+        loadRecordLatest();
+        // rebuildDbTable 會重置虛擬表並重新 fetchPage(0)
+        rebuildDbTable();
+      }
     };
-
-    if (btnAdd) btnAdd.onclick = ()=>{
-      const pill = document.getElementById('dbStatusPill');
-      if (pill){ pill.style.display='inline-block'; pill.textContent='處理中…'; pill.className='pill zero'; }
-      google.script.run
-        .withSuccessHandler((res)=>{
-          if (pill){ pill.textContent = (res && res.msg) || '已新增一列'; pill.className='pill pos'; setTimeout(()=>{ pill.style.display='none'; }, 1500); }
-          loadRecordLatest();
-          rebuildDbTable();
-        })
-        .withFailureHandler(err=>{
-          if (pill){ pill.textContent = '新增失敗：' + ((err && err.message) || err); pill.className='pill neg'; }
-        })
-        .runRecordAddRow();
-    };
-
-    loadRecordLatest();
-    rebuildDbTable();
-  }
-
-  // —— 對外註冊 —— 
-  window.initDatabaseView = initDatabaseView;
-  window.loadRecordLatest = loadRecordLatest;
-})();
+  })();
 </script>
