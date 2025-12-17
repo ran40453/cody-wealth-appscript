@@ -5797,6 +5797,68 @@
       line-height: 1.3;
     }
 
+    /* Edit Actions (Save/Cancel) */
+    .input-with-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .input-with-actions input {
+      flex: 1;
+      /* Input takes available space */
+    }
+
+    .rtn-edit-actions {
+      display: none;
+      /* Hidden by default */
+      align-items: center;
+      gap: 4px;
+    }
+
+    .rtn-edit-actions.show {
+      display: flex;
+    }
+
+    .rtn-btn-mini {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--hairline);
+      background: var(--card);
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      padding: 0;
+      transition: all 0.2s;
+    }
+
+    .rtn-btn-mini:hover {
+      background: var(--surface);
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    .rtn-btn-mini.save {
+      color: var(--tone-pos-fg);
+      border-color: var(--tone-pos-bd);
+      background: var(--tone-pos-bg);
+    }
+
+    .rtn-btn-mini.cancel {
+      color: var(--tone-neg-fg);
+      border-color: var(--tone-neg-bd);
+      background: var(--tone-neg-bg);
+    }
+
+    .rtn-btn-mini .material-symbols-outlined {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
     #rtn-totals-card .totals-label {
       opacity: .7;
     }

@@ -1,312 +1,340 @@
 <script>
-window.App = window.App || {};
-App.pages = App.pages || {};
-App.routes = App.routes || {};
+  window.App = window.App || {};
+  App.pages = App.pages || {};
+  App.routes = App.routes || {};
 
-(function(){
-  // 狀態存在這裡
-  let state = {
-    rows: [],   // 從 sheet 來的 routines 列
-    meta: {},   // 下拉清單候選
-  };
+  (function () {
+    // 狀態存在這裡
+    let state = {
+      rows: [],   // 從 sheet 來的 routines 列
+      meta: {},   // 下拉清單候選
+    };
 
-  // ====== 公開：routes['routines'] 讓 go('routines') 時觸發 ======
-  App.routes['routines'] = function(){
-    // 第一次或每次切頁都跑 refresh
-    App.pages.routines.init();
-  };
+    // ====== 公開：routes['routines'] 讓 go('routines') 時觸發 ======
+    App.routes['routines'] = function () {
+      // 第一次或每次切頁都跑 refresh
+      App.pages.routines.init();
+    };
 
-  // ====== UI helper ======
-  function q(sel){ return document.querySelector(sel); }
-  function esc(s){
-    const map = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' };
-    return String(s ?? '').replace(/[&<>"']/g, m=>map[m]);
-  }
-  function fmtMoney(n){
-    const v = Number(n)||0;
-    return v.toLocaleString('zh-Hant-TW',{maximumFractionDigits:0});
-  }
-
-  // freq → 每月金額係數
-  function monthlyFactor(freq){
-    const f = String(freq||'').toLowerCase();
-    if (f === 'monthly') return 1;
-    if (f === 'bi-monthly' || f === 'bimonthly' || f === 'bi_monthly') return 1/2;
-    if (f === 'yearly' || f === 'annual' ) return 1/12;
-    return 0; // 未知 freq 先不算
-  }
-
-  function calcTotals(){
-    let mSum = 0;
-    state.rows.forEach(r=>{
-      if (!r.active) return;
-      const factor = monthlyFactor(r.freq);
-      mSum += (Number(r.amount)||0) * factor;
-    });
-    const ySum = mSum * 12;
-    return { month: mSum, year: ySum };
-  }
-
-  // ====== 後端呼叫 ======
-  function loadDataFromServer(){
-    if (!google?.script?.run){
-      console.warn('google.script.run 不存在（本地測試？）');
-      return;
+    // ====== UI helper ======
+    function q(sel) { return document.querySelector(sel); }
+    function esc(s) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+      return String(s ?? '').replace(/[&<>"']/g, m => map[m]);
     }
-    q('#rtn-list-body').innerHTML = `<div class="empty">載入中…</div>`;
-
-    google.script.run
-      .withSuccessHandler(res=>{
-        state.rows = res.rows || [];
-        state.meta = res.meta || {};
-        renderAll();
-      })
-      .withFailureHandler(err=>{
-        console.error('[routines] getRoutinesData failed', err);
-        q('#rtn-list-body').innerHTML = `<div class="empty">讀取失敗</div>`;
-      })
-      .getRoutinesData();
-  }
-
-  function updateField(rowNumber, fieldName, value){
-    if (!google?.script?.run){
-      console.warn('no GAS runtime, skip updateField');
-      return;
+    function fmtMoney(n) {
+      const v = Number(n) || 0;
+      return v.toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 });
     }
-    google.script.run
-      .withSuccessHandler(()=>{
-        // 同步本地 state
-        const rowObj = state.rows.find(r=>r._row===rowNumber);
-        if (rowObj){
-          rowObj[fieldName] = value;
+
+    // freq → 每月金額係數
+    function monthlyFactor(freq) {
+      const f = String(freq || '').toLowerCase();
+      if (f === 'monthly') return 1;
+      if (f === 'bi-monthly' || f === 'bimonthly' || f === 'bi_monthly') return 1 / 2;
+      if (f === 'yearly' || f === 'annual') return 1 / 12;
+      return 0; // 未知 freq 先不算
+    }
+
+    function calcTotals() {
+      let mSum = 0;
+      state.rows.forEach(r => {
+        if (!r.active) return;
+        const factor = monthlyFactor(r.freq);
+        mSum += (Number(r.amount) || 0) * factor;
+      });
+      const ySum = mSum * 12;
+      return { month: mSum, year: ySum };
+    }
+
+    // ====== 後端呼叫 ======
+    function loadDataFromServer() {
+      if (!google?.script?.run) {
+        console.warn('google.script.run 不存在（本地測試？）');
+        return;
+      }
+      q('#rtn-list-body').innerHTML = `<div class="empty">載入中…</div>`;
+
+      google.script.run
+        .withSuccessHandler(res => {
+          state.rows = res.rows || [];
+          state.meta = res.meta || {};
+          renderAll();
+        })
+        .withFailureHandler(err => {
+          console.error('[routines] getRoutinesData failed', err);
+          q('#rtn-list-body').innerHTML = `<div class="empty">讀取失敗</div>`;
+        })
+        .getRoutinesData();
+    }
+
+    function updateField(rowNumber, fieldName, value, onSuccess, onFail) {
+      if (!google?.script?.run) {
+        console.warn('no GAS runtime, skip updateField');
+        if (onSuccess) onSuccess(); // Mock success for local dev
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(() => {
+          // 同步本地 state
+          const rowObj = state.rows.find(r => r._row === rowNumber);
+          if (rowObj) {
+            rowObj[fieldName] = value;
+          }
+          // 重新算統計
+          renderTotalsCard();
+          if (onSuccess) onSuccess();
+        })
+        .withFailureHandler(err => {
+          console.error('updateRoutineField failed:', err);
+          if (onFail) onFail(err);
+          else alert('更新失敗：' + (err?.message || err));
+        })
+        .updateRoutineField(rowNumber, fieldName, value);
+    }
+
+    function addNewRow() {
+      if (!google?.script?.run) {
+        console.warn('no GAS runtime, skip addNewRow');
+        return;
+      }
+      google.script.run
+        .withSuccessHandler(res => {
+          // 新 row 產生後，直接重讀整包資料
+          loadDataFromServer();
+        })
+        .withFailureHandler(err => {
+          console.error('addRoutineBlank failed:', err);
+          alert('新增失敗：' + (err?.message || err));
+        })
+        .addRoutineBlank();
+    }
+
+    function confirmAndDelete(rowNumber) {
+      if (!google?.script?.run) {
+        console.warn('no GAS runtime, skip delete');
+        return;
+      }
+      const ok = window.confirm('確定要刪除這筆例行支出嗎？此動作無法復原。');
+      if (!ok) return;
+      google.script.run
+        .withSuccessHandler(() => {
+          // 重新載入列表
+          loadDataFromServer();
+        })
+        .withFailureHandler(err => {
+          console.error('deleteRoutineRow failed:', err);
+          alert('刪除失敗：' + (err?.message || err));
+        })
+        .deleteRoutineRow(rowNumber);
+    }
+
+    // ====== 綁定互動 ======
+    function bindRowInteractions(row) {
+      const rowEl = document.querySelector(`#rtn-row-${row._row}`);
+      if (!rowEl) return;
+
+      // 展開/收合子清單
+      const header = rowEl.querySelector('.rtn-header');
+      header?.addEventListener('click', (ev) => {
+        // 如果是點在可互動元素上，不要觸發收展
+        if (ev.target.closest('.toggle-btn') ||
+          ev.target.closest('select') ||
+          ev.target.closest('input')) {
+          return;
         }
-        // 重新算統計
-        renderTotalsCard();
-      })
-      .withFailureHandler(err=>{
-        console.error('updateRoutineField failed:', err);
-        alert('更新失敗：' + (err?.message||err));
-      })
-      .updateRoutineField(rowNumber, fieldName, value);
-  }
+        const body = rowEl.querySelector('.rtn-body');
+        body.classList.toggle('show');
+      });
 
-  function addNewRow(){
-    if (!google?.script?.run){
-      console.warn('no GAS runtime, skip addNewRow');
-      return;
+      // 小工具：切 class+aria+文字
+      function applyToggleStyle(btn, isOn) {
+        if (!btn) return;
+        btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+        btn.classList.toggle('on', !!isOn);
+        btn.classList.toggle('off', !isOn);
+        btn.textContent = isOn ? '●' : '○';
+      }
+
+      // active toggle
+      const tActive = rowEl.querySelector('.toggle-active');
+      if (tActive) {
+        tActive.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const newVal = !row.active;
+          row.active = newVal;
+          applyToggleStyle(tActive, newVal);
+          updateField(row._row, 'active', newVal);
+          renderTotalsCard(); // 重新算統計
+        });
+      }
+
+      // autoPost toggle
+      const tAuto = rowEl.querySelector('.toggle-autopost');
+      if (tAuto) {
+        tAuto.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const newVal = !row.autoPost;
+          row.autoPost = newVal;
+          applyToggleStyle(tAuto, newVal);
+          updateField(row._row, 'autoPost', newVal);
+        });
+      }
+
+      // rollupOnly toggle
+      const tRoll = rowEl.querySelector('.toggle-rollup');
+      if (tRoll) {
+        tRoll.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const newVal = !row.rollupOnly;
+          row.rollupOnly = newVal;
+          applyToggleStyle(tRoll, newVal);
+          updateField(row._row, 'rollupOnly', newVal);
+        });
+      }
+
+      // helper for text/number inputs with confirm UI
+      function bindConfirmInput(sel, field) {
+        const inp = rowEl.querySelector(sel);
+        const actions = inp?.parentElement?.querySelector('.rtn-edit-actions');
+        const btnSave = actions?.querySelector('.save');
+        const btnCancel = actions?.querySelector('.cancel');
+
+        if (!inp || !actions || !btnSave || !btnCancel) return;
+
+        inp.addEventListener('input', () => actions.classList.add('show'));
+
+        // Save
+        btnSave.addEventListener('click', (e) => {
+          e.stopPropagation();
+          let val = inp.value;
+          if (field === 'amount') val = Number(val) || 0;
+          else val = val.trim();
+
+          const icon = btnSave.querySelector('.material-symbols-outlined');
+          const origIcon = 'check';
+          if (icon) icon.textContent = 'hourglass_empty';
+          btnSave.disabled = true;
+
+          updateField(row._row, field, val,
+            () => { // OK
+              row[field] = val;
+              actions.classList.remove('show');
+              btnSave.disabled = false;
+              if (icon) icon.textContent = 'check';
+              renderTotalsCard();
+
+              // ★ NEW: Update the display chip if we modified amount
+              if (field === 'amount') {
+                const chip = rowEl.querySelector('.amount-chip');
+                if (chip) chip.textContent = Number(val).toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 });
+              }
+            },
+            (err) => { // Fail
+              btnSave.disabled = false;
+              if (icon) icon.textContent = 'error'; // Visual feedback
+              alert('儲存失敗：' + (err.message || err));
+            }
+          );
+        });
+
+        // Cancel
+        btnCancel.addEventListener('click', (e) => {
+          e.stopPropagation();
+          inp.value = row[field];
+          actions.classList.remove('show');
+        });
+      }
+
+      // 1. Text Inputs (Confirm UI)
+      bindConfirmInput('.edit-name', 'name');
+      bindConfirmInput('.edit-amount', 'amount');
+      bindConfirmInput('.edit-cat', 'cat');
+
+      // 2. Selects / Toggles (Immediate)
+      // freq
+      const selFreq = rowEl.querySelector('.edit-freq');
+      if (selFreq) {
+        selFreq.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const v = selFreq.value;
+          row.freq = v;
+          updateField(row._row, 'freq', v);
+          renderTotalsCard();
+        });
+      }
+
+      // nextDueDate
+      const inpDue = rowEl.querySelector('.edit-nextdue');
+      if (inpDue) {
+        inpDue.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const v = inpDue.value;
+          row.nextDueDate = v;
+          updateField(row._row, 'nextDueDate', v);
+        });
+      }
+
+      // acc
+      const selAcc = rowEl.querySelector('.edit-acc');
+      if (selAcc) {
+        selAcc.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const v = selAcc.value;
+          row.acc = v;
+          updateField(row._row, 'acc', v);
+        });
+      }
+
+      // owner
+      const selOwner = rowEl.querySelector('.edit-owner');
+      if (selOwner) {
+        selOwner.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const v = selOwner.value;
+          row.owner = v;
+          updateField(row._row, 'owner', v);
+        });
+      }
+
+      // dir
+      const selDir = rowEl.querySelector('.edit-dir');
+      if (selDir) {
+        selDir.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const v = selDir.value;
+          row.dir = v;
+          updateField(row._row, 'dir', v);
+        });
+      }
+
+      // currency
+      const selCur = rowEl.querySelector('.edit-currency');
+      if (selCur) {
+        selCur.addEventListener('change', (e) => {
+          e.stopPropagation();
+          const v = selCur.value;
+          row.currency = v;
+          updateField(row._row, 'currency', v);
+        });
+      }
+
+      // delete button
+      const delBtn = rowEl.querySelector('.rtn-delete');
+      if (delBtn) {
+        delBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          confirmAndDelete(row._row);
+        });
+      }
     }
-    google.script.run
-      .withSuccessHandler(res=>{
-        // 新 row 產生後，直接重讀整包資料
-        loadDataFromServer();
-      })
-      .withFailureHandler(err=>{
-        console.error('addRoutineBlank failed:', err);
-        alert('新增失敗：' + (err?.message||err));
-      })
-      .addRoutineBlank();
-  }
 
-  function confirmAndDelete(rowNumber){
-    if (!google?.script?.run){
-      console.warn('no GAS runtime, skip delete');
-      return;
-    }
-    const ok = window.confirm('確定要刪除這筆例行支出嗎？此動作無法復原。');
-    if (!ok) return;
-    google.script.run
-      .withSuccessHandler(()=>{
-        // 重新載入列表
-        loadDataFromServer();
-      })
-      .withFailureHandler(err=>{
-        console.error('deleteRoutineRow failed:', err);
-        alert('刪除失敗：' + (err?.message||err));
-      })
-      .deleteRoutineRow(rowNumber);
-  }
-
-  // ====== 綁定互動 ======
-  function bindRowInteractions(row){
-  const rowEl = document.querySelector(`#rtn-row-${row._row}`);
-  if (!rowEl) return;
-
-  // 展開/收合子清單
-  const header = rowEl.querySelector('.rtn-header');
-  header?.addEventListener('click', (ev)=>{
-    // 如果是點在可互動元素上，不要觸發收展
-    if (ev.target.closest('.toggle-btn') ||
-        ev.target.closest('select') ||
-        ev.target.closest('input')) {
-      return;
-    }
-    const body = rowEl.querySelector('.rtn-body');
-    body.classList.toggle('show');
-  });
-
-  // 小工具：切 class+aria+文字
-  function applyToggleStyle(btn, isOn){
-    if (!btn) return;
-    btn.setAttribute('aria-pressed', isOn ? 'true':'false');
-    btn.classList.toggle('on',  !!isOn);
-    btn.classList.toggle('off', !isOn);
-    btn.textContent = isOn ? '●' : '○';
-  }
-
-  // active toggle
-  const tActive = rowEl.querySelector('.toggle-active');
-  if (tActive){
-    tActive.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      const newVal = !row.active;
-      row.active = newVal;
-      applyToggleStyle(tActive, newVal);
-      updateField(row._row, 'active', newVal);
-      renderTotalsCard(); // 重新算統計
-    });
-  }
-
-  // autoPost toggle
-  const tAuto = rowEl.querySelector('.toggle-autopost');
-  if (tAuto){
-    tAuto.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      const newVal = !row.autoPost;
-      row.autoPost = newVal;
-      applyToggleStyle(tAuto, newVal);
-      updateField(row._row, 'autoPost', newVal);
-    });
-  }
-
-  // rollupOnly toggle
-  const tRoll = rowEl.querySelector('.toggle-rollup');
-  if (tRoll){
-    tRoll.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      const newVal = !row.rollupOnly;
-      row.rollupOnly = newVal;
-      applyToggleStyle(tRoll, newVal);
-      updateField(row._row, 'rollupOnly', newVal);
-    });
-  }
-
-  // amount(金額)
-  const inpAmt = rowEl.querySelector('.edit-amount');
-  if (inpAmt){
-    inpAmt.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = Number(inpAmt.value)||0;
-      row.amount = v;
-      updateField(row._row, 'amount', v);
-      renderTotalsCard();
-    });
-  }
-
-  // freq
-  const selFreq = rowEl.querySelector('.edit-freq');
-  if (selFreq){
-    selFreq.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = selFreq.value;
-      row.freq = v;
-      updateField(row._row, 'freq', v);
-      renderTotalsCard();
-    });
-  }
-
-  // nextDueDate
-  const inpDue = rowEl.querySelector('.edit-nextdue');
-  if (inpDue){
-    inpDue.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = inpDue.value;
-      row.nextDueDate = v;
-      updateField(row._row, 'nextDueDate', v);
-    });
-  }
-
-  // acc
-  const selAcc = rowEl.querySelector('.edit-acc');
-  if (selAcc){
-    selAcc.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = selAcc.value;
-      row.acc = v;
-      updateField(row._row, 'acc', v);
-    });
-  }
-
-  // owner
-  const selOwner = rowEl.querySelector('.edit-owner');
-  if (selOwner){
-    selOwner.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = selOwner.value;
-      row.owner = v;
-      updateField(row._row, 'owner', v);
-    });
-  }
-
-  // dir
-  const selDir = rowEl.querySelector('.edit-dir');
-  if (selDir){
-    selDir.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = selDir.value;
-      row.dir = v;
-      updateField(row._row, 'dir', v);
-    });
-  }
-
-  // currency
-  const selCur = rowEl.querySelector('.edit-currency');
-  if (selCur){
-    selCur.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = selCur.value;
-      row.currency = v;
-      updateField(row._row, 'currency', v);
-    });
-  }
-
-  // name
-  const inpName = rowEl.querySelector('.edit-name');
-  if (inpName){
-    inpName.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = inpName.value.trim();
-      row.name = v;
-      updateField(row._row, 'name', v);
-    });
-  }
-
-  // cat
-  const inpCat = rowEl.querySelector('.edit-cat');
-  if (inpCat){
-    inpCat.addEventListener('change', (e)=>{
-      e.stopPropagation();
-      const v = inpCat.value.trim();
-      row.cat = v;
-      updateField(row._row, 'cat', v);
-    });
-  }
-
-  // delete button
-  const delBtn = rowEl.querySelector('.rtn-delete');
-  if (delBtn){
-    delBtn.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      confirmAndDelete(row._row);
-    });
-  }
-}
-
-  // ====== render ======
-  function renderTotalsCard(){
-    const card = q('#rtn-totals-card');
-    if (!card) return;
-    const {month, year} = calcTotals();
-    card.innerHTML = `
+    // ====== render ======
+    function renderTotalsCard() {
+      const card = q('#rtn-totals-card');
+      if (!card) return;
+      const { month, year } = calcTotals();
+      card.innerHTML = `
       <div class="totals-row">
         <div class="totals-label">本月固定支出</div>
         <div class="totals-value">${fmtMoney(month)}</div>
@@ -316,46 +344,52 @@ App.routes = App.routes || {};
         <div class="totals-value">${fmtMoney(year)}</div>
       </div>
     `;
-  }
+    }
 
-  
-function renderList(){
-  const wrap = document.querySelector('#rtn-list-body');
-  if (!wrap) return;
 
-  if (!state.rows.length){
-    wrap.innerHTML = `<div class="empty">目前沒有例行支出</div>`;
-    return;
-  }
+    function renderList() {
+      const wrap = document.querySelector('#rtn-list-body');
+      if (!wrap) return;
 
-  function esc(s){
-    const map = { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' };
-    return String(s ?? '').replace(/[&<>"']/g, m=>map[m]);
-  }
+      if (!state.rows.length) {
+        wrap.innerHTML = `<div class="empty">目前沒有例行支出</div>`;
+        return;
+      }
 
-  function renderOptions(list, cur){
-    return (list||[]).map(v=>`
-      <option value="${esc(v)}" ${v===cur?'selected':''}>${esc(v)}</option>
+      function esc(s) {
+        const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+        return String(s ?? '').replace(/[&<>"']/g, m => map[m]);
+      }
+
+      function renderOptions(list, cur) {
+        return (list || []).map(v => `
+      <option value="${esc(v)}" ${v === cur ? 'selected' : ''}>${esc(v)}</option>
     `).join('');
-  }
+      }
 
-  function moneyChip(num){
-    const v = Number(num)||0;
-    return `<span class="amount-chip">${v.toLocaleString('zh-Hant-TW',{maximumFractionDigits:0})}</span>`;
-  }
+      function moneyChip(num) {
+        const v = Number(num) || 0;
+        return `<span class="amount-chip">${v.toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 })}</span>`;
+      }
 
-  wrap.innerHTML = state.rows.map(r=>{
-    return `
+      wrap.innerHTML = state.rows.map(r => {
+        return `
     <div class="rtn-row card" id="rtn-row-${r._row}">
       <div class="rtn-header">
-        <button class="toggle-btn toggle-active ${r.active?'on':'off'}"
-                aria-pressed="${r.active?'true':'false'}" type="button">
+        <button class="toggle-btn toggle-active ${r.active ? 'on' : 'off'}"
+                aria-pressed="${r.active ? 'true' : 'false'}" type="button">
           ${r.active ? '●' : '○'}
         </button>
 
         <div class="rtn-main">
           <div class="rtn-line1">
-            <input class="edit-name inline-edit" value="${esc(r.name)}" />
+            <div class="input-with-actions" style="flex:1;">
+              <input class="edit-name inline-edit" value="${esc(r.name)}" />
+              <div class="rtn-edit-actions">
+                <button class="rtn-btn-mini save" type="button"><span class="material-symbols-outlined">check</span></button>
+                <button class="rtn-btn-mini cancel" type="button"><span class="material-symbols-outlined">close</span></button>
+              </div>
+            </div>
             ${moneyChip(r.amount)}
           </div>
 
@@ -385,7 +419,13 @@ function renderList(){
         <div class="rtn-grid4">
           <div class="rtn-cell">
             <label>金額</label>
-            <input class="edit-amount inline-edit" type="number" value="${esc(r.amount)}" />
+            <div class="input-with-actions">
+              <input class="edit-amount inline-edit" type="number" value="${esc(r.amount)}" />
+              <div class="rtn-edit-actions">
+                <button class="rtn-btn-mini save" type="button" title="確認儲存"><span class="material-symbols-outlined">check</span></button>
+                <button class="rtn-btn-mini cancel" type="button" title="取消還原"><span class="material-symbols-outlined">close</span></button>
+              </div>
+            </div>
           </div>
           <div class="rtn-cell">
             <label>幣別</label>
@@ -395,7 +435,13 @@ function renderList(){
           </div>
           <div class="rtn-cell">
             <label>類別</label>
-            <input class="edit-cat inline-edit" value="${esc(r.cat)}" />
+            <div class="input-with-actions">
+              <input class="edit-cat inline-edit" value="${esc(r.cat)}" />
+              <div class="rtn-edit-actions">
+                <button class="rtn-btn-mini save" type="button"><span class="material-symbols-outlined">check</span></button>
+                <button class="rtn-btn-mini cancel" type="button"><span class="material-symbols-outlined">close</span></button>
+              </div>
+            </div>
           </div>
           <div class="rtn-cell">
             <label>Owner</label>
@@ -411,15 +457,15 @@ function renderList(){
           </div>
           <div class="rtn-cell">
             <label>autoPost</label>
-            <button class="toggle-btn toggle-autopost ${r.autoPost?'on':'off'}"
-                    aria-pressed="${r.autoPost?'true':'false'}" type="button">
+            <button class="toggle-btn toggle-autopost ${r.autoPost ? 'on' : 'off'}"
+                    aria-pressed="${r.autoPost ? 'true' : 'false'}" type="button">
               ${r.autoPost ? '●' : '○'}
             </button>
           </div>
           <div class="rtn-cell">
             <label>RollupOnly</label>
-            <button class="toggle-btn toggle-rollup ${r.rollupOnly?'on':'off'}"
-                    aria-pressed="${r.rollupOnly?'true':'false'}" type="button">
+            <button class="toggle-btn toggle-rollup ${r.rollupOnly ? 'on' : 'off'}"
+                    aria-pressed="${r.rollupOnly ? 'true' : 'false'}" type="button">
               ${r.rollupOnly ? '●' : '○'}
             </button>
           </div>
@@ -427,41 +473,44 @@ function renderList(){
       </div>
     </div>
     `;
-  }).join('');
-  
-  // 綁互動在新的 DOM 上
-  state.rows.forEach(r=>bindRowInteractions(r));
-}
+      }).join('');
 
-  function renderAll(){
-    renderList();
-    renderTotalsCard();
-  }
-
-  // ====== init() ======
-  App.pages.routines = {
-    init(){
-      // 把 routines 頁面顯示出來
-      document.querySelectorAll('.page').forEach(p=>p.classList.remove('show'));
-      const sec = document.getElementById('page-routines');
-      if (sec){
-        sec.classList.add('show');
-        sec.style.display = '';
-      }
-
-      // 綁新增按鈕
-      const addBtn = q('#rtn-add-btn');
-      if (addBtn && !addBtn.__bound){
-        addBtn.addEventListener('click', ()=>{
-          addNewRow();
-        });
-        addBtn.__bound = true;
-      }
-
-      // 抓資料
-      loadDataFromServer();
+      // 綁互動在新的 DOM 上
+      state.rows.forEach(r => bindRowInteractions(r));
     }
-  };
 
-})();
+    function renderAll() {
+      renderList();
+      renderTotalsCard();
+    }
+
+    // ====== init() ======
+    App.pages.routines = {
+      init() {
+        // 把 routines 頁面顯示出來
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('show'));
+        const sec = document.getElementById('page-routines');
+        if (sec) {
+          sec.classList.add('show');
+          sec.style.display = '';
+        }
+
+        // 綁新增按鈕
+        const addBtn = q('#rtn-add-btn');
+        if (addBtn && !addBtn.__bound) {
+          addBtn.addEventListener('click', () => {
+            addNewRow();
+          });
+          addBtn.__bound = true;
+        }
+
+        // 抓資料
+        loadDataFromServer();
+      },
+      refresh() {
+        loadDataFromServer();
+      }
+    };
+
+  })();
 </script>

@@ -324,6 +324,29 @@
         return;
       }
       fetchFxUSDTWD();
+      fetchFxUSDTWD();
+
+      // Reset UI to loading state
+      const loadingPlaceholder = '—';
+      setText('kpiTotal', loadingPlaceholder);
+      setText('kpiNet', loadingPlaceholder);
+      setText('kpiCash', loadingPlaceholder);
+      setText('kpiAvail', loadingPlaceholder);
+      setText('kpiUSD', loadingPlaceholder);
+      setText('dashPnlPill', '…');
+      setText('planPnlPill', '…', 0);
+      setText('ctFundVal', loadingPlaceholder);
+      setText('ctPnl', loadingPlaceholder);
+      setText('ctInt', loadingPlaceholder);
+      setText('ctRetPill', '…');
+      setText('accSumPill', '…');
+
+      // Reset Lists
+      const accList = document.getElementById('accList');
+      if (accList) accList.innerHTML = '<div class="empty">載入中…</div>';
+      const plannedList = document.getElementById('plannedList');
+      if (plannedList) plannedList.innerHTML = '<div class="empty">載入中…</div>';
+
       google.script.run
         .withSuccessHandler(res => {
           console.log('[dashmain] getDashboardData ok', res);
