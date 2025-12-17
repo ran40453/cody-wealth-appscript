@@ -334,14 +334,15 @@
     }
 
     function loadTx(account) {
-      if (!google?.script?.run) return;  // 只檢查 GAS 是否可用；不要因為沒有 viewport 就不抓
+      if (!google?.script?.run) return;
       const filter = account ? { account } : {};
+      filter.limit = 200; // [Performance] 只抓最近 200 筆
+
       google.script.run
         .withSuccessHandler(rows => {
-          // rows: [{date,item,amount,account,status,note,_row?}]
           vs.rows = Array.isArray(rows) ? rows : [];
-          applyStatusFilter();            // 依狀態過濾 + 嘗試重畫（如果 DOM 已就緒）
-          updateBalanceCard();            // 左側餘額卡不依賴 viewport，直接更新
+          applyStatusFilter();
+          // updateBalanceCard no longer depends on rows, done separately
         })
         .getTransactions(filter);
     }
@@ -452,7 +453,13 @@
         <td class="txt"><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account || '').toLowerCase())}">${esc(r.account || '')}</span></td>
         <td class="txt">${esc(r.item || '')}</td>
         <td class="num"><span class="mask-num" data-mask-str="＊＊＊">${fmtMoney(r.amount)}</span></td>
-        <td class="txt"><span class="tx-chip tx-chip--status ${statusCls}">${esc(status)}</span></td>
+        <td class="txt">
+          <span class="tx-chip tx-chip--status ${statusCls}" title="${esc(status)}">
+            ${isPln ? '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">schedule</span>' :
+            isUsing ? '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">trending_up</span>' :
+              '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">check_circle</span>'}
+          </span>
+        </td>
       </tr>`;
       }).join('');
 
@@ -477,102 +484,27 @@
     };
   })();
 
-  /* ===== 帳戶餘額：計算工具（沿用你原本的） ===== */
-  function input_computePostedBalancesByAccount(rows) {
-    const posted = (rows || []).filter(r => String(r.status || '').toLowerCase() === 'posted');
-    const byAcct = new Map();
-    posted.forEach(r => {
-      const acct = String(r.account || '').trim();
-      if (!acct) return;
-      (byAcct.get(acct) || byAcct.set(acct, []).get(acct)).push(r);
-    });
-    const out = [];
-    for (const [acct, list] of byAcct.entries()) {
-      const currentRows = list.filter(r => /\bcurrent\b/i.test(String(r.item || '')));
+  /* ===== 帳戶餘額：計算工具 (Server-Side) ===== */
 
-      let base = 0;
-      let snapTs = -1;
-
-      if (currentRows.length) {
-        const latest = currentRows
-          .map(r => ({ ...r, _ts: Date.parse(r.date || '') || 0 }))
-          .sort((a, b) => b._ts - a._ts)[0];
-        base = Number(latest.amount) || 0;
-        snapTs = latest._ts;
-      }
-
-      const others = list.filter(r => !/\bcurrent\b/i.test(String(r.item || '')));
-
-      // 修正：只扣除「日期 > Snapshot」的交易
-      // 若無 Snapshot (snapTs=-1)，則全部扣除
-      const sumOthers = others.reduce((t, r) => {
-        const rTs = Date.parse(r.date || '') || 0;
-        if (rTs > snapTs) {
-          return t + (Number(r.amount) || 0);
-        }
-        return t;
-      }, 0);
-
-      out.push({ account: acct, balance: base - sumOthers });
-    }
-    return out.sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
-  }
-
-  function input_computePlannedTotalsByAccount(rows) {
-    const planned = (rows || []).filter(r => String(r.status || '').toLowerCase() === 'planned');
-    const byAcct = new Map();
-    planned.forEach(r => {
-      if (/\bcurrent\b/i.test(String(r.item || ''))) return;
-      const acct = String(r.account || '').trim();
-      if (!acct) return;
-      const v = -(Number(r.amount) || 0);
-      byAcct.set(acct, (byAcct.get(acct) || 0) + v);
-    });
-    return Array.from(byAcct.entries())
-      .map(([account, balance]) => ({ account, balance }))
-      .sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
-  }
-
-  function input_computeUsingTotalsByAccount(rows) {
-    const usingRows = (rows || []).filter(r => String(r.status || '').toLowerCase() === 'using');
-    const byAcct = new Map();
-    usingRows.forEach(r => {
-      if (/\bcurrent\b/i.test(String(r.item || ''))) return;
-      const acct = String(r.account || '').trim();
-      if (!acct) return;
-      // 與 planned 相同邏輯：將資料列金額轉為「支出為正」的方向
-      const v = -(Number(r.amount) || 0);
-      byAcct.set(acct, (byAcct.get(acct) || 0) + v);
-    });
-    return Array.from(byAcct.entries())
-      .map(([account, balance]) => ({ account, balance }))
-      .sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
-  }
-
-  function renderBalanceCard(activeAccount) {
+  function renderBalanceCard(activeAccount, serverBalances) {
     const cardEl = document.getElementById('acctBalanceCard');
     if (!cardEl) return;
-    const rows = App.modules.pageInput?.__getRows?.() || [];
 
-    let posted = input_computePostedBalancesByAccount(rows);
-    let planned = input_computePlannedTotalsByAccount(rows);
-    let using = input_computeUsingTotalsByAccount(rows);
+    // serverBalances: [{account, posted, planned, using, sum}, ...]
+    let allRows = serverBalances || [];
 
     // activeAccount 篩選：只顯示指定帳戶
     if (activeAccount) {
       const acct = String(activeAccount).trim();
-      posted = posted.filter(x => x.account === acct);
-      planned = planned.filter(x => x.account === acct);
-      using = using.filter(x => x.account === acct);
+      allRows = allRows.filter(x => x.account === acct);
     }
 
-    // 判斷貸款帳戶（專屬置頂表格）
-    const isLoanAccount = (name) => {
-      const s = String(name || '');
-      return s.includes('貸款');
-    };
+    // 排序
+    allRows.sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
 
-    // 判斷一般置頂帳戶（中信 + Cash，但不包含貸款）
+    // 判斷貸款帳戶
+    const isLoanAccount = (name) => String(name || '').includes('貸款');
+    // 判斷置頂 (中信 + Cash)
     const isPinnedAccount = (name) => {
       const s = String(name || '');
       const sLow = s.toLowerCase();
@@ -580,40 +512,10 @@
       return s.includes('中信') || sLow === 'cash';
     };
 
-    // 轉為帳戶對應 map
-    const postedMap = new Map((posted || []).map(x => [String(x.account || '').trim(), Number(x.balance) || 0]));
-    const plannedMap = new Map((planned || []).map(x => [String(x.account || '').trim(), Number(x.balance) || 0]));
-    const usingMap = new Map((using || []).map(x => [String(x.account || '').trim(), Number(x.balance) || 0]));
-
-    // 蒐集所有帳戶
-    const acctSet = new Set([
-      ...Array.from(postedMap.keys()),
-      ...Array.from(plannedMap.keys()),
-      ...Array.from(usingMap.keys())
-    ]);
-
-    const allRows = Array.from(acctSet)
-      .filter(acct => acct) // 排除空帳戶
-      .map(acct => {
-        const pln = plannedMap.get(acct) || 0;
-        const pst = postedMap.get(acct) || 0;
-        const use = usingMap.get(acct) || 0;
-        return {
-          account: acct,
-          planned: pln,
-          posted: pst,
-          using: use,
-          sum: pln + pst   // 基本 Sum（一般帳戶使用這個：posted + planned）
-        };
-      })
-      .sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
-
-    // 分為「貸款帳戶」、「置頂帳戶（中信/Cash）」、「一般帳戶」
     const loanRows = allRows.filter(r => isLoanAccount(r.account));
     const pinRows = allRows.filter(r => isPinnedAccount(r.account));
     const restRows = allRows.filter(r => !isLoanAccount(r.account) && !isPinnedAccount(r.account));
 
-    // 金額 chip
     const moneyChip = (val, extraCls = '') => {
       const n = Number(val) || 0;
       const clsSign = n < 0 ? 'neg' : 'pos';
@@ -623,40 +525,32 @@
       return `<span class="${classes.join(' ')}" data-mask-str="＊＊＊">${txt}</span>`;
     };
 
-    // 1) 貸款帳戶表格（置頂）：帳戶｜Posted｜Using｜Planned｜Sum
-    //    Posted 顯示為「原始 posted 扣掉 using（原始金額）之後的餘額」
-    //    Sum ＝ Posted + Using + Planned（其中 Planned 已為負值）
+    // 1) 貸款帳戶
     let loanHTML = '';
+    const icoPosted = '<span class="material-symbols-outlined" title="Posted" style="font-size:16px; vertical-align:middle;">check_circle</span>';
+    const icoPlanned = '<span class="material-symbols-outlined" title="Planned" style="font-size:16px; vertical-align:middle;">schedule</span>';
+    const icoUsing = '<span class="material-symbols-outlined" title="Using" style="font-size:16px; vertical-align:middle;">trending_up</span>';
+
     if (loanRows.length) {
       loanHTML += `<div class="bal-table-wrap bal-loan"><table class="bal-table"><thead><tr>
       <th>帳戶</th>
-      <th>Posted</th>
-      <th>Using</th>
-      <th>Planned</th>
+      <th>${icoPosted}</th>
+      <th>${icoUsing}</th>
+      <th>${icoPlanned}</th>
       <th>Sum</th>
     </tr></thead><tbody>`;
       loanRows.forEach(r => {
-        const usingAgg = Number(usingMap.get(r.account) || 0); // 聚合值（支出為正）
         const rawPosted = Number(r.posted) || 0;
+        const usingVal = Number(r.using) || 0; // negative
         const pln = Number(r.planned) || 0;
-
-        // using 原始方向總和（＝各筆原始 amount 相加）
-        const usingRaw = -usingAgg;
-
-        // Posted 欄位：顯示「原始 posted 扣掉 using 原始金額」後的餘額
+        const usingRaw = -usingVal; // positive
         const postedDisplay = rawPosted - usingRaw;
-
-        // Sum：Posted + Using + Planned
-        // ＝ (current cash after using) + (invested using) + (future planned, usually negative)
         const sumLoan = postedDisplay + usingRaw + pln;
-
-        // Using 欄位顯示原始方向
-        const usingDisplay = usingRaw;
 
         loanHTML += `<tr>
         <td class="name">${esc(r.account)}</td>
         <td class="num">${moneyChip(postedDisplay, 'posted')}</td>
-        <td class="num">${moneyChip(usingDisplay, 'using')}</td>
+        <td class="num">${moneyChip(usingRaw, 'using')}</td>
         <td class="num">${moneyChip(pln, 'planned')}</td>
         <td class="num">${moneyChip(sumLoan, 'sum')}</td>
       </tr>`;
@@ -664,50 +558,36 @@
       loanHTML += `</tbody></table></div><hr class="bal-divider">`;
     }
 
-    // 2) 一般置頂帳戶（中信 / Cash）：帳戶｜Posted｜Planned｜Sum（沿用原本邏輯）
-    let topHTML = '';
-    if (pinRows.length) {
-      topHTML += `<div class="bal-table-wrap bal-top"><table class="bal-table"><thead><tr>
-      <th>帳戶</th>
-      <th>Posted</th>
-      <th>Planned</th>
-      <th>Sum</th>
-    </tr></thead><tbody>`;
-      pinRows.forEach(r => {
-        topHTML += `<tr>
+    // 2) 置頂 & 3) 一般
+    const renderSimpleTable = (rows, cls) => {
+      let h = `<div class="bal-table-wrap ${cls || ''}"><table class="bal-table"><thead><tr>
+        <th>帳戶</th>
+        <th>${icoPosted}</th>
+        <th>${icoPlanned}</th>
+        <th>Sum</th>
+      </tr></thead><tbody>`;
+      rows.forEach(r => {
+        h += `<tr>
         <td class="name">${esc(r.account)}</td>
         <td class="num">${moneyChip(r.posted, 'posted')}</td>
         <td class="num">${moneyChip(r.planned, 'planned')}</td>
         <td class="num">${moneyChip(r.sum, 'sum')}</td>
       </tr>`;
       });
-      topHTML += `</tbody></table></div><hr class="bal-divider">`;
-    }
+      h += `</tbody></table></div>`;
+      return h;
+    };
 
-    // 3) 其餘帳戶：表格顯示（帳戶｜Posted｜Planned｜Sum）
+    let topHTML = pinRows.length ? (renderSimpleTable(pinRows, 'bal-top') + `<hr class="bal-divider">`) : '';
+
     let tableHTML = '';
     if (restRows.length) {
-      tableHTML += `<div class="bal-table-wrap"><table class="bal-table"><thead><tr>
-      <th>帳戶</th>
-      <th>Posted</th>
-      <th>Planned</th>
-      <th>Sum</th>
-    </tr></thead><tbody>`;
-      restRows.forEach(r => {
-        tableHTML += `<tr>
-        <td class="name">${esc(r.account)}</td>
-        <td class="num">${moneyChip(r.posted, 'posted')}</td>
-        <td class="num">${moneyChip(r.planned, 'planned')}</td>
-        <td class="num">${moneyChip(r.sum, 'sum')}</td>
-      </tr>`;
-      });
-      tableHTML += `</tbody></table></div>`;
+      tableHTML = renderSimpleTable(restRows, '');
     } else if (!loanRows.length && !pinRows.length) {
-      // 完全沒有資料
       tableHTML = `<div class="bal-row empty">（無資料）</div>`;
     }
 
-    // 4) 餘額總計：排除所有置頂帳戶（貸款 + 中信 + Cash）
+    // 4) Grand Total
     const excluded = new Set([
       ...loanRows.map(r => r.account),
       ...pinRows.map(r => r.account)
@@ -715,7 +595,7 @@
     let grandVal = 0;
     allRows.forEach(r => {
       if (!excluded.has(r.account)) {
-        grandVal += Number(r.sum) || 0;   // 非貸款帳戶仍使用「posted+planned」的 sum 定義
+        grandVal += Number(r.sum) || 0;
       }
     });
     const grandTxt = Math.round(grandVal).toLocaleString('zh-Hant-TW');
@@ -737,8 +617,13 @@
 
   function updateBalanceCard() {
     try {
-      const acct = pickActiveAccount();
-      renderBalanceCard(acct);
+      if (!google?.script?.run) return;
+      google.script.run
+        .withSuccessHandler(balances => {
+          const acct = pickActiveAccount();
+          renderBalanceCard(acct, balances);
+        })
+        .getAccountBalances();
     } catch (e) { }
   }
 

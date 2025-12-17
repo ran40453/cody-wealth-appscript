@@ -24,9 +24,12 @@
         <div class="fx-select-wrap">
           <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
             <div class="seg-sm" id="statusSeg">
-              <button id="statusPlanned" class="seg-btn seg-sm">planned</button>
-              <button id="statusPosted" class="seg-btn seg-sm">posted</button>
-              <button id="statusUsing" class="seg-btn seg-sm">Using</button>
+              <button id="statusPlanned" class="seg-btn seg-sm" title="Planned"><span
+                  class="material-symbols-outlined">schedule</span></button>
+              <button id="statusPosted" class="seg-btn seg-sm" title="Posted"><span
+                  class="material-symbols-outlined">check_circle</span></button>
+              <button id="statusUsing" class="seg-btn seg-sm" title="Using"><span
+                  class="material-symbols-outlined">trending_up</span></button>
             </div>
           </div>
           <select id="txAccountPick" class="fx-select">
@@ -53,7 +56,7 @@
       <div class="row amount-row">
         <div class="col">
           <div class="seg" role="tablist" aria-label="收入或支出">
-            <input type="radio" id="typeIn"  name="type" value="in"  checked>
+            <input type="radio" id="typeIn" name="type" value="in" checked>
             <label for="typeIn">支出</label>
             <input type="radio" id="typeOut" name="type" value="out">
             <label for="typeOut">收入</label>
@@ -68,8 +71,8 @@
             <option value="">請選擇帳戶</option>
           </select>
         </div>
-        <button type="button" id="btnToggleUsing" class="btn btn--ghost btn-using-toggle">
-          Using
+        <button type="button" id="btnToggleUsing" class="btn btn--ghost btn-using-toggle" title="Using">
+          <span class="material-symbols-outlined">trending_up</span>
         </button>
       </div>
       <input type="hidden" id="inStatus" value="auto">
@@ -78,11 +81,11 @@
 
 
       <div class="form-actions">
-      <button id="btnSubmit"   class="btn btn--lg btn--primary">送出</button>
-      <button id="btnClear"    class="btn btn--lg btn--dark">移除</button>
-      <button id="btnUpdateTx" class="btn btn--lg btn--danger" disabled>更新</button>
+        <button id="btnSubmit" class="btn btn--lg btn--primary">送出</button>
+        <button id="btnClear" class="btn btn--lg btn--dark">移除</button>
+        <button id="btnUpdateTx" class="btn btn--lg btn--danger" disabled>更新</button>
       </div>
-        
+
     </div>
 
   </div>

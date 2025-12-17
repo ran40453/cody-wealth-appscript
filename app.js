@@ -153,6 +153,7 @@ function getTxByKind(kind) {
 }
 
 /** 明細清單（可過濾：account / dateFrom / dateTo；空值=不過濾） */
+/** 明細清單（可過濾：account / dateFrom / dateTo；空值=不過濾） */
 function getTransactions(filter) {
   filter = filter || {};
   const accPick = String(filter.account || '').trim();
@@ -160,6 +161,7 @@ function getTransactions(filter) {
   const toStr = String(filter.dateTo || '').trim();
   const from = fromStr ? new Date(fromStr) : null;
   const to = toStr ? new Date(toStr) : null;
+  const limit = Number(filter.limit) || 0; // 0 = no limit
 
   const sh = SpreadsheetApp.getActive().getSheetByName(CF_SHEET);
   if (!sh) return [];
@@ -197,6 +199,10 @@ function getTransactions(filter) {
   }
   // 近到遠
   out.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+
+  if (limit > 0 && out.length > limit) {
+    return out.slice(0, limit);
+  }
   return out;
 }
 
@@ -215,12 +221,12 @@ function getColMap_(sh) {
   const row = sh.getRange(HEADER_ROW, 1, 1, sh.getLastColumn()).getValues()[0] || [];
   const norm = s => String(s || '').trim().toLowerCase();
   const alias = {
-    date: ['date', '日期'],
-    item: ['item', '明細', '項目'],
+    date: ['date', '日期', 'due date', 'time', 'day'],
+    item: ['item', '明細', '項目', 'desc', 'description'],
     amount: ['amount', '金額', '金額(+-)'],
-    account: ['account', '帳戶', '帳號'],
-    status: ['status', '狀態'],
-    note: ['note', '備註', '註記']
+    account: ['account', '帳戶', '帳號', 'acct', 'bank'],
+    status: ['status', '狀態', 'state', 'st'],
+    note: ['note', '備註', '註記', 'remark', 'memo']
   };
   const idx = {};
   for (const k of Object.keys(alias)) {
@@ -240,6 +246,7 @@ function getColMap_(sh) {
  *  2. 餘額 = Snapshot.amount + Σ(-posted.amount)
  *     其中 posted 必須是「日期 > Snapshot.date」的交易
  *     (若無 Snapshot，則 Snapshot.date = 0，即加總所有 posted)
+ *  3. [NEW] 若 status='planned' 且 date <= Today，也視為 posted (Effective Posted)
  */
 function calcNow_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(CF_SHEET);
@@ -262,40 +269,36 @@ function calcNow_() {
     byAcc[acc].push(r);
   }
 
+  // Helper date
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || 'Asia/Taipei';
+  const todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
   // 2. Calculate per account
   for (const acc of Object.keys(byAcc)) {
     const rows = byAcc[acc];
-
-    // 找最新的 Current
-    let snapDate = -1;
-    let snapBal = 0;
-
-    // 先掃一遍找 Current (假設日期格式正確，若無日期則視為最舊)
-    // 注意：若有多筆 Current 在同一天，取哪筆？通常取最後一筆 (rowIndex 最大)
-    // 這裡 rows 是按 sheet 順序 (舊->新 or 亂序? 通常是 append 所以是舊->新)
-    // 我們假設 sheet 是 append 的，所以後面的 row 比較新。
-    // 若要嚴謹依 date 排序，需先 parse date。
 
     // 為了準確，我們先把 rows 轉成物件並 parse date
     const parsed = rows.map(r => {
       const dRaw = r[iDate];
       const dObj = dRaw instanceof Date ? dRaw : (dRaw ? new Date(dRaw) : null);
       const ts = dObj ? dObj.getTime() : 0;
+      const dStr = dObj ? Utilities.formatDate(dObj, tz, 'yyyy-MM-dd') : '';
       return {
         r,
         ts,
+        dStr,
         item: String(r[iItem] || '').trim(),
         sta: String(r[iSta] || '').trim().toLowerCase(),
         amt: Number(r[iAmt] || 0)
       };
     });
 
-    // 找最新 Current
-    // 排序：日期小->大，若日期相同則維持原順序 (穩定排序? JS sort 不一定)
-    // 簡單起見，我們遍歷找出 ts 最大且 row index 最大的 Current
+    // 找最新 Snapshot (Current)
+    let snapDate = -1;
+    let snapBal = 0;
+
     for (const p of parsed) {
       if (p.item === 'Current') {
-        // 若找到日期更新，或日期相同但比較晚出現的 (假設 parsed 順序即 row 順序)
         if (p.ts >= snapDate) {
           snapDate = p.ts;
           snapBal = p.amt;
@@ -303,25 +306,119 @@ function calcNow_() {
       }
     }
 
-    // 計算餘額：Base + Sum(posted where date > snapDate)
-    // 注意：若 snapDate == -1 (沒 Current)，則全部 posted 都算
-    // 若 transaction date == snapDate，視為「已包含在 Current」，不重複算 (Strictly Greater)
+    // 計算餘額：Base + Sum(effective_posted where date > snapDate)
     let bal = snapDate === -1 ? 0 : snapBal;
 
     for (const p of parsed) {
-      if (p.item === 'Current') continue; // Current 已處理
-      if (p.sta === 'posted') {
+      if (p.item === 'Current') continue;
+
+      let isEffectivePosted = false;
+      if (p.sta === 'posted') isEffectivePosted = true;
+      else if (p.sta === 'planned') {
+        // 若日期 <= 今天，視為已入帳
+        if (p.dStr <= todayStr) isEffectivePosted = true;
+      }
+
+      if (isEffectivePosted) {
         // 只有日期「晚於」Snapshot 才納入
-        // 沒 Snapshot (snapDate=-1) -> p.ts >= 0 > -1 -> 納入 (Correct)
-        // 有 Snapshot -> p.ts > snapDate -> 納入
+        // 這裡如果是「當日 Planned turned Posted」，只要它的日期 (00:00) > snapDate 就算
+        // 若 snapDate 是今天的 Snapshot (time > 0)，則 planned (time=0) 可能被濾掉 -> 導致「當日 snapshot 後的新交易」漏算
+        // 但通常 snapshot 是歷史定錨。若 snapshot 就是今天，那今天的新交易理應要 > snapshot time 才會算
+        // 可是 planned 通常沒有時間 (00:00)，若 snapshot 是今天下午做的，那今天的 planned 就會變成 <= snapDate 而被忽略 (視為已包含在 snapshot)
+        // 這符合邏輯：若 snapshot 比較新，那它應該已經包含了今天的 planned (如果當時已入帳)
+        // 但如果 snapshot 是舊的 (e.g. 昨天)，那今天的 planned > snapDate，就會被納入 (扣除) -> 正確
         if (p.ts > snapDate) {
-          bal += -p.amt; // posted 支出為正(amt>0) -> 餘額減少; 收入為負(amt<0) -> 餘額增加
+          bal += -p.amt;
         }
       }
     }
     out[acc] = bal;
   }
   return out;
+}
+
+/** [NEW] 回傳所有帳戶的餘額概況 { acc: { posted, planned, sum } } */
+function getAccountBalances() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(CF_SHEET);
+  if (!sh) return {};
+
+  // 1. 取得 Posted/Now 餘額 (已有新邏輯)
+  const postedMap = calcNow_();
+
+  // 2. 取得 Planned (Future) 餘額
+  const lastRow = sh.getLastRow();
+  const plannedMap = {};
+
+  if (lastRow > HEADER_ROW) {
+    const vals = sh.getRange(HEADER_ROW + 1, 1, lastRow - HEADER_ROW, sh.getLastColumn()).getValues();
+    const M = getColMap_(sh);
+    const iItem = M.item - 1, iAmt = M.amount - 1, iAcc = M.account - 1, iSta = M.status - 1, iDate = M.date - 1;
+    const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || 'Asia/Taipei';
+    const todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+    for (const r of vals) {
+      const acc = String(r[iAcc] || '').trim();
+      if (!acc) continue;
+
+      const item = String(r[iItem] || '').trim();
+      if (item === 'Current') continue;
+
+      const sta = String(r[iSta] || '').trim().toLowerCase();
+      if (sta !== 'planned') continue;
+
+      const dRaw = r[iDate];
+      const dObj = dRaw instanceof Date ? dRaw : (dRaw ? new Date(dRaw) : null);
+      const dStr = dObj ? Utilities.formatDate(dObj, tz, 'yyyy-MM-dd') : '';
+
+      // 只算未來的 planned (日期 > 今天)
+      if (dStr > todayStr) {
+        const amt = Number(r[iAmt] || 0);
+        // planned 顯示為 -金額 (支出為正，故用負號)
+        if (!plannedMap[acc]) plannedMap[acc] = 0;
+        plannedMap[acc] += -amt;
+      }
+    }
+  }
+
+  // 3. 取得 Using 總和 (維持原邏輯)
+  const usingMap = {};
+  if (lastRow > HEADER_ROW) {
+    const vals = sh.getRange(HEADER_ROW + 1, 1, lastRow - HEADER_ROW, sh.getLastColumn()).getValues();
+    const M = getColMap_(sh);
+    const iAmt = M.amount - 1, iAcc = M.account - 1, iSta = M.status - 1, iItem = M.item - 1;
+
+    for (const r of vals) {
+      const acc = String(r[iAcc] || '').trim();
+      if (!acc) continue;
+      if (String(r[iItem] || '').toLowerCase() === 'current') continue;
+      const sta = String(r[iSta] || '').trim().toLowerCase();
+      if (sta === 'using') {
+        const amt = Number(r[iAmt] || 0);
+        if (!usingMap[acc]) usingMap[acc] = 0;
+        usingMap[acc] += -amt; // using 視同支出/投資，用負號
+      }
+    }
+  }
+
+  // 4. 合併結果
+  const out = [];
+  // 收集所有帳戶
+  const allAcc = new Set([...Object.keys(postedMap), ...Object.keys(plannedMap), ...Object.keys(usingMap)]);
+
+  allAcc.forEach(acc => {
+    const p = postedMap[acc] || 0;
+    const pl = plannedMap[acc] || 0;
+    const u = usingMap[acc] || 0;
+    out.push({
+      account: acc,
+      posted: p,
+      planned: pl,
+      using: u,
+      sum: p + pl // 一般定義 sum = posted + planned (using 只有貸款帳戶特殊處理，前端會再算)
+    });
+  });
+
+  return out.sort((a, b) => a.account.localeCompare(b.account, 'zh-Hant'));
 }
 
 /** 回傳指定帳戶的 Balance(NOW)；name 空字串→回全部加總 */
@@ -354,19 +451,12 @@ function submitCashflow(rec) {
 
   if (M.status) {
     const stCell = sh.getRange(row, M.status);
-    if (!st || /^auto$/i.test(st)) {
-      const delta = (M.date || 0) - (M.status || 0);
-      stCell.setFormulaR1C1(`=IF(RC[${delta}]<=TODAY(),"posted","planned")`);
-    } else if (/^posted$/i.test(st)) {
-      stCell.clearFormat().setValue('posted');
-    } else if (/^planned$/i.test(st)) {
-      stCell.clearFormat().setValue('planned');
-    } else if (/^using$/i.test(st)) {
+    if (/^using$/i.test(st)) {
       // 保留 using 狀態，不套自動公式
       stCell.clearFormat().setValue('using');
     } else {
       const delta = (M.date || 0) - (M.status || 0);
-      stCell.setFormulaR1C1(`=IF(RC[${delta}]<=TODAY(),"posted","planned")`);
+      stCell.setFormulaR1C1(`=IF(INT(RC[${delta}])<=TODAY(),"posted","planned")`);
     }
   }
 
@@ -1226,19 +1316,12 @@ function updateTransaction(row, rec) {
 
   if (map.status) {
     const stCell = sh.getRange(row, map.status);
-    if (!st || /^auto$/i.test(st)) {
-      const delta = (map.date || 0) - (map.status || 0);
-      stCell.setFormulaR1C1(`=IF(RC[${delta}]<=TODAY(),"posted","planned")`);
-    } else if (/^posted$/i.test(st)) {
-      stCell.clearFormat().setValue('posted');
-    } else if (/^planned$/i.test(st)) {
-      stCell.clearFormat().setValue('planned');
-    } else if (/^using$/i.test(st)) {
+    if (/^using$/i.test(st)) {
       // 保留 using 狀態，不套自動公式
       stCell.clearFormat().setValue('using');
     } else {
       const delta = (map.date || 0) - (map.status || 0);
-      stCell.setFormulaR1C1(`=IF(RC[${delta}]<=TODAY(),"posted","planned")`);
+      stCell.setFormulaR1C1(`=IF(INT(RC[${delta}])<=TODAY(),"posted","planned")`);
     }
   }
   SpreadsheetApp.flush();       // ★ 讓前端下一次讀到最新值
