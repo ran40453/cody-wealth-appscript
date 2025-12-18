@@ -219,6 +219,62 @@
       }
 
       updateBalanceCard();
+      bindConsolidate();
+    }
+
+    /* ===== 庫存整併按鈕 ===== */
+    function bindConsolidate() {
+      const btn = byId('btnConsolidate');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const acc = byId('txAccountPick')?.value;
+        if (!acc) { alert('請先選擇要整併的帳戶'); return; }
+
+        // Must select a row
+        if (!vs.selectedRec || !vs.selectedRec.date) {
+          alert('請先在清單中點選一筆交易，作為整併的「截止日期」。\n\n系統將會把該日期（含）之前的 Posted 交易整併。');
+          return;
+        }
+
+        const cutoffDate = vs.selectedRec.date;
+        const msg = `【庫存整併警告】\n\n帳戶：${acc}\n截止日：${cutoffDate}\n\n系統將整併「${cutoffDate}」之前（含）的所有 Posted 交易。\n\n• 舊的交易將被刪除。\n• 餘額將更新至 Current 行。\n• 此動作無法復原！\n\n確定要執行嗎？`;
+
+        if (!confirm(msg)) return;
+
+        const icon = btn.querySelector('.material-symbols-outlined');
+        const origIcon = icon ? icon.textContent : 'inventory_2';
+        if (icon) icon.textContent = 'hourglass_empty';
+        btn.disabled = true;
+
+        if (!google?.script?.run) {
+          alert('無法連線至伺服器');
+          btn.disabled = false;
+          if (icon) icon.textContent = origIcon;
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            btn.disabled = false;
+            if (icon) icon.textContent = origIcon;
+            if (res.ok) {
+              alert('整併成功！\n' + res.msg);
+              clearFormAndSelection(false); // Clear selection
+              reloadList();
+              updateBalanceCard();
+              window.dispatchEvent(new CustomEvent('acc:balanceSaved'));
+            } else {
+              alert('整併結果：' + res.msg);
+            }
+          })
+          .withFailureHandler((err) => {
+            btn.disabled = false;
+            if (icon) icon.textContent = 'error';
+            alert('整併失敗：' + (err.message || err));
+            setTimeout(() => { if (icon) icon.textContent = origIcon; }, 2000);
+          })
+          .consolidateAccount(acc, cutoffDate);
+      });
     }
 
     function collect() {
@@ -337,6 +393,10 @@
       if (!google?.script?.run) return;
       const filter = account ? { account } : {};
       filter.limit = 200; // [Performance] 只抓最近 200 筆
+
+      // Show/Hide Consolidate Button
+      const btnCon = document.getElementById('btnConsolidate');
+      if (btnCon) btnCon.style.display = account ? 'inline-flex' : 'none';
 
       google.script.run
         .withSuccessHandler(rows => {
@@ -721,11 +781,11 @@
 
         if (!isMobile) {
           const pv = Math.max(200, Math.floor(rect.height - toolbar.offsetHeight - 12));
-          viewport.style.height = pv + 'px';
+          // viewport.style.height = pv + 'px';
         } else {
           const vh = window.innerHeight;
           const pv = Math.max(120, Math.floor(vh - hdrH - rect.height - toolbar.offsetHeight - tabbarH - 36));
-          viewport.style.height = pv + 'px';
+          // viewport.style.height = pv + 'px';
           panel.style.marginBottom = '0px';
         }
       } catch (e) { }

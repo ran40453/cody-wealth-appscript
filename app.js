@@ -99,6 +99,118 @@ function getPlannedList() {
   return out;
 }
 
+/** 
+ * History Consolidation (User Triggered)
+ * 1. Find account's existing 'Current' snapshot (or create one).
+ * 2. Sum all 'posted' transactions up to CUTOFF DATE (inclusive).
+ * 3. Update 'Current' amount = OldSnapshot + Sum(-Posted).
+ * 4. Update 'Current' date = Cutoff Date.
+ * 5. Delete consolidated rows.
+ */
+function consolidateAccount(accName, cutoffDateStr) {
+  if (!accName) throw new Error('Account name is required');
+  if (!cutoffDateStr) throw new Error('Cutoff date is required');
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(CF_SHEET);
+  if (!sh) throw new Error('Sheet not found');
+
+  const tz = SpreadsheetApp.getActive().getSpreadsheetTimeZone() || 'Asia/Taipei';
+
+  // Logic: consolidate items where date <= cutoffDateStr.
+  // Safest: compare timestamps.
+  const cutDate = new Date(cutoffDateStr || '');
+  // Set to end of day to ensuring full coverage (23:59:59.999)
+  if (isNaN(cutDate.getTime())) throw new Error('Invalid cutoff date format');
+  cutDate.setHours(23, 59, 59, 999);
+  const cutTime = cutDate.getTime();
+
+  const lastRow = sh.getLastRow();
+  if (lastRow <= HEADER_ROW) return { ok: true, msg: 'No data to consolidate' };
+
+  // Read all data
+  const range = sh.getRange(HEADER_ROW + 1, 1, lastRow - HEADER_ROW, sh.getLastColumn());
+  const vals = range.getValues();
+  const M = getColMap_(sh);
+  const iItem = M.item - 1, iAmt = M.amount - 1, iAcc = M.account - 1, iSta = M.status - 1, iDate = M.date - 1;
+
+  // Find targets
+  let snapRowIdx = -1;  // 0-based relative to vals
+  let snapAmt = 0;
+  const toDelete = [];
+  let sumPosted = 0;
+  let count = 0;
+
+  for (let i = 0; i < vals.length; i++) {
+    const r = vals[i];
+    const rAcc = String(r[iAcc] || '').trim();
+    if (rAcc !== accName) continue;
+
+    const item = String(r[iItem] || '').trim();
+    const sta = String(r[iSta] || '').trim().toLowerCase();
+
+    // Check Date
+    const rDate = r[iDate] instanceof Date ? r[iDate] : (r[iDate] ? new Date(r[iDate]) : null);
+
+    // Snapshot?
+    if (item === 'Current') {
+      snapRowIdx = i;
+      snapAmt = Number(r[iAmt] || 0);
+      continue;
+    }
+
+    // Target for consolidation: Posted AND Date <= Cutoff (Timestamp compare)
+    // Ignore if date is empty or invalid
+    if (sta === 'posted' && rDate) {
+      // Comparison
+      const rTime = rDate.getTime();
+      if (!isNaN(rTime) && rTime <= cutTime) {
+        sumPosted += Number(r[iAmt] || 0);
+        toDelete.push(i);
+        count++;
+      }
+    }
+  }
+
+  if (count === 0) {
+    return { ok: true, msg: 'No transactions found to consolidate (up to ' + yesterStr + ')' };
+  }
+
+  // Execute update
+  let finalSnapAmt = snapAmt - sumPosted; // Expense(pos) reduces snapshot
+
+  // 1. Update or Create Snapshot
+  // Note: If no snapshot existed, start from 0 - sumPosted
+  if (snapRowIdx >= 0) {
+    const absRow = HEADER_ROW + 1 + snapRowIdx;
+    sh.getRange(absRow, iAmt + 1).setValue(finalSnapAmt);
+    // Update date to cutoff date (just store the raw string or parsed date)
+    sh.getRange(absRow, iDate + 1).setValue(cutoffDateStr);
+  } else {
+    // New row
+    const newRow = [];
+    // initialize empty
+    for (let k = 0; k < sh.getLastColumn(); k++) newRow.push('');
+    newRow[iDate] = cutoffDateStr;
+    newRow[iItem] = 'Current';
+    newRow[iAmt] = finalSnapAmt;
+    newRow[iAcc] = accName;
+    newRow[iSta] = 'posted';
+    sh.appendRow(newRow);
+  }
+
+  // 2. Delete rows (from bottom to top to preserve indices)
+  // Convert relative index -> absolute row number
+  const absRowsToDelete = toDelete.map(idx => HEADER_ROW + 1 + idx).sort((a, b) => b - a);
+
+  // Optimization: delete one by one is slow. Direct Sheets API is better but here we use simple loop.
+  // Or check if contiguous? Let's assume standard usage.
+  for (const rNum of absRowsToDelete) {
+    sh.deleteRow(rNum);
+  }
+
+  return { ok: true, msg: `Consolidated ${count} rows. New Start Balance: ${finalSnapAmt}` };
+}
+
 /** 依種類取清單：kind = 'planned' | 'now' | 'final'
  *  planned: 只取 status=planned
  *  now:     只取 status=posted（排除 item='Current'）

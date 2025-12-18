@@ -147,6 +147,8 @@
 
     --app-header-h: var(--header-h);
     --app-tabbar-h: calc(var(--tabbar-h) * var(--ui-scale));
+    --active-tabbar-h: 0px;
+    /* Desktop: 0px because tabbar is hidden */
     --tabbar-extra: 20px;
     /* 額外底部留白（內容與 Tabbar 之間） */
 
@@ -1005,6 +1007,7 @@
 
     .ctbc-kpiBar .kpi-grid,
     .ctbc-kpiBar .kpi-toggle-wrap {
+      /* Removing empty rulesets for cleaner CSS */
       display: none;
     }
 
@@ -1292,6 +1295,7 @@
   }
 
   .db-kpi .kpi-value {
+    /* Removing empty rulesets for cleaner CSS */
     font-weight: 900;
     font-variant-numeric: tabular-nums;
     font-size: calc(var(--kpi-size) * var(--ui-scale));
@@ -1360,7 +1364,7 @@
 
   .db-viewport {
     position: relative;
-    height: 65vh;
+    height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h) - 180px);
     overflow: auto;
     border: 1px solid color-mix(in oklab, var(--tint) 12%, transparent);
     border-radius: 12px;
@@ -1668,6 +1672,12 @@
     }
   }
 
+  @media (max-width:1024px) {
+    :root {
+      --active-tabbar-h: var(--app-tabbar-h);
+    }
+  }
+
   .is-mobile .tabbar {
     display: grid;
   }
@@ -1897,7 +1907,7 @@
     align-items: stretch;
     grid-auto-rows: 1fr;
     /* 讓三張卡高度延伸到視窗底部，交給卡片內部滾動 */
-    height: calc(100dvh - var(--app-header-h, 56px) - var(--app-tabbar-h, 0px) - 12px);
+    height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h) - 4px);
     overflow: hidden;
   }
 
@@ -1941,9 +1951,11 @@
   /* 手機：balance/form 上、list 下 */
   @media (max-width:1024px) {
     #page-input .input-layout {
-      height: calc(100dvh - var(--app-header-h, 56px) - var(--app-tabbar-h, 56px));
-      grid-template-rows: 1fr 1fr;
-      /* 上半 balance+form、下半 list 各佔一半 */
+      height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h));
+      /* Change to scrollable if content exceeds viewport */
+      overflow-y: auto;
+      grid-template-rows: max-content minmax(300px, 1fr);
+      /* Check min-height for list to ensure it's usable */
       grid-template-columns: 1fr 1fr !important;
       grid-template-areas:
         "balance form"
@@ -3539,7 +3551,7 @@
       grid-template-rows: minmax(160px, auto) minmax(160px, auto) auto;
       padding: var(--gap);
       box-sizing: border-box;
-      height: calc(100dvh - var(--header-h, 56px) - var(--tabbar-h, 56px));
+      height: calc(100dvh - var(--header-h, 56px) - var(--active-tabbar-h));
       overflow-y: auto;
       /* 允許整體捲動如果內容太多 */
     }
@@ -3643,7 +3655,7 @@
     gap: 10px;
     padding: 12px;
     grid-template-columns: 390px 1fr;
-    height: calc(100dvh - var(--app-header-h, 100px) - var(--app-tabbar-h, 0px) - 12px);
+    height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h) - 4px);
     overflow: hidden;
   }
 
@@ -4166,8 +4178,9 @@
   #page-policy {
     display: grid;
     gap: 12px;
-    grid-template-rows: 44vh 16vh 28vh;
-    /* 上/中/下 */
+    height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h) - 4px);
+    grid-template-rows: 1.5fr 0.5fr 1fr;
+    /* 上/中/下 比例分配全高 */
   }
 
   @media (max-width:1024px) {
@@ -4457,12 +4470,8 @@
     }
 
     /* 鍵值列：直接吃共用骨架 */
-    #page-settings .kv-grid {
-      /* 只需掛 class，骨架由 shared 提供 */
-    }
-
     #page-settings .kv-duo {
-      /* 同上 */
+      /* Shared utilities used */
     }
 
     /* 小徽章（資訊/警示） */
@@ -5158,7 +5167,7 @@
         display: grid;
         grid-template-columns: 280px 1fr;
         gap: var(--space);
-        height: calc(100dvh - var(--header-h, 72px) - 16px);
+        height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h) - 4px);
         overflow: hidden;
       }
 
@@ -5656,13 +5665,8 @@
       display: block;
     }
 
-    .pill-input {
-      /* for type=date */
-    }
-
     .pill-select {
       appearance: none;
-      /* 你可以自行加上小下箭頭背景圖 如果想要再漂亮 */
     }
 
     .rtn-line2 .pill-select,
@@ -5897,4 +5901,5 @@
       opacity: 1;
       background: color-mix(in oklab, var(--tint) 20%, transparent);
     }
+  }
 </style>
