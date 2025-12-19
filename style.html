@@ -49,7 +49,7 @@
   :root {
     /* --- Modern Base Tokens --- */
     --ui-scale: 1.0;
-    --ui-scale-mobile: 2.1;
+    --ui-scale-mobile: 2.3;
     --container-max: clamp(1400px, 98vw, 2200px);
 
     /* Spacing & Radius */
@@ -108,7 +108,10 @@
     --c-danger-600: color-mix(in oklab, var(--danger) 86%, #000 14%);
 
     /* KPI / UI Specific */
-    --tabbar-h: 130px;
+    --tabbar-h: 140px;
+    --tab-ico-circle: 88px;
+    --tab-ico-font: 44px;
+    --tab-text: 24px;
     --drawerW: clamp(300px, 22vw, 480px);
     --ctbc-border: color-mix(in oklab, var(--tint) 14%, transparent);
     --card-shadow: 0 4px 12px rgba(0, 0, 0, .1);
@@ -139,6 +142,10 @@
 
   :root.mobile {
     --ui-scale: var(--ui-scale-mobile);
+    --fs-body: 20px;
+    /* Increased from 19px */
+    --fs-title: 19px;
+    --fs-label: 17px;
   }
 
   :root:not(.light) {
@@ -596,8 +603,9 @@
       border-radius: 16px;
       box-shadow: 0 16px 48px var(--shadow);
       padding: 12px;
-      top: 10px;
-      padding-top: calc(var(--header-h) + 8px);
+      top: calc(var(--header-h) + 12px);
+      max-height: calc(100dvh - var(--header-h) - 24px);
+      padding-top: 12px;
     }
 
     .drawer .navItem,
@@ -1619,7 +1627,9 @@
   .tabbtn .ico.circle {
     width: calc(var(--tab-ico-circle) * var(--ui-scale));
     height: calc(var(--tab-ico-circle) * var(--ui-scale));
-    border-radius: 999px;
+    aspect-ratio: 1/1;
+    flex-shrink: 0;
+    border-radius: 50%;
     display: grid;
     place-items: center;
     background: color-mix(in oklab, var(--card) 82%, transparent);
@@ -1911,13 +1921,22 @@
     display: grid;
     align-content: start;
     /* Prevent fields from stretching to fill card height */
+    gap: var(--space-sm);
+    /* More compact gap */
   }
 
   #page-input #acctBalanceCard,
   #page-input .tx-panel,
   #page-input .form-card {
     align-self: stretch;
-    height: 100%;
+    height: 100% !important;
+    overflow: hidden;
+    /* Prevent cards from growing beyond layout */
+  }
+
+  #page-input #acctBalanceCard {
+    overflow-y: auto;
+    /* Balance card can scroll internally if many accounts */
   }
 
   #page-input .tx-panel {
@@ -2506,6 +2525,137 @@
     border-color: var(--tone-neg-bd);
   }
 
+  /* Buttons */
+  .btn--primary {
+    background: var(--tint);
+    color: var(--bg);
+  }
+
+  .btn--primary:hover {
+    background: color-mix(in oklab, var(--tint) 88%, #000);
+  }
+
+  .btn--secondary {
+    background: color-mix(in oklab, var(--tint) 12%, transparent);
+    color: var(--tint);
+  }
+
+  .btn--secondary:hover {
+    background: color-mix(in oklab, var(--tint) 18%, transparent);
+  }
+
+  /* Modals */
+  .dlg-modal:not([open]) {
+    display: none !important;
+  }
+
+  .dlg-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    border: none;
+    border-radius: 20px;
+    padding: 0;
+    background: var(--card);
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3);
+    color: var(--txt);
+    max-width: 800px;
+    width: 95%;
+  }
+
+  .th-ico {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .th-ico .material-symbols-outlined {
+    font-size: 18px;
+    opacity: 0.7;
+  }
+
+  .dlg-modal::backdrop {
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+  }
+
+  .dlg-box {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dlg-hd {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .dlg-title {
+    font-size: 1.2em;
+    font-weight: 600;
+  }
+
+  .dlg-close {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .dlg-bd {
+    padding: 20px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .dlg-ft {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    border-top: 1px solid var(--hairline);
+  }
+
+  .db-table-mini {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+  }
+
+  .db-table-mini th,
+  .db-table-mini td {
+    padding: 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .db-table-mini th {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .db-table-mini .num {
+    text-align: right;
+    font-family: var(--font-mono, monospace);
+  }
+
+  .db-table-mini .num.neg,
+  .db-table-mini .neg {
+    color: var(--tone-neg);
+  }
+
+  .db-table-mini .pos {
+    color: var(--tone-pos);
+  }
+
+  .db-table tr.is-selected {
+    background: color-mix(in oklab, var(--tint) 10%, transparent);
+  }
+
   #acctBalanceTotal {
     margin-top: 6px;
     padding-top: 6px;
@@ -3020,8 +3170,18 @@
   }
 
   .app-logo {
-    height: 28px;
+    height: 32px;
+    /* Slightly larger */
     cursor: pointer;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    transition: transform var(--trans-fast);
+  }
+
+  .app-logo:hover {
+    transform: scale(1.05);
   }
 
   .hdr-center {
@@ -3209,14 +3369,16 @@
   }
 
   .card-hd-pill .ico {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 30px;
-    height: 30px;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    aspect-ratio: 1/1;
+    flex-shrink: 0;
     border-radius: 50%;
+    background: color-mix(in oklab, var(--tint) 12%, transparent);
     color: var(--tint);
-    background: color-mix(in oklab, var(--tint) 10%, transparent);
+    font-size: 18px !important;
   }
 
   .card-hd-pill .txt {
@@ -3659,7 +3821,9 @@
   #page-dashmain :where(.card > .list, .card .list.slim, .card .kpi-grid, .card .rows) {
     flex: 1 1 auto;
     min-height: 0;
+    /* 關鍵：避免內容把父容器撐爆 */
     overflow: auto;
+    /* 在卡片內滾，不要把整頁撐出捲軸 */
   }
 
   /* planned/accounts 的 list 已有虛擬清單支援，這裡只確保顯示 */
@@ -3699,6 +3863,70 @@
     display: flex;
     align-items: center;
     gap: 8px;
+  }
+
+  /* Dashmain card header: Invest and Stocks pills */
+  #page-dashmain .card-hd-pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  #page-dashmain .card-hd-pills .card-hd-pill {
+    max-width: 38px;
+    /* Default collapsed state */
+    padding-right: 0;
+  }
+
+  #page-dashmain .card-hd-pills .card-hd-pill:hover,
+  #page-dashmain .card-hd-pills .card-hd-pill.active {
+    max-width: 160px;
+    /* Expanded state */
+    padding-right: 14px;
+  }
+
+  #page-dashmain .card-hd-pills .card-hd-pill.stk-pill .ico {
+    content: "payments";
+    /* Icon for Stocks */
+  }
+
+  #page-dashmain .card-hd-pills .card-hd-pill[data-go="ctbc"] .ico {
+    content: "trending_up";
+    /* Icon for Invest */
+  }
+
+  /* Align money capsules in Dashmain */
+  #plannedList .item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  #plannedList .meta-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  #plannedList .meta-group .label-ico {
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  #plannedList .meta-group .num {
+    min-width: 80px;
+    text-align: right;
+  }
+
+  #plannedList .meta-group .vr-sep {
+    width: 1px;
+    height: 12px;
+    background: var(--ctbc-border);
+    margin: 0 2px;
   }
 
 
@@ -5276,6 +5504,18 @@
       #page-stk .ctbc-table {
         width: 100%;
         table-layout: fixed;
+      }
+
+      #page-stk .ctbc-table tbody tr {
+        cursor: pointer;
+      }
+
+      #page-stk .ctbc-table tbody tr:hover {
+        background: color-mix(in oklab, var(--tint) 8%, transparent);
+      }
+
+      #page-stk .ctbc-table tbody tr.selected {
+        background: color-mix(in oklab, var(--tint) 16%, transparent);
       }
 
       @media (max-width:1024px) {

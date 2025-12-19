@@ -3,8 +3,17 @@
     <div class="card-hd">
       <div class="title">Database 操作</div>
       <div class="actions">
-        <button id="btnRecordAddRow" class="btn">新增一列（快照＋骨架）</button>
-        <button id="btnRecordReload" class="btn-ghost">重載清單</button>
+        <button id="btnRecordAnalyse" class="btn btn--secondary" title="分析變動">
+          <span class="material-symbols-outlined">analytics</span>
+          <span class="txt">分析變動</span>
+        </button>
+        <button id="btnRecordAddRow" class="btn btn--primary" title="新增一列">
+          <span class="material-symbols-outlined">add_circle</span>
+          <span class="txt">新增一列</span>
+        </button>
+        <button id="btnRecordReload" class="btn-ghost" title="重載清單">
+          <span class="material-symbols-outlined">refresh</span>
+        </button>
         <span id="dbStatusPill" class="pill">—</span>
       </div>
     </div>
@@ -33,4 +42,23 @@
       <div class="db-meta" id="dbMeta">—</div>
     </div>
   </div>
+
 </section>
+
+<!-- Analysis Modal -->
+<dialog id="dbAnalyseDlg" class="dlg-modal">
+  <div class="dlg-box">
+    <header class="dlg-hd">
+      <div class="dlg-title" id="dbAnalyseTitle">變動分析</div>
+      <button class="dlg-close" id="dbAnalyseClose"><span class="material-symbols-outlined">close</span></button>
+    </header>
+    <div class="dlg-bd">
+      <div id="dbAnalyseResult" class="db-analyse-table">
+        <!-- Table content injected here -->
+      </div>
+    </div>
+    <footer class="dlg-ft">
+      <button class="btn btn--secondary" id="dbAnalyseOk">關閉</button>
+    </footer>
+  </div>
+</dialog>

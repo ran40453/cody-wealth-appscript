@@ -126,152 +126,16 @@
       onResize();
       fetchPage(0);
 
-      // 點擊主列 → 開/收子清單
+      // 點擊主列 → 選定（不再開啟子清單）
       state.tbody.addEventListener('click', (ev) => {
         const tr = ev.target.closest('tr');
-        if (!tr || tr.classList.contains('db-detail-row')) return; // 忽略明細列
+        if (!tr) return;
         const rowIndex = Number(tr.getAttribute('data-row')) || 0;
 
-        // 若已開啟且再次點擊同一列 → 收合
-        if (App.state.dbOpen.rowIndex === rowIndex) {
-          const nxt = tr.nextElementSibling;
-          if (nxt && nxt.classList.contains('db-detail-row')) nxt.remove();
-          App.state.dbOpen.rowIndex = null;
-          return;
-        }
-        // 先關掉舊的
-        const openTr = state.tbody.querySelector('tr.db-detail-row');
-        if (openTr) openTr.previousElementSibling?.classList.remove('is-open');
-        openTr?.remove();
-
-        // 插入占位明細列
-        tr.classList.add('is-open');
-        const colSpan = Math.max(1, state.headers.length || tr.children.length);
-        const detailTr = document.createElement('tr');
-        detailTr.className = 'db-detail-row';
-        detailTr.innerHTML = `<td colspan="${colSpan}"><div class="db-detail-grid"><div class="db-detail-item">載入中…</div></div></td>`;
-        tr.after(detailTr);
+        // 切換選中狀態
+        state.tbody.querySelectorAll('tr.is-selected').forEach(el => el.classList.remove('is-selected'));
+        tr.classList.add('is-selected');
         App.state.dbOpen.rowIndex = rowIndex;
-
-        // 取得日期值，fallback 第一欄
-        const tds = Array.from(tr.children);
-        const dateCell = tds[state.dateColIdx] || tds[0];
-        const rawDateStr = dateCell ? dateCell.textContent.trim() : '';
-        let dateText = rawDateStr;
-        // 先嘗試直接抓到 yyyyMMdd（以原始顯示字串為準）
-        let ymd = (rawDateStr || '').replace(/\D+/g, '').slice(0, 8);
-        if (!(ymd && ymd.length === 8)) {
-          // A 欄只有 M/D 的情況：用 data-month 推回年份
-          const monthMeta = tr.getAttribute('data-month') || '';
-          const mdDigits = (rawDateStr || '').replace(/\D+/g, '');
-          let mm = '', dd = '';
-          if (mdDigits.length >= 3) {
-            // 3~4 碼：前兩碼當月，後兩碼當日（1 位數月/日以左側補 0）
-            if (mdDigits.length === 3) { mm = mdDigits.slice(0, 1); dd = mdDigits.slice(1); }
-            else { mm = mdDigits.slice(0, 2); dd = mdDigits.slice(2); }
-          }
-          if (mm) { mm = mm.padStart(2, '0'); }
-          if (dd) { dd = dd.padStart(2, '0'); }
-          // 從月份欄抓年份：支援 2025-10、2025/10、25-10、25/10 等
-          let yy = '';
-          const y4 = (monthMeta.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
-          const y2 = (!y4 && (monthMeta.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
-          if (y4) { yy = y4; }
-          else if (y2) { yy = (Number(y2) < 70 ? '20' : '19') + y2; } // 00~69 視為 2000 後
-          if (yy && mm && dd) { ymd = yy + mm + dd; }
-        }
-        if (ymd && ymd.length === 8) dateText = ymd;
-
-        // 多格式嘗試：優先 yyyymmdd → yyyy-MM-dd → M/D/YYYY（由 data-month 推回年份）
-        const tryDates = [];
-        if (ymd && ymd.length === 8) tryDates.push(ymd);
-        // yyyy-MM-dd
-        if (ymd && ymd.length === 8) {
-          tryDates.push(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`);
-        }
-        // M/D/YYYY（用 data-month 年份 + A 欄 M/D）
-        (function () {
-          const monthMeta = tr.getAttribute('data-month') || '';
-          const y4 = (monthMeta.match(/(\d{4})[\/-]?(\d{1,2})/) || [])[1];
-          const y2 = (!y4 && (monthMeta.match(/\b(\d{2})[\/-]?(\d{1,2})\b/) || [])[1]) || '';
-          const YY = y4 ? y4 : (y2 ? ((Number(y2) < 70 ? '20' : '19') + y2) : '');
-          const md = (rawDateStr || '').replace(/\D+/g, '');
-          let MM = '', DD = '';
-          if (md.length >= 3) {
-            if (md.length === 3) { MM = md.slice(0, 1); DD = md.slice(1); }
-            else { MM = md.slice(0, 2); DD = md.slice(2); }
-          }
-          if (YY && MM && DD) { tryDates.push(`${Number(MM)}/${Number(DD)}/${YY}`); }
-        })();
-
-        function renderDetails(items, used) {
-          const grid = detailTr.querySelector('.db-detail-grid');
-          try {
-            const arr = Array.isArray(items) ? items.slice().sort((a, b) => (a.col_index || 0) - (b.col_index || 0)) : [];
-            const html = (arr.length)
-              ? arr.map(it => {
-                const label = (it && it.label) || '';
-                const val = (it && it.value);
-                const vHtml = (typeof val === 'number') ? maskHTML(fmtNumTW(val)) : maskHTML(String(val || ''));
-                return `<div class="db-detail-item"><div class="lbl">${label}</div><div class="val">${vHtml}</div></div>`;
-              }).join('')
-              : `<div class="db-detail-item"><div class="lbl">查無資料</div><div class="val">${used}</div></div>`;
-            if (grid) grid.innerHTML = html;
-            console.debug('[record] detail items', used, arr.length, tryDates);
-          } catch (e) {
-            if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">渲染錯誤</div><div class="val">${e && e.message || e}</div></div>`;
-            console.error('detail render error', e);
-          }
-        }
-
-        function tryNext(i) {
-          if (i >= tryDates.length) {
-            renderDetails([], dateText);
-            return;
-          }
-          const d = tryDates[i];
-          google.script.run
-            .withSuccessHandler(list => {
-              if (Array.isArray(list) && list.length) {
-                renderDetails(list, d);
-              } else {
-                tryNext(i + 1);
-              }
-            })
-            .withFailureHandler(err => {
-              const grid = detailTr.querySelector('.db-detail-grid');
-              const msg = (err && (err.message || err)) || '未知錯誤';
-              if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">讀取失敗</div><div class="val">${msg}</div></div>`;
-              console.error('detail fetch error', d, err);
-            })
-            .getRecordDetailsByDate(d);
-        }
-
-        function tryByRowNumber() {
-          const rowNumAttr = tr.getAttribute('data-rownum');
-          const rowNum = Number(rowNumAttr || 0);
-          const grid = detailTr.querySelector('.db-detail-grid');
-          if (!rowNum) {
-            if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">查無列號</div><div class="val">—</div></div>`;
-            return;
-          }
-          google.script.run
-            .withSuccessHandler(list => {
-              if (Array.isArray(list) && list.length) {
-                renderDetails(list, `rowNum#${rowNum}`);
-              } else {
-                if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">查無資料</div><div class="val">row ${rowNum}</div></div>`;
-              }
-            })
-            .withFailureHandler(err => {
-              const msg = (err && (err.message || err)) || '未知錯誤';
-              if (grid) grid.innerHTML = `<div class="db-detail-item"><div class="lbl">讀取失敗</div><div class="val">${msg}</div></div>`;
-              console.warn('detail by rowNumber failed', err);
-            })
-            .getRecordDetailsByRowNumber(rowNum);
-        }
-        // 只用「列號」精準取，失敗再走日期多格式
-        tryByRowNumber();
       });
 
       // 對外 refresh
@@ -407,6 +271,112 @@
 
       loadRecordLatest();
       rebuildDbTable();
+      bindAnalyse();
+    }
+
+    let analyseData = [];
+    let analyseSortDesc = true;
+
+    // —— 變動分析 ——
+    function bindAnalyse() {
+      const btn = document.getElementById('btnRecordAnalyse');
+      if (!btn) return;
+      btn.onclick = () => {
+        const idx = App.state.dbOpen.rowIndex;
+        if (idx == null) {
+          alert('請先點擊下方列表中的一列資料進行分析。');
+          return;
+        }
+
+        btn.disabled = true;
+        const pill = document.getElementById('dbStatusPill');
+        if (pill) { pill.style.display = 'inline-block'; pill.textContent = '分析中…'; pill.className = 'pill zero'; }
+
+        google.script.run
+          .withSuccessHandler(data => {
+            btn.disabled = false;
+            if (pill) pill.style.display = 'none';
+            if (!data || !data.length) {
+              alert('此列與前一列相比，所有金額欄位均無差異。');
+              return;
+            }
+            analyseData = data;
+            analyseSortDesc = true;
+            renderAnalyseContent();
+            document.getElementById('dbAnalyseDlg').showModal();
+          })
+          .withFailureHandler(err => {
+            btn.disabled = false;
+            if (pill) { pill.textContent = '分析失敗'; pill.className = 'pill neg'; }
+            alert('分析失敗：' + (err && err.message || err));
+          })
+          .getRecordDelta(idx);
+      };
+
+      document.getElementById('dbAnalyseOk').onclick = () => document.getElementById('dbAnalyseDlg').close();
+      document.getElementById('dbAnalyseClose').onclick = () => document.getElementById('dbAnalyseDlg').close();
+    }
+
+    function renderAnalyseContent() {
+      const wrap = document.getElementById('dbAnalyseResult');
+      if (!wrap) return;
+
+      // 計算總變動
+      const totalDelta = analyseData.reduce((s, it) => s + (it.delta || 0), 0);
+      const totalCls = totalDelta > 0 ? 'pos' : (totalDelta < 0 ? 'neg' : 'zero');
+      const totalSign = totalDelta > 0 ? '+' : '';
+
+      const titleBox = document.getElementById('dbAnalyseTitle');
+      titleBox.innerHTML = `
+        變動分析
+        <span class="pill ${totalCls}" style="margin-left: 12px; font-size: 0.8em; padding: 2px 10px;">
+          ${totalSign}${fmtNumTW(totalDelta, { maximumFractionDigits: 0 })}
+        </span>
+        <button id="btnAnalyseSort" class="btn-ghost" style="margin-left: 8px;" title="切換排序">
+          <span class="material-symbols-outlined" style="font-size:18px;">${analyseSortDesc ? 'sort_by_alpha' : 'filter_list'}</span>
+        </button>
+      `;
+
+      document.getElementById('btnAnalyseSort').onclick = () => {
+        analyseSortDesc = !analyseSortDesc;
+        renderAnalyseContent();
+      };
+
+      // 排序：預設絕對值由大到小
+      const sorted = analyseData.slice().sort((a, b) => {
+        const va = Math.abs(a.delta), vb = Math.abs(b.delta);
+        return analyseSortDesc ? (vb - va) : (va - vb);
+      });
+
+      const html = `
+        <table class="db-table-mini">
+          <thead>
+            <tr>
+              <th><div class="th-ico"><span class="material-symbols-outlined">category</span>項目</div></th>
+              <th class="num"><div class="th-ico" style="justify-content:flex-end;"><span class="material-symbols-outlined">history</span>前次金額</div></th>
+              <th class="num"><div class="th-ico" style="justify-content:flex-end;"><span class="material-symbols-outlined">today</span>本次金額</div></th>
+              <th class="num"><div class="th-ico" style="justify-content:flex-end;"><span class="material-symbols-outlined">change_circle</span>變動</div></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sorted.map(it => {
+        const d = it.delta || 0;
+        const dCls = d > 0 ? 'pos' : (d < 0 ? 'neg' : 'zero');
+        const dSign = d > 0 ? '+' : '';
+        const prevCls = it.previous < 0 ? 'neg' : '';
+        const curCls = it.current < 0 ? 'neg' : '';
+        return `
+              <tr>
+                <td style="white-space:nowrap;">${it.label}</td>
+                <td class="num ${prevCls} mask-num" data-mask-str="＊＊＊">${fmtNumTW(it.previous, { maximumFractionDigits: 0 })}</td>
+                <td class="num ${curCls} mask-num" data-mask-str="＊＊＊">${fmtNumTW(it.current, { maximumFractionDigits: 0 })}</td>
+                <td class="num ${dCls} mask-num" data-mask-str="＊＊＊"><b>${dSign}${fmtNumTW(d, { maximumFractionDigits: 0 })}</b></td>
+              </tr>`;
+      }).join('')}
+          </tbody>
+        </table>
+      `;
+      wrap.innerHTML = html;
     }
 
     // —— 對外註冊 —— 

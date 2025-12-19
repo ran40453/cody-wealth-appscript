@@ -384,6 +384,11 @@
           fillFormByRec(rec);
           const btnUpd = document.getElementById('btnUpdateTx');
           if (btnUpd) btnUpd.disabled = false;
+
+          // 展示「庫存整併」按鈕（若已選定帳戶）
+          const btnCon = document.getElementById('btnConsolidate');
+          const activeAcc = document.getElementById('txAccountPick')?.value;
+          if (btnCon) btnCon.style.display = activeAcc ? 'inline-flex' : 'none';
         });
         vs._boundRowClick = true;
       }

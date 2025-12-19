@@ -1711,16 +1711,16 @@ function getRecordDetailsByRowNumber(rowNumber) {
  * @param {number} rowIndexFromTop 0-based，0 表最新（對應實際表第 3 列）
  * @return {Array<{label:string,value:any,col_index:number}>}
  */
+/**
+ * 依前端虛擬清單的列索引回傳該列「所有欄位明細」
+ */
 function getRecordDetailsByRowIndex(rowIndexFromTop) {
   var ss = SpreadsheetApp.getActive();
   var sh = ss.getSheetByName(typeof RECORD_SHEET_NAME === 'string' ? RECORD_SHEET_NAME : 'record');
   if (!sh) return [];
-
-  var lastRow = sh.getLastRow();
-  var lastCol = sh.getLastColumn();
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
   if (lastRow < 3 || lastCol < 1) return [];
 
-  // 掃描尾端：忽略尾端「全空白顯示」的骨架列，對齊前端 total
   function isBlankDisplayRow(r) {
     var disp = sh.getRange(r, 1, 1, lastCol).getDisplayValues()[0];
     for (var i = 0; i < disp.length; i++) { if (String(disp[i] || '').trim() !== '') return false; }
@@ -1730,44 +1730,36 @@ function getRecordDetailsByRowIndex(rowIndexFromTop) {
   while (lastUsed >= 3 && isBlankDisplayRow(lastUsed)) lastUsed--;
   if (lastUsed < 3) return [];
 
-  // 表頭（第 1、2 列）
   var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
   var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
-
-  // 以「最新在上」解讀的索引（0 → lastUsed）
   var i = Math.max(0, Number(rowIndexFromTop || 0));
-  var nData = lastUsed - 2; // 真正有效資料筆數
+  var nData = lastUsed - 2;
   if (i >= nData) return [];
 
-  // 兩種映射方案：A=最新在上（0→lastUsed），B=最舊在上（0→3）
   var targetA = lastUsed - i;
   var targetB = 3 + i;
   if (targetA < 3 || targetA > lastUsed) targetA = -1;
   if (targetB < 3 || targetB > lastUsed) targetB = -1;
 
   function rowHasAnyValue(r) {
+    if (r < 3) return false;
     var disp = sh.getRange(r, 1, 1, lastCol).getDisplayValues()[0];
     for (var k = 0; k < disp.length; k++) { if (String(disp[k] || '').trim() !== '') return true; }
     return false;
   }
 
-  // 優先用 A（最新在上）；如果空或越界，再試 B
   var targetRow = -1;
   if (targetA !== -1 && rowHasAnyValue(targetA)) targetRow = targetA;
   else if (targetB !== -1 && rowHasAnyValue(targetB)) targetRow = targetB;
   else targetRow = (targetA !== -1 ? targetA : targetB);
   if (targetRow === -1) return [];
 
-  // 取該列原始值
   var rowVals = sh.getRange(targetRow, 1, 1, lastCol).getValues()[0] || [];
-
   function combineLabel(a, b) {
-    a = String(a || '').trim();
-    b = String(b || '').trim();
+    a = String(a || '').trim(); b = String(b || '').trim();
     if (a && b && a !== b) return a + ' (' + b + ')';
     return a || b || '';
   }
-
   var out = new Array(lastCol);
   for (var c = 1; c <= lastCol; c++) {
     var label = combineLabel(hdr1[c - 1], hdr2[c - 1]);
@@ -1777,6 +1769,48 @@ function getRecordDetailsByRowIndex(rowIndexFromTop) {
   return out;
 }
 
+/**
+ * 比較指定列與其「前一筆」（舊一筆，即下一列）的差異
+ */
+function getRecordDelta(rowIndexFromTop) {
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(RECORD_SHEET_NAME || 'record');
+  if (!sh) return [];
+  var lastRow = sh.getLastRow(), lastCol = sh.getLastColumn();
+  if (lastRow < 4) return [];
+
+  function isBlankDisplayRow(r) {
+    var disp = sh.getRange(r, 1, 1, lastCol).getDisplayValues()[0];
+    for (var i = 0; i < disp.length; i++) { if (String(disp[i] || '').trim() !== '') return false; }
+    return true;
+  }
+  var lastUsed = lastRow;
+  while (lastUsed >= 3 && isBlankDisplayRow(lastUsed)) lastUsed--;
+
+  var i = Math.max(0, Number(rowIndexFromTop || 0));
+  var r1 = lastUsed - i;
+  var r2 = r1 - 1;
+  if (r1 < 3 || r2 < 3) return [];
+
+  var hdr1 = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var hdr2 = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0] || [];
+  var v1 = sh.getRange(r1, 1, 1, lastCol).getValues()[0] || [];
+  var v2 = sh.getRange(r2, 1, 1, lastCol).getValues()[0] || [];
+
+  function combineLabel(a, b) {
+    a = String(a || '').trim(); b = String(b || '').trim();
+    if (a && b && a !== b) return a + ' (' + b + ')';
+    return a || b || '';
+  }
+  var out = [];
+  for (var c = 7; c < lastCol; c++) {
+    var cur = Number(v1[c]) || 0, prev = Number(v2[c]) || 0, diff = cur - prev;
+    if (Math.abs(diff) > 0.001) {
+      out.push({ label: combineLabel(hdr1[c], hdr2[c]) || ('Col ' + (c + 1)), current: cur, previous: prev, delta: diff });
+    }
+  }
+  return out;
+}
 /** 前端按鈕用：呼叫「凍結最後一列 + 新增骨架」 */
 function runRecordAddRow() {
   var name = (typeof CONFIG !== 'undefined' && CONFIG.recordSheet) ? CONFIG.recordSheet : 'record';
