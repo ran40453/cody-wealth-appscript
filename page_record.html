@@ -1,15 +1,14 @@
 <section id="page-record" class="page">
-  <div class="card cards-zoom-scope" style="margin-bottom:10px;">
-    <div class="card-hd" style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+  <div class="card cards-zoom-scope db-header-card">
+    <div class="card-hd">
       <div class="title">Database 操作</div>
-      <div class="actions" style="display:flex;gap:10px;align-items:center;">
+      <div class="actions">
         <button id="btnRecordAddRow" class="btn">新增一列（快照＋骨架）</button>
         <button id="btnRecordReload" class="btn-ghost">重載清單</button>
-        <!-- 右側固定狀態膠囊（只此一個） -->
-        <span id="dbStatusPill" class="pill" style="display:none;">—</span>
+        <span id="dbStatusPill" class="pill">—</span>
       </div>
     </div>
-    <div class="card-bd" style="font-size:12px;opacity:.8;">
+    <div class="card-bd db-notice">
       這個按鈕會：凍結最後一列 H~末欄為值、A 欄寫入時間，然後在下一列鋪回公式骨架。
     </div>
   </div>
@@ -17,8 +16,10 @@
   <!-- 兩欄佈局：左最新摘要 + 右虛擬清單 -->
   <div class="db2col">
     <aside class="card db-latest" id="dbLatestCard">
-      <h3 class="keep-title" style="margin:0 0 8px 0;">最新資料</h3>
-      <div id="dbLatestBox"><div class="empty">載入中…</div></div>
+      <h3 class="keep-title">最新資料</h3>
+      <div id="dbLatestBox">
+        <div class="empty">載入中…</div>
+      </div>
     </aside>
 
     <div class="card db-tableCard">
@@ -29,7 +30,7 @@
           <tbody id="dbTbody"></tbody>
         </table>
       </div>
-      <div class="db-meta" id="dbMeta" style="margin-top:8px;">—</div>
+      <div class="db-meta" id="dbMeta">—</div>
     </div>
   </div>
 </section>

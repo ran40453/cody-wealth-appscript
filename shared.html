@@ -1,199 +1,348 @@
 <style>
-/* ---------------------------------------------------------
+  /* ---------------------------------------------------------
    Layer order — 必須在任何 @layer 使用前宣告順序
    --------------------------------------------------------- */
-@layer base, utilities, shared, pages, overrides;
+  @layer base, utilities, shared, pages, overrides;
 
-/* =====================================================
+  /* =====================================================
    色票（Palette）— 全域語意基準，供所有元件引用
    說明：在這裡新增/修改語意色，元件只吃 --tone-* 變數；
         如需新增色票，請依此格式加在這一區，並用中文註解說明用途。
    ===================================================== */
-:root{
-  /* 正向（獲利/成功/上漲） */
-  --tone-pos-fg:  #0f766e;              /* 深綠字：KPI/徽章正向主字色，例：獲利、上漲 */
-  --tone-pos-bg:  rgba(16,185,129,.12); /* 淺綠底：背景填充，例：正向徽章、pill */
-  --tone-pos-bd:  rgba(16,185,129,.35); /* 綠色邊：邊框顏色，例：正向徽章、pill */
+  :root {
+    /* 正向（獲利/成功/上漲） */
+    --tone-pos-fg: #0f766e;
+    --tone-pos-bg: rgba(16, 185, 129, .12);
+    --tone-pos-bd: rgba(16, 185, 129, .35);
 
-  /* 負向（虧損/失敗/下跌） */
-  --tone-neg-fg:  #b91c1c;              /* 暗紅字：KPI/徽章負向主字色，例：虧損、下跌 */
-  --tone-neg-bg:  rgba(239,68,68,.12);  /* 淺紅底：背景填充，例：負向徽章、pill */
-  --tone-neg-bd:  rgba(239,68,68,.35);  /* 紅色邊：邊框顏色，例：負向徽章、pill */
+    /* 負向（虧損/失敗/下跌） */
+    --tone-neg-fg: #b91c1c;
+    --tone-neg-bg: rgba(239, 68, 68, .12);
+    --tone-neg-bd: rgba(239, 68, 68, .35);
 
-  /* 中性（無變化/持平/灰階） */
-  --tone-zero-fg: var(--muted);                                  /* 灰字：持平/無資料 */
-  --tone-zero-bg: color-mix(in oklab, var(--tint) 10%, transparent); /* 淺灰底：中性背景 */
-  --tone-zero-bd: color-mix(in oklab, var(--tint) 25%, transparent); /* 灰邊：中性邊框 */
+    /* 中性（無變化/持平/灰階） */
+    --tone-zero-fg: var(--muted);
+    --tone-zero-bg: color-mix(in oklab, var(--tint) 10%, transparent);
+    --tone-zero-bd: color-mix(in oklab, var(--tint) 25%, transparent);
 
-  /* 警示（提醒/未完成/注意） */
-  --tone-warn-fg:  #b45309;                 /* 褐橙字：警示主字色，例：提醒、待確認 */
-  --tone-warn-bg:  rgba(251, 191, 36, .16); /* 淺橙底：背景填充，例：警示徽章 */
-  --tone-warn-bd:  rgba(251, 191, 36, .38); /* 橙邊：邊框顏色，例：警示徽章 */
+    /* 警示（提醒/未完成/注意） */
+    --tone-warn-fg: #b45309;
+    --tone-warn-bg: rgba(251, 191, 36, .16);
+    --tone-warn-bd: rgba(251, 191, 36, .38);
 
-  /* 資訊（中性提示/一般訊息） */
-  --tone-info-fg:  #0b4a6f;                 /* 靛藍字：資訊主字色，例：通知、描述 */
-  --tone-info-bg:  rgba(59, 130, 246, .12); /* 淺藍底：背景填充，例：info 標籤 */
-  --tone-info-bd:  rgba(59, 130, 246, .35); /* 藍邊：邊框顏色，例：info 標籤 */
+    /* 資訊（中性提示/一般訊息） */
+    --tone-info-fg: #0b4a6f;
+    --tone-info-bg: rgba(59, 130, 246, .12);
+    --tone-info-bd: rgba(59, 130, 246, .35);
 
-  /* 品牌主色（Primary）— 由 --tint 推導 */
-  --tone-primary-fg: #0b1939;                                   /* 深藍字：主動作文字 */
-  --tone-primary-bg: color-mix(in oklab, var(--tint) 26%, transparent); /* 主色底 */
-  --tone-primary-bd: color-mix(in oklab, var(--tint) 60%, transparent); /* 主色邊 */
-
-  /* 輔助色（Secondary）— 由 --accent 推導 */
-  --tone-secondary-fg: #073f35;                                 /* 深青字：輔助動作文字 */
-  --tone-secondary-bg: color-mix(in oklab, var(--accent) 22%, transparent); /* 輔助底 */
-  --tone-secondary-bd: color-mix(in oklab, var(--accent) 55%, transparent); /* 輔助邊 */
-
-  /* ===== 相容性別名（舊元件可沿用；新元件請改用 --tone-*） ===== */
-  /* ROI 徽章（舊名） → 指向全域語意色 */
-  --roi-pos-fg:   var(--tone-pos-fg);   /* 舊：正向字色 → 全域正向字 */
-  --roi-pos-bg:   var(--tone-pos-bg);   /* 舊：正向底色 → 全域正向底 */
-  --roi-pos-bd:   var(--tone-pos-bd);   /* 舊：正向邊框 → 全域正向邊 */
-  --roi-neg-fg:   var(--tone-neg-fg);   /* 舊：負向字色 → 全域負向字 */
-  --roi-neg-bg:   var(--tone-neg-bg);   /* 舊：負向底色 → 全域負向底 */
-  --roi-neg-bd:   var(--tone-neg-bd);   /* 舊：負向邊框 → 全域負向邊 */
-  --roi-zero-fg:  var(--tone-zero-fg);  /* 舊：中性字色 → 全域中性字 */
-  --roi-zero-bg:  var(--tone-zero-bg);  /* 舊：中性底色 → 全域中性底 */
-  --roi-zero-bd:  var(--tone-zero-bd);  /* 舊：中性邊框 → 全域中性邊 */
-
-  /* === Shared Buttons (low-specificity, variable-driven) === */
-    /* palette */
-    --c-primary: #3b82f6;      /* blue-500 */
-    --c-primary-600: #2563eb;  /* blue-600 */
-    --c-dark: #111827;         /* gray-900 */
-    --c-dark-700: #0f172a;     /* slate-900 */
-    --c-danger: #ef4444;       /* red-500 */
-    --c-danger-600: #dc2626;   /* red-600 */
-}
-  :root[data-theme="dark"]{
-    /* 深色略提亮，確保對比 */
-    --c-primary: #60a5fa;      /* blue-400 */
-    --c-primary-600: #3b82f6;  /* blue-500 */
-    --c-dark: #1f2937;         /* gray-800 */
-    --c-dark-700: #111827;     /* gray-900 */
-    --c-danger: #f87171;       /* red-400 */
-    --c-danger-600: #ef4444;   /* red-500 */
+    /* --- Shared Color Tokens (Theme-aware) --- */
+    --c-primary: var(--tint);
+    --c-primary-600: color-mix(in oklab, var(--tint) 84%, #000 16%);
+    --c-dark: #111827;
+    --c-dark-700: #0f172a;
+    --c-danger: var(--danger);
+    --c-danger-600: color-mix(in oklab, var(--danger) 86%, #000 14%);
   }
 
-/* =========================================================
+  :root[data-theme="dark"] {
+    --c-primary: var(--tint);
+    --c-primary-600: color-mix(in oklab, var(--tint) 84%, #000 16%);
+    --c-dark: #1f2937;
+    --c-dark-700: #111827;
+    --c-danger: var(--danger);
+    --c-danger-600: color-mix(in oklab, var(--danger) 86%, #000 14%);
+  }
+
+  /* =========================================================
    #4 Cards / Forms / Tables（通用，已抽離）
    ========================================================= */
-@layer shared{
-/* @extract-start shared */
-.card{ background:var(--card); border:1px solid color-mix(in oklab, var(--tint) 10%, transparent); border-radius:var(--radius); padding:14px; box-shadow:0 8px 28px var(--shadow); overflow:hidden; }
-.grid{ display:grid; gap:var(--space); }
-@media (min-width:1024px){ .grid-2{ grid-template-columns:1fr 1fr; } }
-label{ font-size: calc(var(--label-size) * var(--ui-scale)); color:var(--muted); margin-bottom:6px; display:block; }
-input,select,textarea{
-  -webkit-text-size-adjust: 100%;
-  width:100%; padding:12px; outline:none; border-radius:12px;
-  background:var(--surface); color:var(--text);
-  border:1px solid color-mix(in oklab, var(--tint) 25%, transparent);
-  font-size: calc(var(--form-font) * var(--ui-scale));
-}
-textarea{ min-height:72px; resize:vertical; }
-.row-amount{ display:flex; gap:8px; align-items:center; }
-.btn,.btn-ghost{
-  min-height: max(var(--tap-min), calc(44px * var(--ui-scale)));
-  border-radius:12px; cursor:pointer; font-weight:700; letter-spacing:.3px;
-  border:1px solid color-mix(in oklab, var(--tint) 35%, transparent);
-  padding:0 16px;
-  transition: transform .06s ease, box-shadow .12s ease, background .12s ease, border-color .12s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.btn{ background: var(--btn-bg, var(--tint)); color: var(--btn-fg, #fff); }
-.btn-ghost{ background:transparent; color:var(--text); }
-@media (pointer:coarse){ .btn:active{ transform: scale(.97); } }
-.actions{ display:flex; gap:10px; }
-.hint{ font-size: calc(13px * var(--ui-scale)); color:var(--muted); margin-top:6px; }
+  @layer shared {
 
-/* 通用表格 */
-table{ width:100%; border-collapse:collapse; }
-th,td{ padding: calc(var(--table-pad) * var(--ui-scale)); border-bottom:1px solid color-mix(in oklab, var(--tint) 12%, transparent); font-size: calc(var(--table-font) * var(--ui-scale)); }
-th{ text-align:left; color:var(--muted); font-weight:700; }
+    /* @extract-start shared */
+    .card {
+      background: var(--card);
+      border: 1px solid color-mix(in oklab, var(--tint) 10%, transparent);
+      border-radius: var(--radius-lg);
+      padding: var(--space-md);
+      box-shadow: var(--card-shadow);
+      overflow: hidden;
+    }
 
-.empty{ color:var(--muted); text-align:center; padding:16px; }
+    .grid {
+      display: grid;
+      gap: var(--space-md);
+    }
 
-/* 4.1 Shared KPI Primitives */
-:where(.kpi-item .v){ font-variant-numeric: tabular-nums; font-weight: 700; }
+    @media (min-width:1024px) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
 
-/* 卡片 header 右上小鈕統一 */
-.card .card-hd .btn-ghost{
-  height: 8px; padding: 0 10px;
-  border-radius: var(--radius);
-  font-weight: 600; line-height: 1; font-size:10px;
-}
+    label {
+      font-size: var(--fs-label);
+      color: var(--muted);
+      margin-bottom: var(--space-xs);
+      display: block;
+    }
 
-/* 4.2 Shared KPI Grid */
-:where(.kpi-grid){ display:grid; gap:8px; }
+    input,
+    select,
+    textarea {
+      -webkit-text-size-adjust: 100%;
+      width: 100%;
+      padding: 12px;
+      outline: none;
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid color-mix(in oklab, var(--tint) 25%, transparent);
+      font-size: var(--fs-body);
+    }
 
-/* 4.3 Shared KPI Item Base */
-.kpi-item{ display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:center; padding:6px 8px; border-radius:10px; background:var(--kpi-bg, rgba(0,0,0,.03)); font-weight:200; font-size:23px; }
-.kpi-item .k{ opacity:.7; }
-.kpi-item .v{ text-align:right; }
-.kpi-item.span2{ grid-column:1 / span 2; }
+    textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
 
-/* 4.4 Shared Data Cell Utilities */
-:where(.txt){ text-align:left; }
-:where(.num){ text-align:right; font-variant-numeric: tabular-nums; }
+    .btn,
+    .btn-ghost {
+      min-height: max(44px, calc(44px * var(--ui-scale)));
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 700;
+      letter-spacing: .3px;
+      border: 1px solid color-mix(in oklab, var(--tint) 35%, transparent);
+      padding: 0 16px;
+      transition: transform 0.2s var(--ease-bounce), background 0.3s var(--ease-standard), box-shadow 0.3s var(--ease-standard);
+      -webkit-tap-highlight-color: transparent;
+    }
 
-/* 4.5 Shared Capsules（badge/chip） — Base */
-:where(.badge, .chip){ border-radius:999px; line-height:1; }
+    .btn {
+      background: var(--btn-bg, var(--tint));
+      color: var(--btn-fg, #fff);
+    }
 
-/* 4.6 Shared Pills（pill/af-pill） — Base */
-:where(.pill, .af-pill){ border-radius:999px; line-height:1; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+    }
 
-/* 4.7 Shared ROI Badge（統一基礎 + 色系） */
-:where(.roi-badge){ display:inline-block; padding:2px 8px; border-radius:999px; font-weight:700; line-height:1; vertical-align:baseline; border:1px solid transparent; }
-.roi-badge.pos{ color:var(--roi-pos-fg); background:var(--roi-pos-bg); border-color:var(--roi-pos-bd); }
-.roi-badge.neg{ color:var(--roi-neg-fg); background:var(--roi-neg-bg); border-color:var(--roi-neg-bd); }
-.roi-badge.zero{ color:var(--roi-zero-fg); background:var(--roi-zero-bg); border-color:var(--roi-zero-bd); }
+    .actions {
+      display: flex;
+      gap: var(--space-sm);
+    }
 
-/* 4.8 Shared Numeric Helpers */
-:where(.ctbc-kpiBar .v, .kpi-card .v){ font-variant-numeric: tabular-nums; }
+    .hint {
+      font-size: calc(var(--fs-label) - 1px);
+      color: var(--muted);
+      margin-top: var(--space-xs);
+    }
 
-/* 4.9 Shared Rows Grid */
-:where(.rows .r){ display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:center; }
+    /* 通用表格 */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-/* 4.10 Utility: Scroll Area */
-:where(.scroll-area){ min-height:0; overflow:auto; }
+    th,
+    td {
+      padding: calc(var(--table-pad) * var(--ui-scale));
+      border-bottom: 1px solid color-mix(in oklab, var(--tint) 12%, transparent);
+      font-size: calc(var(--table-font) * var(--ui-scale));
+    }
 
-/* 4.11 Shared Key-Value Grids */
-:where(.kv-grid, .ctbc-grid .kv){
-  display:grid;
-  grid-template-columns:auto 1fr;
-  gap:8px;
-  align-items:center;
-}
-:where(.kv-duo, .ctbc-grid){
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:8px;
-}
+    th {
+      text-align: left;
+      color: var(--muted);
+      font-weight: 700;
+    }
 
-/* Base button — 不強制白底/白字，改用變數 */
+    .empty {
+      color: var(--muted);
+      text-align: center;
+      padding: 16px;
+    }
 
-  /* 大尺寸（不動你 page_input 的高度控制，這裡只有基礎邊角/內距） */
-  :where(.btn).btn--lg{ padding: 10px 16px; font-weight: 600; border-radius: 10px; }
+    /* 4.1 Shared KPI Primitives */
+    :where(.kpi-item .v) {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
 
-  /* 變體：只設定變數，不直接寫顏色 → 主題自然切換 */
-  :where(.btn).btn--primary{ --btn-bg: var(--c-primary); --btn-bd: var(--c-primary); --btn-fg: #fff; }
-  :where(.btn).btn--primary:hover{ --btn-bg: var(--c-primary-600); --btn-bd: var(--c-primary-600); }
+    /* 卡片 header 右上小鈕統一 */
+    .card .card-hd .btn-ghost {
+      height: 8px;
+      padding: 0 10px;
+      border-radius: var(--radius);
+      font-weight: 600;
+      line-height: 1;
+      font-size: 10px;
+    }
 
-  :where(.btn).btn--dark{ --btn-bg: var(--c-dark); --btn-bd: var(--c-dark); --btn-fg: #fff; }
-  :where(.btn).btn--dark:hover{ --btn-bg: var(--c-dark-700); --btn-bd: var(--c-dark-700); }
+    /* 4.2 Shared KPI Grid */
+    :where(.kpi-grid) {
+      display: grid;
+      gap: 8px;
+    }
 
-  :where(.btn).btn--danger{ --btn-bg: var(--c-danger); --btn-bd: var(--c-danger); --btn-fg: #fff; }
-  :where(.btn).btn--danger:hover{ --btn-bg: var(--c-danger-600); --btn-bd: var(--c-danger-600); }
-/* @extract-end shared */
-}
+    /* 4.3 Shared KPI Item Base */
+    .kpi-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: var(--kpi-bg, rgba(0, 0, 0, .03));
+      font-weight: 200;
+      font-size: 23px;
+    }
 
-/* =========================================================
+    .kpi-item .k {
+      opacity: .7;
+    }
+
+    .kpi-item .v {
+      text-align: right;
+    }
+
+    .kpi-item.span2 {
+      grid-column: 1 / span 2;
+    }
+
+    /* 4.4 Shared Data Cell Utilities */
+    :where(.txt) {
+      text-align: left;
+    }
+
+    :where(.num) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 4.5 Shared Capsules（badge/chip） — Base */
+    :where(.badge, .chip) {
+      border-radius: 999px;
+      line-height: 1;
+    }
+
+    /* 4.6 Shared Pills（pill/af-pill） — Base */
+    :where(.pill, .af-pill) {
+      border-radius: 999px;
+      line-height: 1;
+    }
+
+    /* 4.7 Shared ROI Badge（統一基礎 + 色系） */
+    :where(.roi-badge) {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+      line-height: 1;
+      vertical-align: baseline;
+      border: 1px solid transparent;
+    }
+
+    .roi-badge.pos {
+      color: var(--roi-pos-fg);
+      background: var(--roi-pos-bg);
+      border-color: var(--roi-pos-bd);
+    }
+
+    .roi-badge.neg {
+      color: var(--roi-neg-fg);
+      background: var(--roi-neg-bg);
+      border-color: var(--roi-neg-bd);
+    }
+
+    .roi-badge.zero {
+      color: var(--roi-zero-fg);
+      background: var(--roi-zero-bg);
+      border-color: var(--roi-zero-bd);
+    }
+
+    /* 4.8 Shared Numeric Helpers */
+    :where(.ctbc-kpiBar .v, .kpi-card .v) {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 4.9 Shared Rows Grid */
+    :where(.rows .r) {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    /* 4.10 Utility: Scroll Area */
+    :where(.scroll-area) {
+      min-height: 0;
+      overflow: auto;
+    }
+
+    /* 4.11 Shared Key-Value Grids */
+    :where(.kv-grid, .ctbc-grid .kv) {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      align-items: center;
+    }
+
+    :where(.kv-duo, .ctbc-grid) {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    /* Base button — 不強制白底/白字，改用變數 */
+
+    /* 大尺寸（不動你 page_input 的高度控制，這裡只有基礎邊角/內距） */
+    :where(.btn).btn--lg {
+      padding: 10px 16px;
+      font-weight: 600;
+      border-radius: 10px;
+    }
+
+    /* 變體：只設定變數，不直接寫顏色 → 主題自然切換 */
+    :where(.btn).btn--primary {
+      --btn-bg: var(--c-primary);
+      --btn-bd: var(--c-primary);
+      --btn-fg: #fff;
+    }
+
+    :where(.btn).btn--primary:hover {
+      --btn-bg: var(--c-primary-600);
+      --btn-bd: var(--c-primary-600);
+    }
+
+    :where(.btn).btn--dark {
+      --btn-bg: var(--c-dark);
+      --btn-bd: var(--c-dark);
+      --btn-fg: #fff;
+    }
+
+    :where(.btn).btn--dark:hover {
+      --btn-bg: var(--c-dark-700);
+      --btn-bd: var(--c-dark-700);
+    }
+
+    :where(.btn).btn--danger {
+      --btn-bg: var(--c-danger);
+      --btn-bd: var(--c-danger);
+      --btn-fg: #fff;
+    }
+
+    :where(.btn).btn--danger:hover {
+      --btn-bg: var(--c-danger-600);
+      --btn-bd: var(--c-danger-600);
+    }
+
+    /* @extract-end shared */
+  }
+
+  /* =========================================================
    #21 Page Settings
    ========================================================= */
-@layer pages{
-
-
-}
+  @layer pages {}
 </style>

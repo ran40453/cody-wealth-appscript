@@ -3,7 +3,9 @@
 
     <!-- 左側：市場總覽卡（替代 stkMarketChips） -->
     <div class="card" id="stkMarketsCard">
-      <div class="card-hd"><div class="title">市場總覽</div></div>
+      <div class="card-hd">
+        <div class="title">市場總覽</div>
+      </div>
       <div class="card-bd">
         <div id="stkMarketsList" class="list"></div>
       </div>
@@ -13,10 +15,22 @@
     <div class="card" id="stkMainCard">
       <div id="stkKPI" class="ctbc-kpiBar" data-collapsed="0">
         <div class="kpi-row">
-          <div class="kpi"><div class="k">市場價值</div><div class="v bold" id="stkKpiMV">—</div></div>
-          <div class="kpi"><div class="k">成本</div><div class="v bold" id="stkKpiCost">—</div></div>
-          <div class="kpi"><div class="k">損益(NT)</div><div class="v bold" id="stkKpiPL">—</div></div>
-          <div class="kpi"><div class="k">ROI</div><div class="v bold" id="stkKpiROI">—</div></div>
+          <div class="kpi">
+            <div class="k">市場價值</div>
+            <div class="v bold" id="stkKpiMV">—</div>
+          </div>
+          <div class="kpi">
+            <div class="k">成本</div>
+            <div class="v bold" id="stkKpiCost">—</div>
+          </div>
+          <div class="kpi">
+            <div class="k">損益(NT)</div>
+            <div class="v bold" id="stkKpiPL">—</div>
+          </div>
+          <div class="kpi">
+            <div class="k">ROI</div>
+            <div class="v bold" id="stkKpiROI">—</div>
+          </div>
           <div id="stkActions" class="kpi-actions-card">
             <button id="stkStatusToggle" class="icon-btn" title="持有／已賣出">
               <span class="material-symbols-outlined">inventory_2</span>
@@ -34,7 +48,11 @@
       <div class="ctbc-scroll" id="stkViewport">
         <table class="ctbc-table">
           <thead id="stkHead"></thead>
-          <tbody id="stkBody"><tr><td class="empty" colspan="8">載入中…</td></tr></tbody>
+          <tbody id="stkBody">
+            <tr>
+              <td class="empty" colspan="8">載入中…</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
@@ -42,7 +60,7 @@
   </div>
 
   <!-- 通用小窗：編輯現價/股息 -->
-  <div class="modal" id="stkEditDlg" style="display:none">
+  <div class="modal" id="stkEditDlg">
     <div class="modal-content">
       <div class="modal-hd">
         <div class="title" id="stkEditTitle">編輯</div>
@@ -54,7 +72,7 @@
           <button class="btn" id="stkEditCancel" type="button">取消</button>
           <button class="btn primary" id="stkEditOk" type="submit">
             <span id="stkEditOkTxt">儲存</span>
-            <span id="stkEditOkSpin" class="spinner" style="display:none"></span>
+            <span id="stkEditOkSpin" class="spinner"></span>
           </button>
         </div>
       </form>
@@ -62,7 +80,7 @@
   </div>
 
   <!-- 新增項目 Modal -->
-  <div class="modal" id="stkAddDlg" style="display:none">
+  <div class="modal" id="stkAddDlg">
     <div class="modal-content">
       <div class="modal-hd">
         <div class="title">新增部位</div>
@@ -104,7 +122,7 @@
           <button class="btn" id="stkAddCancel" type="button">取消</button>
           <button class="btn primary" id="stkAddOk" type="submit">
             <span id="stkAddOkTxt">新增</span>
-            <span id="stkAddOkSpin" class="spinner" style="display:none"></span>
+            <span id="stkAddOkSpin" class="spinner"></span>
           </button>
         </div>
       </form>

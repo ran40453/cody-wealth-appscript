@@ -22,19 +22,21 @@
     <aside class="tx-panel">
       <div class="tx-toolbar cards-zoom-scope">
         <div class="fx-select-wrap">
-          <div class="status-filter" style="display:flex;align-items:center;gap:8px;margin-left:8px;">
+          <div class="status-filter">
             <div class="seg-sm" id="statusSeg">
-              <button id="statusPlanned" class="seg-btn seg-sm" title="Planned"><span
-                  class="material-symbols-outlined">schedule</span></button>
-              <button id="statusPosted" class="seg-btn seg-sm" title="Posted"><span
-                  class="material-symbols-outlined">check_circle</span></button>
-              <button id="statusUsing" class="seg-btn seg-sm" title="Using"><span
-                  class="material-symbols-outlined">trending_up</span></button>
+              <button id="statusPlanned" class="seg-btn" title="Planned">
+                <span class="material-symbols-outlined">schedule</span>
+              </button>
+              <button id="statusPosted" class="seg-btn" title="Posted">
+                <span class="material-symbols-outlined">check_circle</span>
+              </button>
+              <button id="statusUsing" class="seg-btn" title="Using">
+                <span class="material-symbols-outlined">trending_up</span>
+              </button>
             </div>
           </div>
         </div>
-        <button id="btnConsolidate" class="btn btn--sm btn--ghost" type="button" title="庫存整併"
-          style="display:none; margin-left:8px; align-items:center; justify-content:center;">
+        <button id="btnConsolidate" class="btn btn--sm btn--ghost" type="button" title="庫存整併">
           <span class="material-symbols-outlined">inventory_2</span>
         </button>
         <select id="txAccountPick" class="fx-select">

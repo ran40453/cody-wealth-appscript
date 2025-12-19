@@ -605,6 +605,7 @@
     const icoPosted = '<span class="material-symbols-outlined" title="Posted" style="font-size:16px; vertical-align:middle;">check_circle</span>';
     const icoPlanned = '<span class="material-symbols-outlined" title="Planned" style="font-size:16px; vertical-align:middle;">schedule</span>';
     const icoUsing = '<span class="material-symbols-outlined" title="Using" style="font-size:16px; vertical-align:middle;">trending_up</span>';
+    const icoSum = '<span class="material-symbols-outlined" title="Total" style="font-size:16px; vertical-align:middle;">functions</span>';
 
     if (loanRows.length) {
       loanHTML += `<div class="bal-table-wrap bal-loan"><table class="bal-table"><thead><tr>
@@ -612,7 +613,7 @@
       <th>${icoPosted}</th>
       <th>${icoUsing}</th>
       <th>${icoPlanned}</th>
-      <th>Sum</th>
+      <th>${icoSum}</th>
     </tr></thead><tbody>`;
       loanRows.forEach(r => {
         const rawPosted = Number(r.posted) || 0;
@@ -639,7 +640,7 @@
         <th>帳戶</th>
         <th>${icoPosted}</th>
         <th>${icoPlanned}</th>
-        <th>Sum</th>
+        <th>${icoSum}</th>
       </tr></thead><tbody>`;
       rows.forEach(r => {
         h += `<tr>

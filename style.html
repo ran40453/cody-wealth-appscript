@@ -47,122 +47,75 @@
    - --tabbar-h  ↔ --app-tabbar-h（統一以 --tabbar-h；--app-tabbar-h 改為別名）
    - --logo-h-desktop / --logo-h-mobile → 後續收斂為 --logo-h（媒體查詢覆蓋） */
   :root {
-    /* 尺寸/排版 */
+    /* --- Modern Base Tokens --- */
     --ui-scale: 1.0;
     --ui-scale-mobile: 2.1;
     --container-max: clamp(1400px, 98vw, 2200px);
+
+    /* Spacing & Radius */
+    --space-unit: 8px;
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
     --space: 12px;
-    --radius: 16px;
+    /* Legacy compat */
+
+    --radius-sm: 8px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+    --radius: var(--radius-md);
+
+    /* Animation Easing (MD3 / Premium Damping) */
+    --ease-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
+    --ease-emphasized: cubic-bezier(0.3, 0.0, 0.1, 1.0);
+    --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --trans-fast: 0.2s var(--ease-standard);
+    --trans-md: 0.4s var(--ease-standard);
+    --trans-slow: 0.6s var(--ease-standard);
+
+    /* Header Heights */
     --hdrH-desktop: 72px;
-    --hdrH-mobile: 56px;
+    --hdrH-mobile: 64px;
     --hdrH: var(--hdrH-desktop);
-    --pri: #3b82f6;
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .06);
-    /* Phase 2 Aliases */
     --header-h: var(--hdrH);
-    --logo-h: var(--logo-h-desktop);
 
-    --logo-h-desktop: 30px;
-    --logo-h-mobile: 24px;
-
-    --font-body: 18px;
+    /* Typography */
+    --fs-body: 18px;
+    --fs-title: 16px;
+    --fs-label: 14px;
+    --fs-table: 14px;
     --lh-body: 1.5;
-    --tap-min: 46px;
+    --font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Noto Sans TC", system-ui;
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Noto Sans TC", system-ui;
 
-    --dash-fs: 18px;
-    /* ← 改這個就能一把抓dashmain四張卡片裡所有文字大小 */
-
-    --title-size: 16px;
-    --crumb-size: 13px;
-    --label-size: 14px;
-    --form-font: 17px;
-    --table-font: 14px;
-    --table-pad: 10px;
-
-    --kpi-size: 19px;
-    --sum-label-size: calc(18px / var(--ui-scale));
-    --sum-num-size: calc(18px / var(--ui-scale));
-
-    --tabbar-h: 130px;
-    --tab-ico-circle: 80px;
-    --tab-ico-font: 40px;
-    --tab-text: 25px;
-
-    --drawerW: clamp(280px, 22vw, 460px);
-    --chart-h-desktop: 320px;
-    --chart-h-mobile: 260px;
-
-    /* CTBC table layout */
-    --ctbc-fixed-col-w: 140px;
-    --ctbc-row-h: 44px;
-    --ctbc-head-bg: #f7f7f9;
-    --ctbc-sticky-bg: #fff;
-    --ctbc-border: #e6e6eb;
-    --ctbc-shadow: rgba(15, 23, 42, .08);
-
-    /* z-index 統一 */
-    --z-rows: 1;
-    --z-sticky-cols: 300;
-    --z-thead: 500;
-    --z-ui: 600;
-    --z-nowbar: 900;
-    --z-tabbar: 1100;
-    --z-header: 1500;
-    --z-drawer: 1200;
-    --z-sheet: 1310;
-    --z-popmenu: 1201;
-    --z-popmenu-top: 1199;
-    --z-settings: 2000;
-    /* 高於 header/drawer */
-
-    /* 主題（深色預設） */
+    /* Theme Colors (Main) */
+    --pri: #3b82f6;
+    --tint: #3aa3ff;
+    --accent: #00e0b8;
+    --danger: #ff5a5f;
     --bg: #0b0f14;
     --surface: #111823;
     --card: #151e2b;
     --text: #eaf2ff;
     --muted: #9db1c9;
-    --tint: #3aa3ff;
-    --accent: #00e0b8;
-    --danger: #ff5a5f;
-    /* Button palette aliases (map to existing theme tokens) */
+    --shadow-color: rgba(0, 0, 0, .35);
+
+    /* Legacy / Semantic Aliases */
     --c-primary: var(--tint);
     --c-primary-600: color-mix(in oklab, var(--tint) 84%, #000 16%);
-    --c-dark: #111827;
-    --c-dark-700: #0f172a;
     --c-danger: var(--danger);
     --c-danger-600: color-mix(in oklab, var(--danger) 86%, #000 14%);
-    --shadow: rgba(0, 0, 0, .35);
 
-    /* 其他 */
-    --kb-safe: 0px;
-    --scrollY: 0px;
+    /* KPI / UI Specific */
+    --tabbar-h: 130px;
+    --drawerW: clamp(300px, 22vw, 480px);
+    --ctbc-border: color-mix(in oklab, var(--tint) 14%, transparent);
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, .1);
 
-    /* KPI 面板底色（亮/暗在下方覆寫） */
-    --kpi-pane-bg: #fafafa;
-
-    /* Input page 共用尺寸 */
-    --input-h: 66px;
-    --toggle-w-desktop: 88px;
-    --toggle-w-mobile: 132px;
-
-    --app-header-h: var(--header-h);
-    --app-tabbar-h: calc(var(--tabbar-h) * var(--ui-scale));
-    --active-tabbar-h: 0px;
-    /* Desktop: 0px because tabbar is hidden */
-    --tabbar-extra: 20px;
-    /* 額外底部留白（內容與 Tabbar 之間） */
-
-    /* === Card shadows & header separators by theme === */
-    --card-shadow: 0 1px 2px rgba(0, 0, 0, .06);
-    /* 淺色 */
-    --card-hd-sep: 1px solid var(--card-bd, #e6e6e6);
-
-    /* Segmented control aliases (map to existing theme tokens) */
-    --field-bg: color-mix(in oklab, var(--card) 88%, transparent);
-    --field-border: color-mix(in oklab, var(--tint) 22%, transparent);
-    --line: color-mix(in oklab, var(--tint) 22%, transparent);
-    --fg: var(--text);
-
+    /* Interactive States */
+    --btn-scale-active: 0.96;
+    --card-scale-active: 0.985;
   }
 
   :root.light {
@@ -257,26 +210,61 @@
 
   .page.show {
     display: block;
-    animation: fadeUp 0.6s cubic-bezier(0.2, 0.0, 0, 1.0) forwards;
-    /* Material Standard Easing */
+    animation: fadeUp 0.6s var(--ease-emphasized) forwards;
   }
 
   @keyframes fadeUp {
     from {
       opacity: 0;
-      transform: translateY(16px);
+      transform: translateY(24px) scale(0.98);
     }
 
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
   }
 
   /* Global Transition Damping */
   * {
-    transition-timing-function: cubic-bezier(0.2, 0.0, 0, 1.0);
-    /* MD3 Standard */
+    transition: all 0.3s var(--ease-standard);
+  }
+
+  /* Interactive Elements Scaling */
+  button,
+  .btn,
+  .navItem,
+  .navSubItem,
+  .card-hd-pill,
+  .tabbtn,
+  .crumb,
+  .maskBtn,
+  .themeBtn,
+  .menuBtn {
+    transition: transform 0.2s var(--ease-bounce), background 0.3s var(--ease-standard), box-shadow 0.3s var(--ease-standard);
+  }
+
+  button:active,
+  .btn:active,
+  .navItem:active,
+  .navSubItem:active,
+  .card-hd-pill:active,
+  .tabbtn:active,
+  .crumb:active,
+  .is-press {
+    transform: scale(var(--btn-scale-active));
+  }
+
+  .card {
+    transition: transform 0.4s var(--ease-bounce), box-shadow 0.4s var(--ease-standard);
+    overflow: hidden;
+    /* Ensure rounded corners clip content */
+  }
+
+  /* Soft press for cards when inside a zoom scope */
+  .cards-zoom-scope .card.card--hot {
+    transform: scale(var(--card-scale-active));
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
 
   /* Header Title Hover Effect */
@@ -1895,18 +1883,12 @@
   #page-input .input-layout {
     display: grid;
     gap: var(--space);
-    /* Desktop：三欄寬度自適應，吃滿畫面寬度 */
     grid-template-columns:
-      minmax(280px, 1.3fr)
-      /* balance */
-      minmax(300px, 1.5fr)
-      /* list */
-      minmax(260px, 1.2fr);
-    /* form */
+      minmax(280px, 1.3fr) minmax(300px, 1.5fr) minmax(260px, 1.2fr);
     grid-template-areas: "balance list form";
     align-items: stretch;
-    grid-auto-rows: 1fr;
-    /* 讓三張卡高度延伸到視窗底部，交給卡片內部滾動 */
+    /* Remove grid-auto-rows: 1fr to allow content-based height if needed, 
+       but we want the columns to stay equal height via align-items: stretch */
     height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h) - 4px);
     overflow: hidden;
   }
@@ -1926,6 +1908,9 @@
     width: 380px;
     max-width: 100%;
     margin-inline: auto;
+    display: grid;
+    align-content: start;
+    /* Prevent fields from stretching to fill card height */
   }
 
   #page-input #acctBalanceCard,
@@ -1952,10 +1937,8 @@
   @media (max-width:1024px) {
     #page-input .input-layout {
       height: calc(100dvh - var(--app-header-h, 56px) - var(--active-tabbar-h));
-      /* Change to scrollable if content exceeds viewport */
       overflow-y: auto;
       grid-template-rows: max-content minmax(300px, 1fr);
-      /* Check min-height for list to ensure it's usable */
       grid-template-columns: 1fr 1fr !important;
       grid-template-areas:
         "balance form"
@@ -1964,7 +1947,6 @@
       row-gap: var(--space);
       margin-right: 0;
       align-items: stretch;
-      grid-auto-rows: 1fr;
     }
 
     #page-input .form-card {
@@ -1982,31 +1964,56 @@
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--tint) 28%, transparent);
   }
 
-  /* Segmented controls (small & regular) */
+  .status-filter {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-left: var(--space-sm);
+  }
+
   .seg-sm {
     display: flex;
     gap: 6px;
+    background: color-mix(in oklab, var(--surface) 90%, transparent);
+    padding: 2px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--ctbc-border);
   }
 
   .seg-sm button {
-    border: 1px solid var(--line);
-    background: var(--field-bg);
-    color: var(--fg);
-    border-radius: 12px;
-    padding: 6px 10px;
-    font-size: 13px;
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: calc(var(--radius-sm) - 2px);
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
     cursor: pointer;
+    transition: all 0.2s var(--ease-standard);
+  }
+
+  .seg-sm button:hover {
+    background: color-mix(in oklab, var(--tint) 8%, transparent);
+    color: var(--tint);
   }
 
   .seg-sm button.active {
     background: var(--tint);
     color: #fff;
-    border-color: transparent;
-    box-shadow: 0 4px 10px rgba(10, 132, 255, .25);
+    box-shadow: 0 4px 12px color-mix(in oklab, var(--tint) 25%, transparent);
   }
 
-  .seg-sm button {
-    transition: background .15s ease, box-shadow .15s ease, color .15s ease, border-color .15s ease;
+  #btnConsolidate {
+    display: none;
+    /* Controlled by JS */
+    margin-left: var(--space-sm);
+    aspect-ratio: 1;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    place-items: center;
   }
 
   .seg {
@@ -2050,17 +2057,17 @@
   }
 
   #page-input .fx-field {
-    width: 95%;
+    width: 100%;
     height: var(--input-h);
-    padding: 0 14px;
-    border-radius: 12px;
+    padding: 0 var(--space-md);
+    border-radius: var(--radius-sm);
     outline: none;
     border: 1px solid color-mix(in oklab, var(--tint) 25%, transparent);
     background: var(--surface);
     color: var(--text);
     -webkit-text-size-adjust: 100%;
-    font-size: clamp(16px, calc(var(--form-font) * var(--ui-scale)), 22px);
-    transition: border-color .18s ease, box-shadow .18s ease;
+    font-size: clamp(16px, var(--fs-body), 22px);
+    transition: border-color 0.3s var(--ease-standard), box-shadow 0.3s var(--ease-standard);
   }
 
   #page-input .fx-field:focus {
@@ -2197,7 +2204,7 @@
     border-radius: 999px;
     display: inline-block;
     font-size: 13px;
-    width: 95%;
+    width: 100%;
     background: color-mix(in oklab, var(--surface) 85%, transparent);
     border: 1px solid color-mix(in oklab, var(--tint) 25%, transparent);
     color: var(--text);
@@ -2333,16 +2340,7 @@
     white-space: nowrap;
   }
 
-  #page-input .fx-select-wrap::after {
-    content: "";
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    border: 6px solid transparent;
-    border-top-color: color-mix(in oklab, var(--tint) 60%, transparent);
-    pointer-events: none;
-  }
+  /* Removed redundant dropdown arrow as requested */
 
   /* 清單 viewport 與表格 */
   #page-input .tx-viewport {
@@ -2384,25 +2382,27 @@
     top: 0;
     z-index: 50;
     background: var(--card);
-    border-bottom: 1px solid color-mix(in oklab, var(--tint) 10%, transparent);
-    padding: 8px 10px;
+    border-bottom: 1px solid var(--ctbc-border);
+    padding: var(--space-xs) var(--space-xs);
     text-align: center;
+    font-size: var(--fs-label);
   }
 
   #page-input .tx-table tbody td {
-    padding: 8px 10px;
-    border-bottom: 1px solid color-mix(in oklab, var(--tint) 10%, transparent);
+    padding: var(--space-xs) var(--space-xs);
+    border-bottom: 1px solid var(--ctbc-border);
     text-align: center;
+    font-size: var(--fs-label);
   }
 
   #page-input .tx-table tbody td:nth-child(1) {
-    font-size: calc(var(--table-font) * .85);
+    font-size: calc(var(--fs-label) * .85);
     opacity: .9;
   }
 
   #page-input .tx-table td.txt,
   #page-input .tx-table td.num {
-    font-size: 18px;
+    font-size: var(--fs-body);
   }
 
   /* planned 行背景 */
@@ -2437,39 +2437,40 @@
   }
 
   /* 13.4 帳戶餘額卡 */
+  /* 13.4 帳戶餘額卡 */
   #acctBalanceCard {
-    font-size: 18px;
+    font-size: var(--fs-body);
   }
 
   #acctBalanceCard .title {
     font-weight: 800;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-xs);
     font-size: 1em;
   }
 
   #acctBalanceCard .section-title {
-    font-size: .9em;
+    font-size: var(--fs-label);
     font-weight: 700;
     opacity: .85;
-    margin: 4px 0 6px;
+    margin: var(--space-xs) 0;
   }
 
   #acctBalanceCard .bal-sec+.bal-sec {
-    margin-top: 10px;
+    margin-top: var(--space-sm);
   }
 
   #acctBalanceCard .bal-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
-    padding: 6px 0;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
     line-height: 1.25;
   }
 
   #acctBalanceCard .bal-row .name {
     font-weight: 600;
-    font-size: .67em;
+    font-size: 0.85em;
     opacity: .95;
   }
 
@@ -2724,6 +2725,78 @@
   :root[data-theme="dark"] #page-input .btn-using-toggle.active {
     background: color-mix(in oklab, #facc15 70%, #020617 30%);
     color: #0b1120;
+  }
+
+  /* =========================================================
+   #13.6 Record（Database）
+   ========================================================= */
+  #page-record .db-header-card {
+    margin-bottom: var(--space-sm);
+  }
+
+  #page-record .card-hd {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+  }
+
+  #page-record .actions {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+  }
+
+  #page-record .db-notice {
+    font-size: var(--fs-label);
+    opacity: 0.8;
+    color: var(--muted);
+  }
+
+  #page-record .keep-title {
+    margin: 0 0 var(--space-xs) 0;
+    font-size: var(--fs-body);
+    font-weight: 800;
+  }
+
+  #page-record .db-meta {
+    margin-top: var(--space-xs);
+    font-size: var(--fs-label);
+    color: var(--muted);
+  }
+
+  #page-record .db-viewport {
+    border: 1px solid var(--ctbc-border);
+    border-radius: var(--radius-sm);
+    overflow: auto;
+  }
+
+  #page-record .db-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-label);
+  }
+
+  #page-record .db-table th {
+    position: sticky;
+    top: 0;
+    background: var(--card);
+    padding: var(--space-xs);
+    border-bottom: 1px solid var(--ctbc-border);
+    z-index: 10;
+  }
+
+  #page-record .db-table td {
+    padding: var(--space-xs);
+    border-bottom: 1px solid var(--ctbc-border);
+  }
+
+  /* CTBC status */
+  .ctbc-status {
+    min-height: 1.5em;
+    margin: var(--space-xs) 0;
+    color: var(--muted);
+    font-size: var(--fs-label);
   }
 
   /* Page Input：帳戶餘額表格置中顯示 */
@@ -3030,24 +3103,18 @@
     opacity: 0.8;
   }
 
-  /* 桌機：四區塊 - 四欄並排 */
   #page-dashmain .dashmain {
-    --gap: 16px;
+    --gap: var(--space-md);
     display: grid;
     gap: var(--gap);
-    /* 定義 Grid Areas：四欄並排 */
     grid-template-areas: "kpi planned ctbc accounts";
-    /* 四欄等寬 (使用 minmax(0, 1fr) 避免內容撐爆) */
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    /* 單列填滿高度 */
     grid-template-rows: 1fr;
-    padding: 16px;
-    /* 填滿螢幕高度，卡片內部捲動 */
-    height: calc(100dvh - var(--header-h, 72px) - 16px);
+    padding: var(--space-md);
+    height: calc(100dvh - var(--header-h, 72px) - var(--space-md));
     box-sizing: border-box;
     width: 100%;
     max-width: 100%;
-    /* 移除最大寬度限制，讓四欄能展延 */
     margin: 0 auto;
   }
 
@@ -3093,36 +3160,28 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    /* iOS 風格圓角與陰影 */
-    border-radius: 24px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    /* 微弱邊框增加質感 */
+    border-radius: var(--radius-lg);
+    box-shadow: var(--card-shadow);
+    border: 1px solid color-mix(in oklab, var(--tint) 8%, transparent);
     background: var(--card);
-    /* 確保有背景色 */
     overflow: hidden;
-    /* 確保內容不溢出圓角 */
-    transition: box-shadow 0.2s;
+    transition: transform 0.4s var(--ease-bounce), box-shadow 0.4s var(--ease-standard);
   }
 
   #page-dashmain .card:hover {
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
-    transform: translateY(-2px);
-    transition: all 0.5s cubic-bezier(0.2, 0.0, 0, 1.0);
+    box-shadow: 0 12px 32px var(--shadow-color);
+    transform: translateY(-4px) scale(1.01);
   }
 
   #page-dashmain .card-hd {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
-    /* 縮減底部間距 */
+    margin-bottom: var(--space-xs);
     z-index: 1;
     position: relative;
-    padding: 8px 12px 0 12px;
-    /* 調整內距，縮減高度 */
-    min-height: 36px;
-    /* 限制最小高度 */
+    padding: var(--space-sm) var(--space-md) 0;
+    min-height: 48px;
   }
 
   /* Title Pill (Icon + Expanding Text) */
@@ -3130,51 +3189,48 @@
     display: flex;
     align-items: center;
     background: var(--surface);
-    border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+    border: 1px solid color-mix(in oklab, var(--tint) 15%, transparent);
     border-radius: 999px;
-    /* Capsule */
     padding: 4px;
     padding-right: 0;
-    /* Text starts hidden */
-    transition: all 0.25s ease;
-    cursor: default;
+    transition: all 0.3s var(--ease-standard);
+    cursor: pointer;
     overflow: hidden;
-    max-width: 36px;
-    /* Icon width + padding */
+    max-width: 38px;
   }
 
   .card-hd-pill:hover,
   .card-hd-pill:active,
   .card-hd-pill.active {
-    padding-right: 12px;
-    max-width: 140px;
-    /* Expand */
-    background: color-mix(in oklab, var(--tint) 8%, var(--surface));
-    border-color: color-mix(in oklab, var(--tint) 20%, transparent);
+    padding-right: 14px;
+    max-width: 160px;
+    background: color-mix(in oklab, var(--tint) 12%, var(--surface));
+    border-color: var(--tint);
   }
 
   .card-hd-pill .ico {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
-    color: var(--text);
+    color: var(--tint);
+    background: color-mix(in oklab, var(--tint) 10%, transparent);
   }
 
   .card-hd-pill .txt {
-    font-size: 14px;
-    font-weight: 700;
+    font-size: var(--fs-label);
+    font-weight: 800;
     white-space: nowrap;
     opacity: 0;
-    transform: translateX(-8px);
-    transition: all 0.2s ease;
-    margin-left: 4px;
+    transform: translateX(-10px);
+    transition: all 0.3s var(--ease-standard);
+    margin-left: 6px;
+    color: var(--text);
   }
 
   .card-hd-pill:hover .txt,
-  .card-hd-pill:active .txt,
   .card-hd-pill.active .txt {
     opacity: 1;
     transform: translateX(0);
@@ -4040,21 +4096,11 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 2px 8px;
-    font-weight: 500;
-    font-size: 13px;
-  }
-
-  .badge.pos {
-    background: var(--tone-pos-bg);
-    color: var(--tone-pos-fg);
-    border: 1px solid var(--tone-pos-bd);
-  }
-
-  .badge.neg {
-    background: var(--tone-neg-bg);
-    color: var(--tone-neg-fg);
-    border: 1px solid var(--tone-neg-bd);
+    padding: 2px 10px;
+    font-weight: 700;
+    font-size: var(--fs-label);
+    border-radius: 999px;
+    line-height: 1;
   }
 
 
@@ -4195,15 +4241,14 @@
 
   #pol-top .kpi-item .v,
   #pol-top .kpi-item .k {
-    font-size: var(--dash-kpi-font, 16px);
+    font-size: var(--fs-body);
   }
 
-  /* 接上文的共用變數 */
   #page-dashmain .kpi-item .v,
   #page-dashmain .kpi-item .k,
   #page-dashmain .card .list.slim,
   #page-dashmain .card .rows {
-    font-size: var(--dash-kpi-font);
+    font-size: var(--fs-body);
   }
 
 
@@ -4371,7 +4416,7 @@
     #stkAddDlg .modal-hd {
       position: sticky;
       top: 0;
-      padding: 12px 16px;
+      padding: var(--space-sm) var(--space-md);
       background: inherit;
       border-bottom: 1px solid var(--hairline);
     }
@@ -4446,7 +4491,7 @@
 
     #page-stk .kpi .k {
       color: #64748b;
-      font-size: 13px;
+      font-size: var(--fs-label);
     }
 
     /* 版面骨架：桌機雙欄，手機單欄 */
@@ -4467,11 +4512,6 @@
     /* 卡片外觀：沿用 .card，可在此做本頁微調 */
     #page-settings .card {
       padding: 14px;
-    }
-
-    /* 鍵值列：直接吃共用骨架 */
-    #page-settings .kv-duo {
-      /* Shared utilities used */
     }
 
     /* 小徽章（資訊/警示） */
@@ -5554,21 +5594,18 @@
 
     /* === Routines 頁面專屬 === */
     #page-routines .rtn-row.card {
-      border-radius: 16px;
-      padding: 12px;
-      margin-bottom: 10px;
-      /* 不強灌黑底，延用 .card 的玻璃感/陰影 */
+      border-radius: var(--radius-md);
+      padding: var(--space-sm);
+      margin-bottom: var(--space-sm);
       backdrop-filter: blur(12px) saturate(120%);
       background: color-mix(in oklab, var(--card) 80%, transparent);
       border: 1px solid color-mix(in oklab, var(--tint) 18%, transparent);
-      box-shadow: 0 8px 24px var(--shadow);
+      box-shadow: var(--card-shadow);
       color: var(--text);
     }
 
-
     :root.light #page-routines .rtn-row.card {
       background: color-mix(in oklab, var(--card) 70%, transparent);
-      color: var(--text);
     }
 
     /* header */
@@ -5596,8 +5633,8 @@
       min-width: 0;
       background: transparent;
       border: none;
-      font-size: 14px;
-      font-weight: 600;
+      font-size: var(--fs-body);
+      font-weight: 700;
       color: inherit;
       padding: 0;
     }
@@ -5606,10 +5643,10 @@
     .amount-chip {
       display: inline-block;
       border-radius: 999px;
-      border: 1px solid var(--hairline, color-mix(in oklab, var(--tint) 30%, transparent));
-      padding: 2px 8px;
-      font-size: 12px;
-      font-weight: 600;
+      border: 1px solid color-mix(in oklab, var(--tint) 30%, transparent);
+      padding: 2px 10px;
+      font-size: var(--fs-label);
+      font-weight: 700;
       line-height: 1.4;
       background: color-mix(in oklab, var(--surface) 80%, transparent);
       color: inherit;
@@ -5618,11 +5655,11 @@
 
     /* 第二行：freq / date / acc 橫向一排小膠囊 */
     .rtn-line2 {
-      margin-top: 6px;
+      margin-top: var(--space-xs);
       display: flex;
       flex-wrap: nowrap;
       gap: 6px;
-      font-size: 12px;
+      font-size: var(--fs-label);
     }
 
     .rtn-chip-field {
@@ -5632,17 +5669,13 @@
     .rtn-chip-field .pill-select,
     .rtn-chip-field .pill-input {
       border-radius: 999px;
-      border: 1px solid var(--hairline, color-mix(in oklab, var(--tint) 25%, transparent));
+      border: 1px solid color-mix(in oklab, var(--tint) 25%, transparent);
       background: transparent;
       color: inherit;
-      font-size: 12px;
+      font-size: var(--fs-label);
       line-height: 1.2;
       padding: 4px 10px;
       min-height: 28px;
-    }
-
-    .pill-input {
-      /* for type=date */
     }
 
     .pill-select {
