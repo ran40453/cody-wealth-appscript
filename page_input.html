@@ -1,5 +1,5 @@
 <!-- page_input：表單 + 虛擬清單（桌面左/右；手機上/下） -->
-<section id="page-input" class="page show">
+<section id="page-input" class="page">
   <div class="input-layout cards-zoom-scope">
 
     <!-- 左：帳戶餘額（Posted / Planned） -->
@@ -39,15 +39,25 @@
         <button id="btnConsolidate" class="btn btn--sm btn--ghost" type="button" title="庫存整併">
           <span class="material-symbols-outlined">inventory_2</span>
         </button>
+        <!-- Mobile Floating Form Trigger -->
+        <button id="btnOpenForm" class="btn btn--sm btn--primary" type="button" title="新增/編輯" style="display:none;">
+          <span class="material-symbols-outlined">edit_note</span>
+        </button>
         <select id="txAccountPick" class="fx-select">
           <option value="">請選擇帳戶</option>
         </select>
       </div>
       <div class="tx-viewport" id="txViewport">
-        <table class="tx-table">
-          <thead id="txHead"></thead>
-          <tbody id="txBody"></tbody>
-        </table>
+        <!-- Flex/Grid List Structure -->
+        <div class="tx-list">
+          <div id="txHead" class="tx-head-row">
+            <!-- Header injected by JS or static? Keeping it JS dynamic usually safer for column alignment but static is fine if we define cols now. 
+                     Let's verify input_js.html renderHead usage. It sets innerHTML. 
+                     So we just provide the container. 
+                -->
+          </div>
+          <div id="txBody" class="tx-body-rows"></div>
+        </div>
         <div id="txSpacer"></div>
       </div>
     </aside>

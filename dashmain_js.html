@@ -236,13 +236,13 @@
       // 驗證實際文字
       const usdEl = document.getElementById('kpiUSD');
       if (usdEl && typeof console !== 'undefined') {
-        console.log('[kpiUSD verify]', { wroteUSD, text: usdEl.textContent, dataValue: usdEl.dataset.value });
+
       }
       const d = document.getElementById('kpiDate');
       if (d) d.textContent = kp.date || '—';
 
       if (typeof console !== 'undefined' && !window.__dashUSDLogged) {
-        console.log('[dashmain] USD debug', { usdFromKpis: kp.usd, usdFromLatest: latest.CU, kUSD });
+
         window.__dashUSDLogged = true;
       }
 
@@ -349,7 +349,7 @@
 
       google.script.run
         .withSuccessHandler(res => {
-          console.log('[dashmain] getDashboardData ok', res);
+
           renderDashboard(res);
           loadAccList();
 

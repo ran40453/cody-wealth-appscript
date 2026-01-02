@@ -24,11 +24,11 @@
   </aside>
 
   <main class="app" id="app-pages">
+    <?!= include('page_dashmain'); ?>
     <?!= include('page_input'); ?>
     <?!= include('page_acc'); ?>
     <?!= include('page_invest'); ?>
     <?!= include('page_record'); ?>
-    <?!= include('page_dashmain'); ?>
     <?!= include('page_debt'); ?>
     <?!= include('page_routines'); ?>
     <?!= include('page_policy'); ?>
@@ -100,7 +100,7 @@
       document.documentElement.classList.toggle('mobile', looksMobile);
       document.documentElement.classList.toggle('is-mobile', looksMobile);
       const v = getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim();
-      console.log('[UI] final --ui-scale =', v);
+
     })();
 
   </script>

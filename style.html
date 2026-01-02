@@ -2078,7 +2078,9 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* 1. Enlarge tabbar icons on mobile (doubled size logic) */
   .tabbtn .ico.circle {
+    /* Base size for desktop/tablet if visible, otherwise overridden in mobile media query */
     width: var(--tab-ico-circle);
     height: var(--tab-ico-circle);
     aspect-ratio: 1/1;
@@ -2091,8 +2093,10 @@
     border: 1px solid color-mix(in oklab, var(--tint) 12%, transparent);
     transition: transform .08s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
     box-shadow: var(--neu-flat);
-    /* Default rounded look */
   }
+
+  /* Remove square background from tabbtn, keep circle only */
+  /* Handled by .tabbtn background: transparent existing rule, just ensuring no other bg applied */
 
   .tabbtn .ico {
     font-size: calc(var(--tab-ico-font) * var(--ui-scale)) !important;
@@ -2930,73 +2934,164 @@
     height: 0;
   }
 
-  #page-input .tx-table {
+  /* Viewport Refactor: List based */
+  #page-input .tx-list {
+    display: block;
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
   }
 
-  #page-input .tx-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    background: var(--card);
-    border-bottom: 1px solid var(--invest-border);
-    padding: var(--space-xs) var(--space-xs);
+  #page-input .tx-viewport .tx-empty {
+    padding: 24px;
     text-align: center;
+    color: var(--muted);
     font-size: var(--fs-label);
   }
 
-  #page-input .tx-table tbody td {
-    padding: var(--space-xs) var(--space-xs);
+  .tx-row {
+    display: flex;
+    align-items: center;
     border-bottom: 1px solid var(--invest-border);
-    text-align: center;
-    font-size: var(--fs-label);
+    cursor: pointer;
+    transition: transform 0.15s ease, background-color 0.15s ease;
+    user-select: none;
+    background: transparent;
+    /* Default */
   }
 
-  #page-input .tx-table tbody td:nth-child(1) {
-    font-size: calc(var(--fs-label) * .85);
-    opacity: .9;
-  }
-
-  #page-input .tx-table td.txt,
-  #page-input .tx-table td.num {
+  .tx-cell {
+    padding: 10px 6px;
     font-size: var(--fs-body);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
   }
 
-  /* planned 行背景 */
-  #page-input .tx-table tbody tr.row-planned td {
-    background: var(--tone-pos-bg);
+  /* Columns Widths & Alignments */
+  .col-date {
+    flex: 0 0 52px;
+    font-size: 0.8em;
+    opacity: 0.7;
+    justify-content: center;
   }
 
-
-  /* 虛擬清單：選取中的列（含深色） */
-  #page-input .tx-table tbody tr.selected {
-    background: #fff7d6;
+  .col-acc {
+    flex: 0 0 84px;
+    justify-content: flex-start;
   }
 
-  #page-input .tx-table tbody tr.selected:hover {
-    background: #fff3bf;
+  /* chip handles align */
+  .col-item {
+    flex: 1;
+    min-width: 0;
+    font-weight: 500;
   }
 
-  html:not(.light) #page-input .tx-table tbody tr.selected,
-  html:not(.light) #page-input .tx-table tbody tr.selected .txt,
-  html:not(.light) #page-input .tx-table tbody tr.selected .num {
+  .col-amt {
+    flex: 0 0 76px;
+    justify-content: flex-end;
+    font-family: 'JetBrains Mono';
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+
+  .col-st {
+    flex: 0 0 40px;
+    justify-content: center;
+  }
+
+  /* Chip Overrides for Grid */
+  .tx-chip-acc {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :root[data-theme="dark"] .tx-chip-acc {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Animation Keyframes */
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .tx-row.animate-enter {
+    animation: slideInUp 0.3s cubic-bezier(0.2, 0.0, 0, 1.0) forwards;
+  }
+
+  /* Status Icons */
+  .icon-st {
+    font-size: 18px;
+    opacity: 0.8;
+    transition: transform 0.2s;
+  }
+
+  .tx-row:hover .icon-st {
+    transform: scale(1.1);
+  }
+
+  .st-planned {
+    color: var(--pri);
+    opacity: 1;
+  }
+
+  .st-posted {
+    color: var(--xg-green);
+    opacity: 1;
+  }
+
+  .st-using {
+    color: var(--tone-info-fg);
+    opacity: 1;
+  }
+
+  /* Row States */
+  .row-planned {
+    background: color-mix(in oklab, var(--pri) 5%, transparent);
+  }
+
+  .row-using {
+    background: color-mix(in oklab, var(--tone-info-bg) 15%, transparent);
+  }
+
+  /* Selection State */
+  .tx-row.selected {
+    background: #fff7d6 !important;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .tx-row:active {
+    transform: scale(0.98);
+  }
+
+  html:not(.light) .tx-row.selected {
+    background: #ffe8a3 !important;
     color: #000 !important;
   }
 
-  html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip,
-  html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip * {
-    color: #000 !important;
+  html:not(.light) .tx-row.selected .col-date {
+    color: #444;
   }
 
-  html:not(.light) #page-input .tx-table tbody tr.selected .tx-chip {
-    background: #ffe8a3;
-    border-color: #f0d07a;
+  html:not(.light) .tx-row.selected .st-planned,
+  html:not(.light) .tx-row.selected .st-posted {
+    filter: brightness(0.8);
   }
 
   /* 13.4 帳戶餘額卡 */
@@ -3363,13 +3458,7 @@
   }
 
   /* Using 狀態：列表列背景 + 狀態膠囊色票 */
-  #page-input .tx-table tbody tr.row-using td {
-    background: color-mix(in oklab, #facc15 16%, var(--card));
-  }
-
-  :root.light #page-input .tx-table tbody tr.row-using td {
-    background: color-mix(in oklab, #facc15 16%, #ffffff);
-  }
+  /* Using 狀態：由 .tx-row.row-using 統一處理 */
 
   .tx-chip--status.using {
     background: color-mix(in oklab, #facc15 26%, var(--surface));
@@ -6592,6 +6681,11 @@
     opacity: .6;
   }
 
+  /* Pages (SPA) */
+  .page:not(.show) {
+    display: none !important;
+  }
+
   /* body (子清單) */
   .rtn-body {
     display: none;
@@ -6907,10 +7001,44 @@
       width: calc(100% - 32px) !important;
       margin: 0 16px !important;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15) !important;
+      height: 96px !important;
+      /* Increased height for larger icons */
     }
 
     .tabbtn .ico.circle {
-      --tab-ico-circle: 48px;
+      --tab-ico-circle: 64px !important;
+      /* 2x size increase from ~32-40px range */
+      width: 64px !important;
+      height: 64px !important;
+    }
+
+    .tabbtn .ico {
+      font-size: 32px !important;
+      /* Larger icon inside circle */
+    }
+
+    /* 2. FAB z-index and circular shape */
+    #hdrFabWrap {
+      z-index: 4000 !important;
+    }
+
+    #hdrFab {
+      border-radius: 50% !important;
+      /* Make circular */
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    /* 3. Invest Page overlap fix */
+    .analysis-split {
+      margin-top: 20px !important;
+      padding-top: 20px !important;
+    }
+
+    /* 4. Column width fix */
+    .num.col-fix-2 {
+      width: auto !important;
+      min-width: 60px !important;
+      max-width: 100px !important;
     }
   }
 
@@ -6933,6 +7061,713 @@
 
     to {
       opacity: 1;
+    }
+  }
+
+  /* =========================================================
+     #35 Database Dashboard Overhaul
+     ========================================================= */
+  .db-dash-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    position: relative;
+    z-index: 10;
+  }
+
+  .card-date-nav {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    margin: 0 auto;
+    /* Center it */
+    min-width: 280px;
+    justify-content: space-between;
+    position: relative;
+  }
+
+  .nav-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    color: var(--tint);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s ease;
+  }
+
+  .nav-btn:hover {
+    background: color-mix(in oklab, var(--tint) 10%, transparent);
+  }
+
+  .nav-btn:active {
+    transform: scale(0.9);
+  }
+
+  .date-display {
+    text-align: center;
+    position: relative;
+    cursor: pointer;
+  }
+
+  .date-main {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: -0.5px;
+  }
+
+  .date-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .hidden-date-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+    z-index: 2;
+  }
+
+  .db-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .btn-icon.circle.glass {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: color-mix(in oklab, var(--surface) 80%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: var(--neu-flat);
+    border: 1px solid color-mix(in oklab, var(--tint) 10%, transparent);
+    color: var(--tint);
+  }
+
+  /* KPI Grid */
+  .db-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .kpi-card {
+    display: flex;
+    align-items: flex-start;
+    /* Icon top-left */
+    gap: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+
+  .kpi-icon-wrap.tonality-pos {
+    background: var(--tone-pos-bg);
+    color: var(--tone-pos-fg);
+  }
+
+  .kpi-icon-wrap.tonality-neg {
+    background: var(--tone-neg-bg);
+    color: var(--tone-neg-fg);
+  }
+
+  .kpi-icon-wrap.tonality-warn {
+    background: var(--tone-warn-bg);
+    color: var(--tone-warn-fg);
+  }
+
+  .kpi-icon-wrap.tonality-info {
+    background: var(--tone-info-bg);
+    color: var(--tone-info-fg);
+  }
+
+  .kpi-icon-wrap.tonality-zero {
+    background: var(--tone-zero-bg);
+    color: var(--tone-zero-fg);
+  }
+
+  .kpi-content {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .kpi-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .kpi-val {
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .kpi-delta {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .kpi-delta.pos {
+    color: var(--tone-pos-fg);
+  }
+
+  .kpi-delta.neg {
+    color: var(--tone-neg-fg);
+  }
+
+  .kpi-delta.zero {
+    color: var(--muted);
+    opacity: 0.7;
+  }
+
+  /* Details Grid */
+  .db-details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .detail-group-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detail-group-hd {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--hairline);
+    color: var(--tint);
+    font-weight: 600;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    /* Align text baselines */
+    padding: 6px 0;
+    font-size: 15px;
+    border-bottom: 1px dashed color-mix(in oklab, var(--muted) 20%, transparent);
+  }
+
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .detail-label {
+    color: var(--muted);
+  }
+
+  .detail-val {
+    font-weight: 600;
+    font-family: 'JetBrains Mono';
+  }
+
+  /* Spinner Overlay */
+  .db-status-overlay {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in oklab, var(--bg) 60%, transparent);
+    backdrop-filter: blur(2px);
+    z-index: 50;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-lg);
+  }
+
+  .db-status-overlay.hidden {
+    display: none;
+  }
+
+  /* Diff Labels (Monolith Style) */
+  .diff-tiny.monolith-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .diff-tiny.pos {
+    background: color-mix(in oklab, var(--tone-pos-bg) 40%, transparent);
+    color: var(--tone-pos-fg);
+  }
+
+  .diff-tiny.neg {
+    background: color-mix(in oklab, var(--tone-neg-bg) 40%, transparent);
+    color: var(--tone-neg-fg);
+  }
+
+  /* Custom Calendar */
+  .cal-box {
+    width: 320px;
+    padding: 16px;
+    background: var(--surface);
+    color: var(--tint);
+  }
+
+  .cal-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    font-weight: 700;
+  }
+
+  .cal-nav button {
+    background: none;
+    border: none;
+    color: var(--tint);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 50%;
+  }
+
+  .cal-nav button:hover {
+    background: var(--bg);
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    text-align: center;
+  }
+
+  .cal-head {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+    padding-bottom: 8px;
+  }
+
+  .cal-cell {
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    font-size: 14px;
+    cursor: pointer;
+    position: relative;
+    transition: all .2s;
+  }
+
+  .cal-cell:hover {
+    background: var(--bg);
+  }
+
+  .cal-cell.selected {
+    background: var(--tint);
+    color: var(--surface);
+    font-weight: 700;
+  }
+
+  /* Dots */
+  .cal-cell.has-data::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--tone-pos-fg);
+    /* Green dot */
+  }
+
+  .cal-cell.no-data::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--muted);
+    opacity: 0.5;
+    /* Gray dot */
+  }
+
+  /* Monolith Style Box Integration */
+  .plannedList,
+  .invest-body,
+  .accList,
+  .kpi-list {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--neu-flat);
+    border: 1px solid var(--hairline);
+  }
+
+  /* Loan Capsule Override (Neutral) */
+
+
+  /* Actually user said "v money capsule mask-num neg-bg" for loans. 
+     We can target it if we can identify it. 
+     Or just globablly make neg-bg less aggressive or remove it in specific contexts.
+  */
+  [data-category="Loan"] .neg-bg,
+  [data-category="負債"] .neg-bg,
+  .detail-group-card .neg-bg {
+    background: transparent !important;
+    color: var(--tint) !important;
+    font-weight: 600;
+  }
+
+  /* Modal Base */
+  .dlg-modal {
+    border: none;
+    border-radius: 16px;
+    padding: 0;
+    background: transparent;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    max-width: 90vw;
+  }
+
+  .dlg-modal::backdrop {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+  }
+
+  .dlg-hd {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+
+  .dlg-title {
+    font-weight: 700;
+    font-size: 18px;
+  }
+
+  .dlg-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--muted);
+  }
+
+  /* Monolith Typography */
+  .monolith-symbol {
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--tint);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  .monolith-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .monolith-gain {
+    /* diff-tiny style is base, augment here */
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+  }
+
+  /* Apply Monolith Typography to Existing Lists (Dashmain, Invest, Acc) */
+  /* Dashmain: .k (label), .v (price) */
+  .accList .k,
+  .invest-body .k,
+  .plannedList .k {
+    font-weight: 500;
+  }
+
+  .accList .v,
+  .invest-body .v,
+  .plannedList .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+  }
+
+  /* Page Record Mobile Padding */
+  #page-record {
+    padding-bottom: 80px;
+    /* Prevent cut-off */
+  }
+
+  /* Invest Sidebar Alignment */
+  .invest-sidebar {
+    position: sticky;
+    top: 20px;
+    align-self: start;
+    height: auto;
+  }
+
+  /* Detail Card Independence */
+  #investDetailCardContainer {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 400px;
+    z-index: 5000;
+    /* Above everything */
+  }
+
+  /* Invest Status */
+  #investStatus {
+    display: none;
+  }
+
+  /* Phase 39: Missing Vars */
+  :root {
+    --tone-info-bg: rgba(255, 235, 59, 0.15);
+    /* Yellow-ish for Using/Working */
+    --tone-info-fg: #f59e0b;
+  }
+
+  :root[data-theme="neu-dark"] {
+    --tone-info-bg: rgba(253, 224, 71, 0.15);
+    --tone-info-fg: #fde047;
+  }
+
+  /* Phase 41: Input Mobile & Pinned Stats */
+  /* 1. Mobile Input Page Layout: Lock Height, Scroll Viewport only */
+  #page-input.show {
+    display: flex !important;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100dvh;
+    /* Mobile safeguard */
+    overflow: hidden;
+    /* No page scroll */
+  }
+
+  /* Ensure children split height */
+  .input-layout {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    /* Mobile: vertically stacked, but we use Grid/Flex mix usually */
+    overflow: hidden;
+    height: 100%;
+  }
+
+  /* On mobile, Transaction Panel (.tx-panel) grows and scrolls internal list */
+  @media (max-width: 1024px) {
+    .acct-balance-card {
+      width: 100% !important;
+      max-width: none !important;
+      flex: 1 1 auto;
+      /* Ensure it can grow if needed, or 0 0 auto if fixed */
+      margin-bottom: 8px;
+      /* Space before list */
+    }
+
+    .input-layout {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tx-panel {
+      flex: 1;
+      overflow-y: auto;
+      /* The viewport inside creates the list scroll, but ensure panel fits */
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tx-viewport {
+      flex: 1;
+      /* Grow to fill panel */
+      height: auto !important;
+      /* Override explicit height if any */
+      overflow-y: auto;
+    }
+
+    /* 2. Hide Input Form Default */
+    #inputFormCard:not(.mobile-floating-form) {
+      display: none !important;
+    }
+
+    /* 3. Floating Modal Sizing */
+    #inputFormCard.mobile-floating-form {
+      position: fixed !important;
+      top: 15% !important;
+      /* Center vertical approximate */
+      /* bottom: auto; */
+      /* Let height define it */
+      left: 50% !important;
+      transform: translateX(-50%) !important;
+      width: 85% !important;
+      height: 70vh !important;
+      max-height: 70vh !important;
+      overflow-y: auto !important;
+      /* Scroll inside form */
+      margin: 0 !important;
+      background: var(--card) !important;
+      border: 1px solid var(--hairline);
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), 0 0 0 100vw rgba(0, 0, 0, 0.4) !important;
+      z-index: 9999 !important;
+      border-radius: 16px;
+      display: flex !important;
+      flex-direction: column;
+      padding: 20px;
+      animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes popUp {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 20px) scale(0.95);
+      }
+
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1.0);
+      }
+    }
+  }
+
+  /* Pinned Stats Grid (Record Page) */
+  .db-pinned-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .stat-card {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 12px;
+    justify-content: center;
+  }
+
+  .stat-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .stat-main {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--text);
+  }
+
+  .tx-row:hover {
+    background-color: var(--surface);
+    transform: scale(1.02);
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-bottom-color: transparent;
+    position: relative;
+  }
+
+  /* Isolate Hover: Prevent acctCard from floating when hovering list if global CSS is too greedy. 
+   Assuming .cards-zoom-scope .card:hover is the culprit. 
+   We don't want to break that generally, but maybe specific overrides? 
+   Actually, the user said "hover in txViewport... acctBalanceCard also float".
+   This implies the pointer events are bubbling or the layout structure makes them siblings in a way that triggers parent hover?
+   No, it's likely they share a parent container `.input-layout.cards-zoom-scope`.
+   If the CSS is `.cards-zoom-scope:hover .card { ... }` that would be bad.
+   Checking style.html (via memory/previous read):
+   ".cards-zoom-scope .card.card--hot { transform... }"
+   It seems JS toggles .card--hot?
+   If not, and it's :hover based, the selector might be `.cards-zoom-scope .card:hover`.
+   If so, hovering txViewport shouldn't trigger acctBalanceCard unless txViewport is INSIDE acctBalanceCard (it isn't).
+   
+   Wait, if the user sees OTHER cards float, maybe the selector is too broad?
+   Or maybe structure is different.
+   
+   Given I can't interactively debug, I will force specificity on the cards to ONLY float when THEY are hovered.
+*/
+  .cards-zoom-scope .card:hover {
+    /* Ensure only the hovered card floats, if there was a greedy rule */
+    /* This rule itself doesn't exist in my grep? 
+       Use explicit hover on IDs to be safe if generic classes are acting up.
+    */
+  }
+
+  /* Phase 39: Mobile Floating Form */
+  .mobile-floating-form {
+    position: fixed !important;
+    inset: 0 !important;
+    margin: auto !important;
+    width: 85% !important;
+    height: auto !important;
+    max-height: 80% !important;
+    z-index: 9999 !important;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25), 0 0 0 100vw rgba(0, 0, 0, 0.4) !important;
+    /* Backdrop hack */
+    border-radius: 20px !important;
+    padding: 24px !important;
+    display: grid !important;
+    animation: floatFormUp 0.3s var(--ease-emphasized) forwards;
+
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  @keyframes floatFormUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px) scale(0.95);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (max-width: 1024px) {
+
+    /* Hide form by default */
+    #inputFormCard:not(.mobile-floating-form) {
+      display: none;
+    }
+
+    /* Show Trigger Button */
+    #btnOpenForm {
+      display: inline-flex !important;
+    }
+
+    /* When floating, ensure visible */
+    #inputFormCard.mobile-floating-form {
+      display: flex;
+      flex-direction: column;
+      background: var(--card);
     }
   }
 </style>

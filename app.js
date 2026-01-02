@@ -598,11 +598,31 @@ function fixMissingValidationAll_() {
   SpreadsheetApp.getUi().alert('已檢查並補齊缺失的格式與下拉驗證。');
 }
 
+
+function deleteInvestRow(rowId) {
+  const sh = SpreadsheetApp.getActive().getSheetByName('✅');
+  if (!sh) throw new Error('Sheet not found');
+  const r = Number(rowId);
+  if (isNaN(r) || r < 3) throw new Error('Invalid Row');
+
+  // Minimal check
+  const last = sh.getLastRow();
+  if (r > last) throw new Error('Row out of bounds');
+
+  sh.deleteRow(r);
+}
+
 /* ===== 你前端會叫用的：CTBC investment（取 ✅ 分頁 H,K,L,N,T,U,V,AF,AH） ===== */
 function getCTBCInvestments() {
   const SHEET = '✅';
-  // A=1, ..., AF=32, AG=33, AH=34
-  const INDEX = { G: 7, H: 8, K: 11, L: 12, M: 13, N: 14, P: 16, Q: 17, R: 18, T: 20, U: 21, V: 22, AF: 32, AH: 34, AI: 35 };
+  // User Requested Schema:
+  // Name=E(5), USD=F(6), TWD=G(7), Market=H(8), PL=I(9), Quote=L(12),
+  // Orig=K(11), DivPL=N(14), DivROI=O(15), Cur=P(16), Upd=AB(28),
+  // Stat=AC(29), DivRx=Z(26), Cat=B(2)
+  const INDEX = {
+    B: 2, E: 5, F: 6, G: 7, H: 8, I: 9, K: 11, L: 12, N: 14, O: 15, P: 16, Z: 26, AB: 28, AC: 29
+  };
+
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) return [];
 
@@ -630,29 +650,56 @@ function getCTBCInvestments() {
     return '';
   }
 
-  // 輸出：每列是一個物件，包含列號 ROW（2 起算）
-  const out = values.map((r, i) => ({
-    ROW: i + 2, // 真實試算表列號
-    G: num_(r[INDEX.G - 1]),
-    H: toStr(r[INDEX.H - 1]),
-    K: toStr(r[INDEX.K - 1]),
-    L: num_(r[INDEX.L - 1]),
-    M: num_(r[INDEX.M - 1]),
-    N: num_(r[INDEX.N - 1]),
-    R: toStr(r[INDEX.R - 1]),
-    QUOTE: num_(r[INDEX.R - 1]),
-    T: num_(r[INDEX.T - 1]),
-    U: num_(r[INDEX.U - 1]),
-    V: toStr(r[INDEX.V - 1]),
-    CUR: normCur_(r[INDEX.V - 1]),
-    AF: num_(r[INDEX.AF - 1]),
-    AH: toStr(r[INDEX.AH - 1]),
-    AI: r[INDEX.AI - 1],
-    P: toStr(r[INDEX.P - 1]),
-    Q: toStr(r[INDEX.Q - 1])
-  }));
-
   function num_(x) { x = Number(x); return isFinite(x) ? x : 0; }
+
+  // 輸出：每列是一個物件，包含列號 ROW（2 起算）
+  // 映射至前端 Key:
+  // K: Name (E)
+  // H: Category (B)
+  // L: Quote (L) (or R?) Frontend usage: R=Quote.
+  // R: Quote (L)
+  // N: Market Value (H)
+  // G: P/L (I)
+  // AF: DivRx/Accumulated (Z)
+  // AH: Update/Remarks (AB) -> User said AB is Update Date.
+  // AI: Status (AC)
+  // U: Units (Calculated: Market H / Quote L)
+  // V: Currency (P)
+  // Original Price (K) -> Map to K_ORIG if needed, or if Frontend uses K for Name, put K col in desc? 
+  //   Let's create a special field if needed, but for now Standard Keys.
+  const out = values.map((r, i) => {
+    const market = num_(r[INDEX.H - 1]);
+    const quote = num_(r[INDEX.L - 1]);
+    const units = (quote !== 0) ? (market / quote) : 0;
+
+    return {
+      ROW: i + 2,
+      K: toStr(r[INDEX.E - 1]), // Name -> K
+      H: toStr(r[INDEX.B - 1]), // Cat -> H
+
+      R: quote,                 // Quote -> R
+      L: quote,                 // Legacy Quote -> L
+      QUOTE: quote,
+
+      N: market,                // Market -> N
+      G: num_(r[INDEX.I - 1]),  // KPI P/L -> G
+
+      AF: num_(r[INDEX.Z - 1]), // DivRx -> AF
+      AH: toStr(r[INDEX.AB - 1]),// Upd -> AH
+      AI: r[INDEX.AC - 1],      // Stat -> AI
+
+      U: num_(r[INDEX.O - 1]),  // Table ROI -> U
+      T: num_(r[INDEX.N - 1]),  // Table P/L -> T (Div P/L)
+
+      V: toStr(r[INDEX.P - 1]), // Cur -> V
+      CUR: normCur_(r[INDEX.P - 1]),
+
+      // Extras
+      USD: num_(r[INDEX.F - 1]),
+      TWD: num_(r[INDEX.G - 1]),
+      ORIG: num_(r[INDEX.K - 1])
+    };
+  });
 
   return out;
 }
@@ -660,9 +707,23 @@ function getCTBCInvestments() {
 /** 更新 ✅ 分頁的值 */
 function setInvestValue(rowId, colKey, val) {
   const SHEET = '✅';
-  const INDEX = { G: 7, H: 8, K: 11, L: 12, M: 13, N: 14, P: 16, Q: 17, R: 18, T: 20, U: 21, V: 22, AF: 32, AH: 34, AI: 35 };
-  const colIndex = INDEX[colKey];
-  if (!colIndex) throw new Error('Invalid column key: ' + colKey);
+  // Remap Keys for Setter:
+  // Frontend sends 'R' for Quote -> Col L(12)
+  // Frontend sends 'AF' for Div -> Col Z(26)
+  // Frontend sends 'AI' for Stat -> Col AC(29)
+  // Frontend sends 'AH' for Note -> Col AB(28) (Update Date? Or Note?) Use AB.
+
+  const KEY_MAP = {
+    'R': 12,  // L
+    'AF': 26, // Z
+    'AI': 29, // AC
+    'AH': 28, // AB
+    'K': 5,   // E (Name)
+    'H': 2    // B (Cat)
+  };
+
+  const colIndex = KEY_MAP[colKey];
+  if (!colIndex) throw new Error('Invalid column key for update: ' + colKey);
 
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) throw new Error('Sheet not found: ' + SHEET);
@@ -677,12 +738,15 @@ function addInvestEntry(category, name) {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) throw new Error('Sheet not found');
 
-  // 假設架構：G(7)=類別, K(11)=項目名稱, AI(35)=狀態(TRUE)
-  // 我們先建立一個 36 欄的陣列
-  const row = new Array(37).fill(''); // 到 AK (37)
-  row[6] = category; // G
-  row[10] = name;    // K
-  row[34] = false;   // AI (狀態預設為持有中 -> FALSE)
+  // Mappings: 
+  // Name -> E (5) -> array index 4
+  // Category -> B (2) -> array index 1
+  // Status -> AC (29) -> array index 28
+
+  const row = new Array(31).fill('');
+  row[4] = name;     // E
+  row[1] = category; // B
+  row[28] = false;   // AC
 
   sh.appendRow(row);
   return { success: true };
@@ -807,28 +871,28 @@ function getCTBCFundStock() {
 /** 讀取某列 AF 儲存格的公式與顯示值（優先回公式） */
 function getCTBCInterestCell(rowNumber) {
   const SHEET = '✅';
-  const COL_AF = 32;
+  const COL_Z = 26; // Was AF(32) -> Z(26)
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) throw new Error('找不到工作表：' + SHEET);
   if (rowNumber < 2) throw new Error('列號不合法');
 
-  const rng = sh.getRange(rowNumber, COL_AF);
+  const rng = sh.getRange(rowNumber, COL_Z);
   return {
     formula: rng.getFormula() || '',
     value: rng.getDisplayValue() || ''
   };
 }
 
-/** 前端寫回「已領利息(USD)」（AF=32），並讓觸發器自動回填 AH(34) */
+/** 前端寫回「已領利息(USD)」（AF->Z），並讓觸發器自動回填 AH->AB */
 function setCTBCInterestUSD(rowNumber, input) {
   const SHEET = '✅';
-  const COL_AF = 32; // 已領利息
-  const COL_AH = 34; // 更新日
+  const COL_Z = 26; // Was AF(32)
+  const COL_AB = 28; // Was AH(34)
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) throw new Error('找不到工作表：' + SHEET);
   if (rowNumber < 2) throw new Error('列號不合法');
 
-  const rngAF = sh.getRange(rowNumber, COL_AF);
+  const rngAF = sh.getRange(rowNumber, COL_Z);
   const s = (typeof input === 'string') ? input.trim() : '';
 
   if (s && s[0] === '=') {
@@ -837,42 +901,42 @@ function setCTBCInterestUSD(rowNumber, input) {
     rngAF.setValue(Number(input) || 0);
   }
 
-  // 注意：用程式寫值不會觸發你的 onEdit，所以這裡直接寫 AH（見第 4 點）
+  // 注意：用程式寫值不會觸發你的 onEdit，所以這裡直接寫 AB（見第 4 點）
   const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
   const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-  sh.getRange(rowNumber, COL_AH).setValue(today);
+  sh.getRange(rowNumber, COL_AB).setValue(today);
 
   SpreadsheetApp.flush();
   return { row: rowNumber };
 }
 
-/** 讀取某列 QUOTE(R) 的公式/值 */
+/** 讀取某列 QUOTE(R) 的公式/值 -> Now L(12) */
 function getCTBCQuoteCell(rowNumber) {
   const SHEET = '✅';
-  const COL_R = 18; // 目前報價
+  const COL_L = 12; // Was R(18)
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) throw new Error('找不到工作表：' + SHEET);
   if (rowNumber < 2) throw new Error('列號不合法');
-  const rng = sh.getRange(rowNumber, COL_R);
+  const rng = sh.getRange(rowNumber, COL_L);
   return { formula: rng.getFormula() || '', value: rng.getDisplayValue() || '' };
 }
 
-/** 寫回「目前報價 (USD)」（R=18），並更新 AH(34) */
+/** 寫回「目前報價 (USD)」（R=18 -> L=12），並更新 AH->AB */
 function setCTBCQuoteUSD(rowNumber, input) {
   const SHEET = '✅';
-  const COL_R = 18; // 目前報價
-  const COL_AH = 34; // 更新日
+  const COL_L = 12; // Was R(18)
+  const COL_AB = 28; // Was AH(34)
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) throw new Error('找不到工作表：' + SHEET);
   if (rowNumber < 2) throw new Error('列號不合法');
 
-  const rngR = sh.getRange(rowNumber, COL_R);
+  const rngR = sh.getRange(rowNumber, COL_L);
   const s = (typeof input === 'string') ? input.trim() : '';
   if (s && s[0] === '=') rngR.setFormula(s); else rngR.setValue(Number(input) || 0);
 
   const tz = Session.getScriptTimeZone() || 'Asia/Taipei';
   const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
-  sh.getRange(rowNumber, COL_AH).setValue(today);
+  sh.getRange(rowNumber, COL_AB).setValue(today);
 
   SpreadsheetApp.flush();
   return { row: rowNumber };
@@ -1070,6 +1134,159 @@ function getDatabaseRowByIndex(rowIndexFromTop, order) {
 }
 
 /** 左側最新資料卡：用欄位字母定位 + 同時取值(getValues)與顯示(getDisplayValues) */
+/**
+ * 依日期取得該日與前一日資料（Dashboard 核心 API）
+ * @param {string} targetDate 'yyyy-MM-dd' or null (for latest)
+ */
+/**
+ * 依日期取得該日與前一日資料（Dashboard 核心 API）
+ * @param {string} targetDate 'yyyy-MM-dd' or null for latest
+ * @param {string} logicType 'exact' | 'prev' | 'next' (default exact, used for nav buttons to find adjacent available record)
+ */
+function getRecordByDate(targetDate, logicType) {
+  var ss = SpreadsheetApp.getActive();
+  var sh = ss.getSheetByName(RECORD_SHEET_NAME);
+  if (!sh) return { error: 'Sheet not found' };
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 3) return { error: 'No data' };
+
+  // Fetch Headers (Row 1 = Main, Row 2 = Sub)
+  var headersMain = sh.getRange(1, 1, 1, lastCol).getDisplayValues()[0];
+  var headersSub = sh.getRange(2, 1, 1, lastCol).getDisplayValues()[0];
+
+  // Fetch Data (Row 3+)
+  var data = sh.getRange(3, 1, lastRow - 2, lastCol).getDisplayValues(); // String values
+
+  // Helper date fmt
+  const fmt = (d) => {
+    if (!d) return '';
+    let s = String(d).split('T')[0].trim();
+    // Normalize YYYY/M/D to YYYY-MM-DD
+    if (s.includes('/')) {
+      const parts = s.split('/');
+      if (parts.length === 3) {
+        s = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      }
+    }
+    return s;
+  };
+
+  // Create Date Map (Index -> DateStr)
+  var validDates = {};
+  data.forEach((r, i) => {
+    var d = fmt(r[0]);
+    if (d) validDates[d] = true;
+  });
+
+  // Determine Target Index
+  var idx = -1;
+
+  if (!targetDate && !logicType) {
+    // Latest
+    idx = data.length - 1;
+  } else {
+    // Find index by date
+    // Note: Data is chronological? Usually yes. If not, we scan linear.
+    // Search logic depends on logicType.
+
+    // 1. First, find exact index if exists
+    var exactIdx = -1;
+    // Search from bottom up
+    for (var i = data.length - 1; i >= 0; i--) {
+      // Robust compare: normalize both to YYYY-MM-DD
+      if (fmt(data[i][0]) === targetDate) {
+        exactIdx = i;
+        break;
+      }
+    }
+
+    if (logicType === 'prev') {
+      // If current date found, we want exactIdx - 1. 
+      if (exactIdx > 0) {
+        idx = exactIdx - 1;
+      } else if (exactIdx === -1 && targetDate) {
+        // Target date not in DB. Find first date strictly smaller (older) than targetDate.
+        // Assuming sorted ascending (oldest at top, newest at bottom).
+        // Scan from bottom up. First one < targetDate is the one.
+        for (var i = data.length - 1; i >= 0; i--) {
+          var d = fmt(data[i][0]);
+          if (d < targetDate) {
+            idx = i;
+            break;
+          }
+        }
+        // If still -1, maybe target is too old? Or empty.
+      }
+    } else if (logicType === 'next') {
+      if (exactIdx !== -1 && exactIdx < data.length - 1) {
+        idx = exactIdx + 1;
+      } else if (exactIdx === -1 && targetDate) {
+        // Find first date strictly larger (newer) than target in a chronologically sorted list.
+        // Effectively: scan from top (0) down? Or bottom up. 
+        // Let's scan from 0 upwards. The first date > target is the next one.
+        for (var i = 0; i < data.length; i++) {
+          var d = fmt(data[i][0]);
+          if (d > targetDate) {
+            idx = i;
+            break;
+          }
+        }
+      }
+    } else {
+      // exact
+      idx = exactIdx;
+    }
+  }
+
+  if (idx === -1) return { error: 'Date not found', headers: headersSub, validDates: validDates };
+
+  // Helper to get value by Column Letter
+  function getVal(r, letter) {
+    if (!r) return '';
+    var colIdx = 0;
+    var s = letter.toUpperCase();
+    for (var i = 0; i < s.length; i++) {
+      colIdx = colIdx * 26 + (s.charCodeAt(i) - 64);
+    }
+    return r[colIdx - 1]; // 1-based to 0-based
+  }
+
+  function enrich(r) {
+    if (!r) return null;
+    return {
+      Date: getVal(r, 'A'),
+      Total: getVal(r, 'C'), // Whole Assets
+      Net: getVal(r, 'D'),   // With Dad -> Net
+      C: getVal(r, 'C'), // Total
+      D: getVal(r, 'D'), // Net
+      E: getVal(r, 'E'), // Avail
+      F: getVal(r, 'F'), // PnL
+      G: getVal(r, 'G'), // Cash
+      BA: getVal(r, 'BA'), // Debt
+      CU: getVal(r, 'CU'), // USD
+      BC: getVal(r, 'BC'), // Credit Card
+      full: r
+    };
+  }
+
+  var current = enrich(data[idx]);
+
+  // Previous record for Comparison (always idx - 1 if sensible)
+  var prevIdx = idx - 1;
+  var prev = (prevIdx >= 0) ? enrich(data[prevIdx]) : null;
+
+  return {
+    current: current,
+    previous: prev,
+    headersMain: headersMain,
+    headersSub: headersSub,
+    validDates: validDates, // For Calendar Dots
+    rowIndex: idx + 3
+  };
+}
+
 function getRecordLatest() {
   var ss = SpreadsheetApp.getActive();
   var sh = ss.getSheetByName(RECORD_SHEET_NAME);

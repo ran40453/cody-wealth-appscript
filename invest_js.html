@@ -13,8 +13,32 @@
         let currentView = 'details'; // 'analysis' | 'details'
         let isKpiCollapsed = false;
 
-        const CHIP_ORDER = ['基金', '債券', '定存', '其他'];
+        const CHIP_ORDER = [];
         const vs = { rowHeight: 44, viewport: null, spacer: null, thead: null, tbody: null, lastRange: [-1, -1] };
+
+
+
+
+        /* ... renderCategoryDetailCard override ... */
+
+
+
+        function removeInvestItem(rowId, name) {
+            if (!confirm('確定要刪除 [' + name + '] 嗎？此動作無法復原。')) return;
+            showStatus('刪除中...');
+            google.script.run
+                .withSuccessHandler(() => {
+                    clearStatus();
+                    closeCategoryDetail();
+                    fetchData();
+                    alert('已刪除');
+                })
+                .withFailureHandler(err => {
+                    clearStatus();
+                    alert('刪除失敗：' + err);
+                })
+                .deleteInvestRow(rowId);
+        }
 
         // ===== init =====
         function init() {
@@ -133,7 +157,7 @@
                     allRows = Array.isArray(rows) ? rows.filter(r => r.K && !String(r.K).includes('總計')) : [];
                     allRows.forEach(r => {
                         const hVal = String(r.H || '').trim();
-                        r.TYPE = hVal || guessType(r.K || '');
+                        r.TYPE = guessType(r.K || '', hVal); // Prioritize H checked inside guessType
                     });
                     const kinds = Array.from(new Set(allRows.map(r => r.TYPE).filter(Boolean)));
                     renderCategories(kinds);
@@ -183,11 +207,7 @@
 
             setText('investTWD_N', sum('M').toFixed(0));
             setText('investUSD_N', sum('L').toFixed(0));
-            if (typeof setPnlPill === 'function') {
-                const isUSD = ['基金', '債券'].includes(currentCategory);
-                setPnlPill('investTWD_ROI', isUSD ? null : roi);
-                setPnlPill('investUSD_ROI', isUSD ? roi : null);
-            }
+
 
             // 總 ROI
             let totalROI = null;
@@ -290,6 +310,7 @@
             const mv = toNum(r.N);
             const cost = mv - pl;
             const roi = cost > 0 ? (pl / cost * 100) : 0;
+            const isActive = (r.AI === true || String(r.AI).trim().toUpperCase() === 'TRUE' || String(r.AI).trim() === '1');
 
             container.innerHTML = `
                 <div class="card stk-details-card damping-open" style="margin-top:20px;">
@@ -524,13 +545,40 @@
         function setBodyLoading(on) { if (on) byId('investBody').innerHTML = `<tr><td class="empty" colspan="6">載入中…</td></tr>`; }
         function failUI(msg) { byId('investBody').innerHTML = `<tr><td class="empty" colspan="6">發生錯誤：${esc(msg)}</td></tr>`; }
 
-        function guessType(name) {
-            if (/基金|fund|etf/i.test(name)) return '基金';
-            if (/stock|股票|shrs|股份/i.test(name)) return '股票';
-            if (/bond|債/i.test(name)) return '債券';
-            if (/定存|cd\b/i.test(name)) return '定存';
-            if (/loan|借款|貸款/i.test(name)) return 'Loan';
-            if (/growin/i.test(name)) return 'Growin';
+        /**
+         * 依名稱或類別猜測投資類型
+         * 嚴格優先使用 excel 類別欄位 (Column H)
+         */
+        function guessType(name, cat) {
+            name = String(name || '').toLowerCase();
+            cat = String(cat || '').trim(); // Keep case for check, or lower
+
+            // 1. Strict Category Override (Column H)
+            // User requested strict mapping: 基金, 債券, 股票, 定存, 貸款
+            // If H column has value, we trust it 100% and map to our standard keys.
+            if (cat) {
+                const c = cat.toLowerCase();
+                if (c.includes('基金') || c.includes('fund')) return '基金';
+                if (c.includes('股票') || c.includes('stock') || c.includes('share')) return '股票';
+                if (c.includes('債') || c.includes('bond')) return '債券';
+                if (c.includes('定存') || c.includes('cd')) return '定存';
+                if (c.includes('貸') || c.includes('loan')) return '貸款';
+                if (c.includes('growin')) return 'Growin';
+                // If user typed something else, return it as '其他' or the raw value? 
+                // Let's fallback to '其他' if it doesn't match known types, or maybe just return it if we want custom?
+                // For now, let's stick to the requested set + '其他'.
+                return '其他';
+            }
+
+            // 2. Name Heuristics (Fallback ONLY if H is empty)
+            if (name.includes('成長') || name.includes('高股息') || name.includes('etf')) return '股票';
+            if (name.includes('fund') || name.includes('基金')) return '基金';
+            if (name.includes('bond') || name.includes('債')) return '債券';
+            if (name.includes('stock') || name.includes('shrs') || name.includes('股份') || name.includes('股')) return '股票';
+            if (name.includes('定存') || name.includes('cd')) return '定存';
+            if (name.includes('loan') || name.includes('借') || name.includes('貸')) return '貸款';
+            if (name.includes('growin')) return 'Growin'; // Only if name has growin and H is empty
+
             return '其他';
         }
 
@@ -541,8 +589,7 @@
                 tb.addEventListener('click', (e) => {
                     const td = e.target.closest('.cell-af');
                     if (td) {
-                        // Re-use logic from ctbc if possible or implement editor
-                        console.log('AF Clicked', td.dataset.row);
+
                     }
                 });
                 tb._afBound = true;
@@ -553,28 +600,20 @@
             if (tb && !tb._rowBound) {
                 tb.addEventListener('click', (e) => {
                     const tr = e.target.closest('tr');
-                    if (!tr || e.target.closest('.cell-af, .cell-quote')) return;
+                    // Avoid triggering if clicked on editable/action cells
+                    if (!tr || e.target.closest('.cell-af, .cell-quote, .col-status')) return;
 
-                    const name = tr.cells[0]?.textContent?.trim();
-                    const mktMap = {
-                        '貸款股票': 'Loan',
-                        '中信股票': 'CTBC',
-                        'Schwab美股': 'US',
-                        'Growin美股': 'Growin'
-                    };
+                    const rowId = Number(tr.dataset.row);
+                    if (!rowId) return;
 
-                    if (mktMap[name]) {
-                        const mkt = mktMap[name];
-                        // 1. 設定 stk 模組的狀態
+                    // If it's Stock, use Stk Module
+                    if (currentCategory === '股票') {
                         if (window.App?.modules?.stk) {
-                            const stk = window.App.modules.stk;
-                            // 注意：stk 可能還沒 init，所以我們直接設定一個全域 flag 或嘗試呼叫其內部方法
-                            // 根據 stk_js.html，它有 state st.market
-                            // 這裡我們假設 go('stk') 後會執行 init
-                            localStorage.setItem('__stk_pending_market__', mkt);
+                            App.modules.stk.renderDetailCard(rowId);
                         }
-                        // 2. 切換頁面
-                        if (typeof go === 'function') go('stk');
+                    } else {
+                        // For all others (Fund, Bond, etc.), open generic detail card
+                        renderCategoryDetailCard(rowId);
                     }
                 });
                 tb._rowBound = true;
@@ -582,7 +621,7 @@
         }
 
         // Final Init
-        fetchData();
+        // Remove auto-exec: fetchData(); 
         return {
             init,
             showAddPrompt,

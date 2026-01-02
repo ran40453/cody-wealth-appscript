@@ -222,6 +222,7 @@
 
       updateBalanceCard();
       bindConsolidate();
+      bindMobileFormTriggers();
     }
 
     /* ===== 庫存整併按鈕 ===== */
@@ -319,6 +320,51 @@
       // 鎖回更新鈕
       const btnUpd = byId('btnUpdateTx');
       if (btnUpd) btnUpd.disabled = true;
+
+      // Close Mobile Form
+      closeMobileForm();
+    }
+
+    /* ===== Mobile Floating Form Logic ===== */
+    function openMobileForm() {
+      const form = byId('inputFormCard');
+      if (form) form.classList.add('mobile-floating-form');
+    }
+    function closeMobileForm() {
+      const form = byId('inputFormCard');
+      if (form) form.classList.remove('mobile-floating-form');
+    }
+
+    // Bind Mobile Trigger
+    function bindMobileFormTriggers() {
+      const btnOpen = byId('btnOpenForm');
+      if (btnOpen) btnOpen.addEventListener('click', openMobileForm);
+
+      // Close on backdrop click (optional, if we add a distinct backdrop element)
+      // Or if we rely on the box-shadow backdrop hack, we need a refined click handler.
+      // Simple approach: Close button inside form? Or clicking outside. 
+      // For now, simple Close/Submit closes it.
+      // Let's add an explicit Close button inside form for better UX?
+      // Or just rely on '移除'/'送出' to close. 
+      // User asked for: "點擊後再浮動開啟... 選擇送出、移除、更新，或是點擊空白處離開頁面。"
+
+      // Click outside logic
+      document.addEventListener('click', (e) => {
+        const form = byId('inputFormCard');
+        const btn = byId('btnOpenForm');
+        if (form && form.classList.contains('mobile-floating-form')) {
+          // If click is OUTSIDE form and NOT on the trigger button
+          if (!form.contains(e.target) && !btn.contains(e.target)) {
+            closeMobileForm();
+          }
+        }
+      });
+
+      // Show trigger button only on Mobile? handled by CSS media query logic or JS check
+      // We added style="display:none" to btnOpenForm. We need to show it on mobile.
+      // We'll let CSS handle display: block on mobile.
+      // Actually, let's just make sure we remove the inline style or handle it via CSS.
+      if (btnOpen) btnOpen.style.display = ''; // Let CSS control
     }
 
     function fillAccounts(list) {
@@ -338,56 +384,47 @@
 
     /* ===== 左側清單：虛擬捲動 ===== */
     function setupViewport() {
-      // 允許用 id 或 class，避免 HTML 改掉 id 就炸
       vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
       vs.spacer = document.getElementById('txSpacer') || document.querySelector('#page-input #txSpacer');
-      // tbody 沒 id 時，退而求其次抓 tx-table 的 tbody
-      vs.body = document.getElementById('txBody') || document.querySelector('#page-input .tx-table tbody');
-      vs.head = document.getElementById('txHead') || document.querySelector('#page-input .tx-table thead');
+      // Update Selectors for Div structure
+      vs.body = document.getElementById('txBody') || document.querySelector('#page-input .tx-list .tx-body-rows');
+      vs.head = document.getElementById('txHead') || document.querySelector('#page-input .tx-list .tx-head-row');
 
-      // 若沒有 spacer，就動態補一個，避免 virtual 計算高度失效
       if (vs.viewport && !vs.spacer) {
         vs.spacer = document.createElement('div');
         vs.spacer.id = 'txSpacer';
         vs.viewport.appendChild(vs.spacer);
       }
 
-      if (!vs.viewport) {
-        // 沒 viewport 也不要報錯，等之後再 render（但資料仍可先抓）
-        return;
-      }
+      if (!vs.viewport) return;
 
       let raf = null;
       vs.viewport.addEventListener('scroll', () => {
         if (raf) return;
         raf = requestAnimationFrame(() => { raf = null; renderVirtual(); });
       });
-      // --- 一次性委派：點 tr 進入編輯模式 ---
+
+      // Bind click on .tx-row
       if (vs.body && !vs._boundRowClick) {
         vs.body.addEventListener('click', (e) => {
-          const tr = e.target.closest('tr[data-row]');
-          if (!tr) return;
+          const rowEl = e.target.closest('.tx-row[data-row]');
+          if (!rowEl) return;
 
-          const row = Number(tr.dataset.row);
-          // 用 _row 找回原始資料（不要用 index，因為 virtual 有切片）
+          const row = Number(rowEl.dataset.row);
           const rec = (vs.rows || []).find(r => Number(r._row) === row);
           if (!rec) return;
 
-          // 先移除舊選取
-          if (vs.selectedEl && vs.selectedEl !== tr) vs.selectedEl.classList.remove('selected');
+          if (vs.selectedEl && vs.selectedEl !== rowEl) vs.selectedEl.classList.remove('selected');
 
-          // 標記新選取
-          vs.selectedEl = tr;
+          vs.selectedEl = rowEl;
           vs.selectedRow = row;
           vs.selectedRec = rec;
-          tr.classList.add('selected');
+          rowEl.classList.add('selected');
 
-          // 帶入表單並開啟「更新」按鈕
           fillFormByRec(rec);
           const btnUpd = document.getElementById('btnUpdateTx');
           if (btnUpd) btnUpd.disabled = false;
 
-          // 展示「庫存整併」按鈕（若已選定帳戶）
           const btnCon = document.getElementById('btnConsolidate');
           const activeAcc = document.getElementById('txAccountPick')?.value;
           if (btnCon) btnCon.style.display = activeAcc ? 'inline-flex' : 'none';
@@ -490,50 +527,63 @@
     }
 
     function renderVirtual() {
-      if (!vs.viewport) vs.viewport = document.getElementById('txViewport') || document.querySelector('#page-input .tx-viewport');
-      if (!vs.body) vs.body = document.getElementById('txBody') || document.querySelector('#page-input .tx-table tbody');
+      if (!vs.viewport) vs.viewport = document.getElementById('txViewport');
+      if (!vs.body) vs.body = document.getElementById('txBody');
       if (!vs.viewport || !vs.body) return;
+
       const top = vs.viewport.scrollTop;
       const h = vs.viewport.clientHeight;
       const start = Math.max(0, Math.floor(top / vs.rowH) - 10);
       const need = Math.ceil(h / vs.rowH) + 20;
       const end = Math.min(vs.view.length, start + need);
+
       if (vs.last[0] === start && vs.last[1] === end) return;
       vs.last = [start, end];
 
       const slice = vs.view.slice(start, end);
       vs.body.style.transform = `translateY(${start * vs.rowH}px)`;
-      vs.body.innerHTML = slice.map(r => {
+
+      vs.body.innerHTML = slice.map((r, i) => {
         const status = String(r.status || '').toLowerCase();
         const isPln = (status === 'planned');
         const isUsing = (status === 'using');
-        const rowCls =
-          isUsing ? 'row-using' :
-            isPln ? 'row-planned' : 'row-posted';
-        const statusCls =
-          isUsing ? 'using' :
-            isPln ? 'planned' : 'posted';
+
+        const rowCls = isUsing ? 'row-using' : isPln ? 'row-planned' : 'row-posted';
+        const stIconClass = isUsing ? 'st-using' : isPln ? 'st-planned' : 'st-posted';
         const sel = (Number(r._row || 0) === Number(vs.selectedRow)) ? ' selected' : '';
+
+        const animateClass = (vs._firstRender ? '' : ' animate-enter');
+
         return `
-      <tr class="${rowCls}${sel}" data-row="${esc(r._row)}">
-        <td class="txt">${esc(r.date || '')}</td>
-        <td class="txt"><span class="tx-chip tx-chip--acct" data-acct="${esc(String(r.account || '').toLowerCase())}">${esc(r.account || '')}</span></td>
-        <td class="txt">${esc(r.item || '')}</td>
-        <td class="num"><span class="mask-num" data-mask-str="＊＊＊">${fmtMoney(r.amount)}</span></td>
-        <td class="txt">
-          <span class="tx-chip tx-chip--status ${statusCls}" title="${esc(status)}">
-            ${isPln ? '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">schedule</span>' :
-            isUsing ? '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">trending_up</span>' :
-              '<span class="material-symbols-outlined" style="font-size:16px;vertical-align:middle;">check_circle</span>'}
-          </span>
-        </td>
-      </tr>`;
+      <div class="tx-row ${rowCls}${sel}${animateClass}" data-row="${esc(r._row)}" style="height:${vs.rowH}px; animation-delay:${(i % 10) * 30}ms">
+        <div class="tx-cell c-date">${esc(fmtMD(r.date))}</div>
+        <div class="tx-cell c-acc"><span class="tx-chip-acc" data-acct="${esc(String(r.account || '').toLowerCase())}">${esc(r.account || '')}</span></div>
+        <div class="tx-cell c-item">${esc(r.item || '')}</div>
+        <div class="tx-cell c-amt"><span class="mask-num" data-mask-str="＊＊＊">${fmtMoney(r.amount)}</span></div>
+        <div class="tx-cell c-stat">
+             ${isPln ? '<span class="material-symbols-outlined icon-st planned">schedule</span>' :
+            isUsing ? '<span class="material-symbols-outlined icon-st using">trending_up</span>' :
+              '<span class="material-symbols-outlined icon-st posted">check_circle</span>'}
+        </div>
+      </div>`;
       }).join('');
+
+      // Mark first render done
+      if (!vs._firstRender) vs._firstRender = true;
 
       if (!slice.length) {
         vs.body.style.transform = 'translateY(0px)';
-        vs.body.innerHTML = `<tr><td class="empty" colspan="5">沒有資料</td></tr>`;
+        vs.body.innerHTML = `<div class="tx-empty">沒有資料</div>`;
       }
+    }
+
+    function fmtMD(dstr) {
+      if (!dstr) return '';
+      const d = new Date(dstr);
+      if (isNaN(d.getTime())) return String(dstr);
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${m}/${dd}`;
     }
 
     /* ===== utils ===== */

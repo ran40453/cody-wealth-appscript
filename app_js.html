@@ -339,8 +339,14 @@
       const id = sec.id || ''; // 兼容 .page.show
       const key = id.replace(/^page[-_]/, '');
       const isTarget = (id === 'page-' + page) || (id === 'page_' + page) || (key === page);
-      sec.classList.toggle('show', isTarget);
-      if ('style' in sec) sec.style.display = isTarget ? '' : 'none';
+
+      if (isTarget) {
+        sec.classList.add('show');
+        if ('style' in sec) sec.style.display = '';
+      } else {
+        sec.classList.remove('show');
+        if ('style' in sec) sec.style.display = 'none';
+      }
     });
 
     App.currentPage = page;
@@ -495,7 +501,21 @@
     initFromPrefs();
 
     // 起始頁：hash > 預設 dashmain
-    const first = (location.hash || '').replace(/^#/, '') || 'dashmain';
+    let first = (location.hash || '').replace(/^#/, '');
+    console.log('[App] Start Hash:', first);
+
+    // Whitelist valid pages to prevent weird states
+    const validPages = ['dashmain', 'input', 'invest', 'record', 'policy', 'links', 'gcv', 'mrpt', 'fortune', 'grw', 'anlys', 'charts', 'stk'];
+    if (!first || !validPages.includes(first)) {
+      console.log('[App] Invalid or empty hash, defaulting to dashmain');
+      first = 'dashmain';
+    }
+
+    // Force clear hash if invalid to prevent sticky
+    if (first === 'dashmain') {
+      try { history.replaceState(null, null, ' '); } catch (e) { }
+    }
+
     go(first);
 
     // 若 dashmain 有進場初始化

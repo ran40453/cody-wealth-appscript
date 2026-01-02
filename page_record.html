@@ -1,64 +1,75 @@
 <section id="page-record" class="page">
-  <div class="card cards-zoom-scope db-header-card">
-    <div class="card-hd">
-      <div class="title">Database 操作</div>
-      <div class="actions">
-        <button id="btnRecordAnalyse" class="btn btn--secondary" title="分析變動">
-          <span class="material-symbols-outlined">analytics</span>
-          <span class="txt">分析變動</span>
-        </button>
-        <button id="btnRecordAddRow" class="btn btn--primary" title="新增一列">
-          <span class="material-symbols-outlined">add_circle</span>
-          <span class="txt">新增一列</span>
-        </button>
-        <button id="btnRecordReload" class="btn-ghost" title="重載清單">
-          <span class="material-symbols-outlined">refresh</span>
-        </button>
-        <span id="dbStatusPill" class="pill">—</span>
+
+  <!-- 1. Header & Date Navigator -->
+  <div class="db-dash-header">
+    <div class="card card-date-nav">
+      <button class="nav-btn" id="dbPrevDay" title="上一日">
+        <span class="material-symbols-outlined">chevron_left</span>
+      </button>
+
+      <div class="date-display" id="dbDateDisplay">
+        <div class="date-main mask-num" id="dbCurrentDate">Loading...</div>
+        <div class="date-sub" id="dbDateSub">--</div> <!-- e.g. "Wednesday" or "Today" -->
+        <input type="date" id="dbDateInput" class="hidden-date-input">
       </div>
+
+      <button class="nav-btn" id="dbNextDay" title="下一日">
+        <span class="material-symbols-outlined">chevron_right</span>
+      </button>
     </div>
-    <div class="card-bd db-notice">
-      這個按鈕會：凍結最後一列 H~末欄為值、A 欄寫入時間，然後在下一列鋪回公式骨架。
+
+    <!-- Actions (Add Row, Reload) - Compact -->
+    <div class="db-actions">
+      <button id="btnRecordAddRow" class="btn-icon circle glass" title="新增一列">
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button id="btnRecordReload" class="btn-icon circle glass" title="重新載入">
+        <span class="material-symbols-outlined">refresh</span>
+      </button>
     </div>
   </div>
 
-  <!-- 兩欄佈局：左最新摘要 + 右虛擬清單 -->
-  <div class="db2col">
-    <aside class="card db-latest" id="dbLatestCard">
-      <h3 class="keep-title">最新資料</h3>
-      <div id="dbLatestBox">
-        <div class="empty">載入中…</div>
-      </div>
-    </aside>
-
-    <div class="card db-tableCard">
-      <div id="dbViewport" class="db-viewport">
-        <div id="dbSpacer"></div>
-        <table class="db-table">
-          <thead id="dbThead"></thead>
-          <tbody id="dbTbody"></tbody>
-        </table>
-      </div>
-      <div class="db-meta" id="dbMeta">—</div>
+  <!-- 2. KPI Summary Cards (Yesterday vs Today) -->
+  <!-- 2. Pinned Stats (Total, Net, Actionable, PnL, Available) -->
+  <div class="db-pinned-stats">
+    <!-- 1: Total Assets (C) -->
+    <div class="card stat-card">
+      <div class="stat-label">總資產 (Total)</div>
+      <div class="stat-main mask-num" id="dbPinTotal">---</div>
     </div>
+    <!-- 2: Net (D) -->
+    <div class="card stat-card">
+      <div class="stat-label">總資產+爸 (Net)</div>
+      <div class="stat-main mask-num" id="dbPinNet">---</div>
+    </div>
+    <!-- 3: Actionable (E) -->
+    <div class="card stat-card">
+      <div class="stat-label">可操作</div>
+      <div class="stat-main mask-num" id="dbPinAction">---</div>
+    </div>
+    <!-- 4: PnL (F) -->
+    <div class="card stat-card">
+      <div class="stat-label">當日損益</div>
+      <div class="stat-main mask-num" id="dbPinPnL">---</div>
+    </div>
+    <!-- 5: Available (G) -->
+    <div class="card stat-card">
+      <div class="stat-label">可用金額</div>
+      <div class="stat-main mask-num" id="dbPinAvail">---</div>
+    </div>
+  </div>
+
+  <!-- 3. Detail Groups Grid -->
+  <div id="dbDetailsGrid" class="db-details-grid">
+    <!-- Content injected by JS -->
+    <div class="empty-state">
+      <span class="material-symbols-outlined spin">sync</span>
+      <span>Loading Dashboard...</span>
+    </div>
+  </div>
+
+  <div id="dbStatusOverlay" class="db-status-overlay hidden">
+    <div class="spinner"></div>
   </div>
 
 </section>
-
-<!-- Analysis Modal -->
-<dialog id="dbAnalyseDlg" class="dlg-modal">
-  <div class="dlg-box">
-    <header class="dlg-hd">
-      <div class="dlg-title" id="dbAnalyseTitle">變動分析</div>
-      <button class="dlg-close" id="dbAnalyseClose"><span class="material-symbols-outlined">close</span></button>
-    </header>
-    <div class="dlg-bd">
-      <div id="dbAnalyseResult" class="db-analyse-table">
-        <!-- Table content injected here -->
-      </div>
-    </div>
-    <footer class="dlg-ft">
-      <button class="btn btn--secondary" id="dbAnalyseOk">關閉</button>
-    </footer>
-  </div>
-</dialog>
