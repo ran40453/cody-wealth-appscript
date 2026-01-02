@@ -3,247 +3,106 @@
   <div class="settings-backdrop"></div>
   <div class="settings-sheet card">
     <div class="sheet-head">
-      <strong>顯示設定</strong>
-      <button id="closeSettings" class="btn-ghost">關閉</button>
-      <button class="btn-ghost btnResetPalette" type="button">還原預設色票</button>
-    </div>
-
-    <div class="grid" id="settingsPanel">
-      <!-- ① 色票 Palette（全域） -->
-<div class="card card--ghost">
-  <h4>色票 Palette（全域）</h4>
-
-  <!-- 小膠囊色票：字色（hex） -->
-  <div class="palette-grid">
-    <div class="swatch" data-color-var="--tone-pos-fg">
-      <button type="button" class="swatch-btn">正向字色</button>
-      <input type="color" class="swatch-input" value="#0f766e" aria-label="正向字色">
-    </div>
-    <div class="swatch" data-color-var="--tone-neg-fg">
-      <button type="button" class="swatch-btn">負向字色</button>
-      <input type="color" class="swatch-input" value="#b91c1c" aria-label="負向字色">
-    </div>
-    <div class="swatch" data-color-var="--tone-info-fg">
-      <button type="button" class="swatch-btn">資訊字色</button>
-      <input type="color" class="swatch-input" value="#0b4a6f" aria-label="資訊字色">
-    </div>
-    <div class="swatch" data-color-var="--tone-primary-fg">
-      <button type="button" class="swatch-btn">品牌主字</button>
-      <input type="color" class="swatch-input" value="#0b1939" aria-label="品牌主字">
-    </div>
-    <div class="swatch" data-color-var="--tone-secondary-fg">
-      <button type="button" class="swatch-btn">輔助主字</button>
-      <input type="color" class="swatch-input" value="#073f35" aria-label="輔助主字">
-    </div>
-  </div>
-
-  <!-- 放在 Palette（全域）那張卡片內，字色膠囊下面 -->
-<div class="palette-grid">
-  <!-- 正向底 -->
-  <div class="swatch swatch--alpha" data-rgba-var="--tone-pos-bg">
-    <button type="button" class="swatch-btn">正向底</button>
-    <input type="color" class="swatch-input" value="#10b981" aria-label="正向底">
-    <input type="range" class="swatch-alpha" min="0" max="1" step="0.01" value="0.12" aria-label="正向底透明度">
-  </div>
-
-  <!-- 正向邊 -->
-  <div class="swatch swatch--alpha" data-rgba-var="--tone-pos-bd">
-    <button type="button" class="swatch-btn">正向邊</button>
-    <input type="color" class="swatch-input" value="#10b981" aria-label="正向邊">
-    <input type="range" class="swatch-alpha" min="0" max="1" step="0.01" value="0.35" aria-label="正向邊透明度">
-  </div>
-</div>
-
-  <!-- 其餘 neg/info/warn 的 rgba 區塊依此複製 -->
-</div>
-
-<!-- ② 全域 Global（卡片 + 三欄） -->
-<div class="card card--ghost">
-  <h4>全域 Global</h4>
-  <div class="settings-grid-3">
-    <label>頁面最大寬度 (--container-max)
-      <input type="range" min="800" max="1600" step="10"
-             data-scope="global" data-var="--container-max" data-suffix="px">
-    </label>
-    <label>整體縮放 (--ui-scale)
-      <input type="range" min="0.8" max="1.4" step="0.01"
-             data-scope="global" data-var="--ui-scale">
-    </label>
-    <label>基礎字級 (--font-body)
-      <input type="range" min="14" max="22" step="1"
-             data-scope="global" data-var="--font-body" data-suffix="px">
-    </label>
-    <label>標籤字級 (--label-size)
-      <input type="range" min="11" max="16" step="1"
-             data-scope="global" data-var="--label-size" data-suffix="px">
-    </label>
-    <label>表格內距 (--table-pad)
-      <input type="range" min="6" max="18" step="1"
-             data-scope="global" data-var="--table-pad" data-suffix="px">
-    </label>
-    <label>點擊最低高度 (--tap-min)
-      <input type="range" min="36" max="64" step="1"
-             data-scope="global" data-var="--tap-min" data-suffix="px">
-    </label>
-    <label>圓角半徑 (--radius)
-      <input type="range" min="6" max="20" step="1"
-             data-scope="global" data-var="--radius" data-suffix="px">
-    </label>
-    <label>主色（tint）
-      <input type="color" class="swatch-input" value="#2f6efc"
-             data-scope="global" data-var="--tint">
-    </label>
-    <label>輔色（accent）
-      <input type="color" class="swatch-input" value="#10b981"
-             data-scope="global" data-var="--accent">
-    </label>
-  </div>
-  <div class="actions">
-    <button class="btn-ghost btnResetAll">恢復全域預設</button>
-    <button class="btn btnSave">儲存</button>
-  </div>
-</div>
-
-<!-- ③ 僅此頁 Page Only（卡片 + 三欄） -->
-<div class="card card--ghost">
-  <h4>僅此頁 Page Only</h4>
-  <div class="settings-grid-3">
-    <label>表單字級 (--form-font)
-      <input type="range" min="14" max="22" step="1"
-             data-scope="page" data-var="--form-font" data-suffix="px">
-    </label>
-    <label>表格字級 (--table-font)
-      <input type="range" min="12" max="20" step="1"
-             data-scope="page" data-var="--table-font" data-suffix="px">
-    </label>
-    <label>輸入高度 (--input-h)
-      <input type="range" min="44" max="84" step="2"
-             data-scope="page" data-var="--input-h" data-suffix="px">
-    </label>
-  </div>
-  <div class="actions">
-    <button class="btn-ghost btnResetPage">恢復此頁預設</button>
-  </div>
-  
-</div>
-
-<!-- 整頁設定區（不影響浮層 overlay） -->
-<section id="page-settings" class="page">
-  <div class="settings-layout">
-    <aside class="card">
-      <h3>偏好</h3>
-      <div class="kv-grid">
-        <div class="k">說明</div>
-        <div class="v">左側可放靜態資訊、快速切換按鈕、預設方案等。</div>
+      <div class="title-with-icon">
+        <span class="material-symbols-outlined">settings_suggest</span>
+        <strong>介面偏好設定</strong>
       </div>
-    </aside>
-
-    <main class="card">
-      <h3>顯示設定 <span class="badge info">即時套用</span></h3>
-
-      <!-- 直接複製 overlay 的 controls，避免 JS 改動；更名容器與按鈕避免 ID 衝突 -->
-      <div id="settingsForm" class="grid">
-        <!-- 語意色票（Palette）編輯器：支援 hex 與 rgba(alpha) -->
-        <h4>色票 Palette（全域）</h4>
-        <div class="kv-grid">
-          <div class="k">正向字色 (--tone-pos-fg)</div>
-          <div class="v"><input type="color" data-scope="global" data-var="--tone-pos-fg"></div>
-
-          <div class="k">負向字色 (--tone-neg-fg)</div>
-          <div class="v"><input type="color" data-scope="global" data-var="--tone-neg-fg"></div>
-
-          <div class="k">資訊字色 (--tone-info-fg)</div>
-          <div class="v"><input type="color" data-scope="global" data-var="--tone-info-fg"></div>
-
-          <div class="k">品牌主字 (--tone-primary-fg)</div>
-          <div class="v"><input type="color" data-scope="global" data-var="--tone-primary-fg"></div>
-
-          <div class="k">輔助主字 (--tone-secondary-fg)</div>
-          <div class="v"><input type="color" data-scope="global" data-var="--tone-secondary-fg"></div>
-        </div>
-
-          <div class="swatch swatch--alpha" data-rgba-var="--tone-pos-bg">
-            <button type="button" class="swatch-btn">正向底</button>
-            <input type="color" class="swatch-input" value="#10b981" aria-label="正向底">
-            <input type="range" class="swatch-alpha" min="0" max="1" step="0.01" value="0.12" aria-label="正向底透明度">
-          </div>
-
-          <div class="k"></div>
-          <div class="v" data-rgba-var="--tone-pos-bd">
-            <input type="color" data-role="color" value="#10b981"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-          </div>
-
-          <div class="k">負向底/邊 (--tone-neg-bg/bd)</div>
-          <div class="v" data-rgba-var="--tone-neg-bg">
-            <input type="color" data-role="color" value="#ef4444"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
-          </div>
-          <div class="k"></div>
-          <div class="v" data-rgba-var="--tone-neg-bd">
-            <input type="color" data-role="color" value="#ef4444"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-          </div>
-
-          <div class="k">資訊底/邊 (--tone-info-bg/bd)</div>
-          <div class="v" data-rgba-var="--tone-info-bg">
-            <input type="color" data-role="color" value="#3b82f6"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.12" data-role="alpha">
-          </div>
-          <div class="k"></div>
-          <div class="v" data-rgba-var="--tone-info-bd">
-            <input type="color" data-role="color" value="#3b82f6"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.35" data-role="alpha">
-          </div>
-
-          <div class="k">警示底/邊 (--tone-warn-bg/bd)</div>
-          <div class="v" data-rgba-var="--tone-warn-bg">
-            <input type="color" data-role="color" value="#f59e0b"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.16" data-role="alpha">
-          </div>
-          <div class="k"></div>
-          <div class="v" data-rgba-var="--tone-warn-bd">
-            <input type="color" data-role="color" value="#f59e0b"> α
-            <input type="range" min="0" max="1" step="0.01" value="0.38" data-role="alpha">
-          </div>
-        </div>
-
-        <!-- 全域 -->
-        <h4>全域 Global</h4>
-        <label>頁面最大寬度 (--container-max)
-          <input type="range" min="800" max="1600" step="10"
-                 data-scope="global" data-var="--container-max" data-suffix="px">
-        </label>
-        <label>整體縮放 (--ui-scale)
-          <input type="range" min="0.8" max="1.4" step="0.01"
-                 data-scope="global" data-var="--ui-scale">
-        </label>
-        <label>基礎字級 (--font-body)
-          <input type="range" min="14" max="22" step="1"
-                 data-scope="global" data-var="--font-body" data-suffix="px">
-        </label>
-
-        <!-- 僅此頁 -->
-        <h4>僅此頁 Page Only</h4>
-        <label>表單字級 (--form-font)
-          <input type="range" min="14" max="22" step="1"
-                 data-scope="page" data-var="--form-font" data-suffix="px">
-        </label>
-        <label>表格字級 (--table-font)
-          <input type="range" min="12" max="20" step="1"
-                 data-scope="page" data-var="--table-font" data-suffix="px">
-        </label>
-        <label>輸入高度 (--input-h)
-          <input type="range" min="44" max="84" step="2"
-                 data-scope="page" data-var="--input-h" data-suffix="px">
-        </label>
-
-        <div class="actions">
-          <button class="btn-ghost btnResetPage">恢復此頁預設</button>
-          <button class="btn-ghost btnResetAll">恢復全域預設</button>
-          <button class="btn btnSave">儲存</button>
-        </div>
+      <div class="head-actions">
+        <button class="btn-ghost btnResetPalette" type="button" title="重置為系統預設顏色">還原預設</button>
+        <button id="closeSettings" class="btn-ghost"><span class="material-symbols-outlined">close</span></button>
       </div>
-    </main>
+    </div>
+
+    <div class="settings-scroll-area">
+      <div class="settings-section" id="settingsPanel">
+
+        <!-- ① 主題與底色 -->
+        <div class="settings-group card card--ghost">
+          <div class="group-title">
+            <span class="material-symbols-outlined">palette</span>
+            主題與底色
+          </div>
+          <div class="neu-control-grid">
+            <label class="neu-lab">自訂主題背景色 (--bg)
+              <div class="inp-with-swatch">
+                <input type="color" data-scope="global" data-var="--bg">
+                <input type="text" placeholder="#HEX" class="hex-text" data-sync="--bg">
+              </div>
+            </label>
+            <label class="neu-lab">全局圓角 (--radius)
+              <div class="range-wrap">
+                <input type="range" min="0" max="40" step="1" data-scope="global" data-var="--radius" data-suffix="px">
+                <span class="range-val" data-read="--radius">16px</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- ② 擬態陰影細節 -->
+        <div class="settings-group card card--ghost">
+          <div class="group-title">
+            <span class="material-symbols-outlined">blur_on</span>
+            擬態細節 (Neumorphic)
+          </div>
+          <div class="neu-control-grid">
+            <label class="neu-lab">上高亮色 (--neu-upper)
+              <input type="color" data-scope="global" data-var="--neu-upper">
+            </label>
+            <label class="neu-lab">下陰影色 (--neu-lower)
+              <input type="color" data-scope="global" data-var="--neu-lower">
+            </label>
+          </div>
+        </div>
+
+        <!-- ③ 品牌與重點色 -->
+        <div class="settings-group card card--ghost">
+          <div class="group-title">
+            <span class="material-symbols-outlined">colorize</span>
+            重點組件顏色
+          </div>
+          <div class="neu-control-grid">
+            <label class="neu-lab">導覽目前項 背景 (--crumb-current-bg)
+              <input type="color" data-scope="global" data-var="--crumb-current-bg">
+            </label>
+            <label class="neu-lab">導覽目前項 字色 (--crumb-current-fg)
+              <input type="color" data-scope="global" data-var="--crumb-current-fg">
+            </label>
+            <label class="neu-lab">品牌主色 (--tint)
+              <input type="color" data-scope="global" data-var="--tint">
+            </label>
+            <label class="neu-lab">輔助特色 (--accent)
+              <input type="color" data-scope="global" data-var="--accent">
+            </label>
+          </div>
+        </div>
+
+        <!-- ④ 佈局佈局 -->
+        <div class="settings-group card card--ghost">
+          <div class="group-title">
+            <span class="material-symbols-outlined">straighten</span>
+            佈局尺寸
+          </div>
+          <div class="neu-control-grid-3">
+            <label class="neu-lab">UI 縮放
+              <input type="range" min="0.8" max="1.5" step="0.05" data-scope="global" data-var="--ui-scale">
+            </label>
+            <label class="neu-lab">字體大小
+              <input type="range" min="12" max="24" step="1" data-scope="global" data-var="--font-body"
+                data-suffix="px">
+            </label>
+            <label class="neu-lab">最大寬度
+              <input type="range" min="800" max="2500" step="50" data-scope="global" data-var="--container-max"
+                data-suffix="px">
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sheet-foot">
+      <button class="btn-ghost btnResetAll">全部重置</button>
+      <button class="btn btnSave" style="margin-left: auto;">確認儲存</button>
+    </div>
   </div>
-</section>
+</div>

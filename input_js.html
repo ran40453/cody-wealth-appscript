@@ -87,6 +87,8 @@
         google.script.run.withSuccessHandler(meta => fillAccounts(meta?.accounts || [])).getMeta();
         loadTx(); // 預設全帳戶
       }
+      // 強制延遲觸發一次虛擬渲染，確保視口尺寸正確
+      setTimeout(() => { if (typeof renderVirtual === 'function') renderVirtual(); }, 300);
     }
 
     /* ===== 表單 ===== */
@@ -800,5 +802,6 @@
 
     App.modules.pageInput?.init?.();
     rebalanceInputLayout();
+    setTimeout(rebalanceInputLayout, 500);
   });
 </script>

@@ -233,37 +233,35 @@
       line-height: 1;
     }
 
-    /* 4.7 Shared ROI Badge（統一基礎 + 色系） */
-    :where(.roi-badge) {
-      display: inline-block;
+    /* 4.7 Shared Monolith Label（統一基礎 + 色系） */
+    :where(.monolith-label) {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       padding: 2px 8px;
-      border-radius: 999px;
+      border-radius: 4px;
       font-weight: 700;
-      line-height: 1;
+      line-height: 1.2;
       vertical-align: baseline;
       border: 1px solid transparent;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
     }
 
-    .roi-badge.pos {
-      color: var(--roi-pos-fg);
-      background: var(--roi-pos-bg);
-      border-color: var(--roi-pos-bd);
+    .monolith-label.monolith-gain {
+      color: #00ffa3;
+      background: rgba(0, 255, 163, 0.1);
     }
 
-    .roi-badge.neg {
-      color: var(--roi-neg-fg);
-      background: var(--roi-neg-bg);
-      border-color: var(--roi-neg-bd);
-    }
-
-    .roi-badge.zero {
-      color: var(--roi-zero-fg);
-      background: var(--roi-zero-bg);
-      border-color: var(--roi-zero-bd);
+    .monolith-label.monolith-loss {
+      color: #ff2e5b;
+      background: rgba(255, 46, 91, 0.1);
     }
 
     /* 4.8 Shared Numeric Helpers */
-    :where(.ctbc-kpiBar .v, .kpi-card .v) {
+    :where(.invest-kpiBar .v, .kpi-card .v) {
       font-variant-numeric: tabular-nums;
     }
 
@@ -282,14 +280,14 @@
     }
 
     /* 4.11 Shared Key-Value Grids */
-    :where(.kv-grid, .ctbc-grid .kv) {
+    :where(.kv-grid, .invest-grid .kv) {
       display: grid;
       grid-template-columns: auto 1fr;
       gap: 8px;
       align-items: center;
     }
 
-    :where(.kv-duo, .ctbc-grid) {
+    :where(.kv-duo, .invest-grid) {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;

@@ -602,7 +602,7 @@ function fixMissingValidationAll_() {
 function getCTBCInvestments() {
   const SHEET = '✅';
   // A=1, ..., AF=32, AG=33, AH=34
-  const INDEX = { H: 8, K: 11, L: 12, N: 14, R: 18, T: 20, U: 21, V: 22, AF: 32, AH: 34 };
+  const INDEX = { G: 7, H: 8, K: 11, L: 12, M: 13, N: 14, P: 16, Q: 17, R: 18, T: 20, U: 21, V: 22, AF: 32, AH: 34, AI: 35 };
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
   if (!sh) return [];
 
@@ -633,21 +633,59 @@ function getCTBCInvestments() {
   // 輸出：每列是一個物件，包含列號 ROW（2 起算）
   const out = values.map((r, i) => ({
     ROW: i + 2, // 真實試算表列號
+    G: num_(r[INDEX.G - 1]),
     H: toStr(r[INDEX.H - 1]),
     K: toStr(r[INDEX.K - 1]),
-    L: Number(r[INDEX.L - 1]) || 0,
-    N: Number(r[INDEX.N - 1]) || 0,
+    L: num_(r[INDEX.L - 1]),
+    M: num_(r[INDEX.M - 1]),
+    N: num_(r[INDEX.N - 1]),
     R: toStr(r[INDEX.R - 1]),
-    QUOTE: Number(r[INDEX.R - 1]) || 0,
-    T: Number(r[INDEX.T - 1]) || 0,
-    U: Number(r[INDEX.U - 1]) || 0,
+    QUOTE: num_(r[INDEX.R - 1]),
+    T: num_(r[INDEX.T - 1]),
+    U: num_(r[INDEX.U - 1]),
     V: toStr(r[INDEX.V - 1]),
     CUR: normCur_(r[INDEX.V - 1]),
-    AF: Number(r[INDEX.AF - 1]) || 0,
+    AF: num_(r[INDEX.AF - 1]),
     AH: toStr(r[INDEX.AH - 1]),
+    AI: r[INDEX.AI - 1],
+    P: toStr(r[INDEX.P - 1]),
+    Q: toStr(r[INDEX.Q - 1])
   }));
 
+  function num_(x) { x = Number(x); return isFinite(x) ? x : 0; }
+
   return out;
+}
+
+/** 更新 ✅ 分頁的值 */
+function setInvestValue(rowId, colKey, val) {
+  const SHEET = '✅';
+  const INDEX = { G: 7, H: 8, K: 11, L: 12, M: 13, N: 14, P: 16, Q: 17, R: 18, T: 20, U: 21, V: 22, AF: 32, AH: 34, AI: 35 };
+  const colIndex = INDEX[colKey];
+  if (!colIndex) throw new Error('Invalid column key: ' + colKey);
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('Sheet not found: ' + SHEET);
+
+  sh.getRange(rowId, colIndex).setValue(val);
+  return true;
+}
+
+/** 在 ✅ 分頁新增一筆投資項目 */
+function addInvestEntry(category, name) {
+  const SHEET = '✅';
+  const sh = SpreadsheetApp.getActive().getSheetByName(SHEET);
+  if (!sh) throw new Error('Sheet not found');
+
+  // 假設架構：G(7)=類別, K(11)=項目名稱, AI(35)=狀態(TRUE)
+  // 我們先建立一個 36 欄的陣列
+  const row = new Array(37).fill(''); // 到 AK (37)
+  row[6] = category; // G
+  row[10] = name;    // K
+  row[34] = false;   // AI (狀態預設為持有中 -> FALSE)
+
+  sh.appendRow(row);
+  return { success: true };
 }
 
 /**
@@ -1944,7 +1982,7 @@ function getSTKRows() {
   return values.map((r, i) => ({
     ROW: i + 2,
     A: r[0], B: r[1], C: num(r[2]), D: num(r[3]), E: num(r[4]),
-    F: num(r[5]), G: num(r[6]), H: r[7], I: r[8],
+    F: num(r[5]), G: num(r[6]), H: num(r[7]), I: r[8],
     J: num(r[9]), K: num(r[10]),
     L: toStr(r[11]), M: toStr(r[12]), N: num(r[13]),
     O: num(r[14]), P: num(r[15]), Q: num(r[16]),

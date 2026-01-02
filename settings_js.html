@@ -1,269 +1,389 @@
 <script>
-(function(){
-  const ROOT = document.documentElement;
-  const STORAGE_KEY = 'ui_prefs_v2'; // 升版以避免舊格式衝突
-  const $ = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
-  // 預設色票（請依你的 share.html 實際值校對）
-  const DEFAULT_PALETTE = {
-    '--tone-pos-fg':'#0f766e',
-    '--tone-pos-bg':'rgba(16,185,129,0.12)',
-    '--tone-pos-bd':'rgba(16,185,129,0.35)',
-    '--tone-neg-fg':'#b91c1c',
-    '--tone-neg-bg':'rgba(239,68,68,0.12)',
-    '--tone-neg-bd':'rgba(239,68,68,0.35)',
-    '--tone-zero-fg':'#6b7280',
-    '--tone-zero-bg':'rgba(47,110,252,0.10)', /* 依你實值調整 */
-    '--tone-zero-bd':'rgba(47,110,252,0.25)',
-    '--tone-warn-fg':'#b45309',
-    '--tone-warn-bg':'rgba(251,191,36,0.16)',
-    '--tone-warn-bd':'rgba(251,191,36,0.38)',
-    '--tone-info-fg':'#0b4a6f',
-    '--tone-info-bg':'rgba(59,130,246,0.12)',
-    '--tone-info-bd':'rgba(59,130,246,0.35)',
-    '--tone-primary-fg':'#0b1939',
-    '--tone-primary-bg':'color-mix(in oklab, var(--tint) 26%, transparent)',
-    '--tone-primary-bd':'color-mix(in oklab, var(--tint) 60%, transparent)',
-    '--tone-secondary-fg':'#073f35',
-    '--tone-secondary-bg':'color-mix(in oklab, var(--accent) 22%, transparent)',
-    '--tone-secondary-bd':'color-mix(in oklab, var(--accent) 55%, transparent)'
-  };
-
-  // 取得目前顯示中的 page 容器（.page.show）
-  function getActivePageEl(){ return document.querySelector('.page.show') || null; }
-  function getActivePageId(){ const el = getActivePageEl(); return el ? (el.id || el.dataset.page || 'unknown') : 'unknown'; }
-
-  // 偏好存取：{ global:{var:val...}, pages:{[pageId]:{var:val...}} }
-  function loadPrefs(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)||'') || {global:{}, pages:{}}; } catch(e){ return {global:{}, pages:{}}; } }
-  function savePrefs(obj){ localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); }
-
-  // 將偏好套用到 DOM：global → :root；page → 目前 .page.show
-  function applyGlobal(vars){ Object.entries(vars||{}).forEach(([k,v])=> ROOT.style.setProperty(k, v)); }
-  function applyPage(pageId, vars){ const el = getActivePageEl(); if (!el) return; Object.entries(vars||{}).forEach(([k,v])=> el.style.setProperty(k, v)); }
-
-  // 讀取目前值（優先偏好 → 否則取 computed style）
-  function readVar(scope, name, pageVars, prefs){
-    if (scope==='page' && pageVars && pageVars[name] != null) return pageVars[name];
-    if (scope==='global' && prefs.global && prefs.global[name] != null) return prefs.global[name];
-    const target = (scope==='page' ? getActivePageEl() : ROOT) || ROOT;
-    return getComputedStyle(target).getPropertyValue(name).trim() || '';
-  }
-
-  // 將控制項顯示同步到目前數值（接受容器）
-  function syncControls(container){
-    const root = container || document;
-    const prefs = loadPrefs();
-    const pageId = getActivePageId();
-    const pageVars = prefs.pages?.[pageId] || {};
-    $$('[data-var]', root).forEach(el=>{
-      const { scope, var: v, suffix='' } = el.dataset;
-      const val = readVar(scope, v, pageVars, prefs);
-      const num = suffix ? parseFloat(String(val).replace(suffix,'')) : parseFloat(val);
-      if (!Number.isNaN(num)) el.value = num;
-    });
-  }
-
-  // 綁定設定控制（容器化）
-  function bindSettings(root){
-    if(!root) return;
-    const inputs = $$('[data-var]', root);
-    const applyVar = (el) => {
-      const v = el.dataset.var; if(!v) return;
-      const scope = el.dataset.scope || 'global';
-      const sx = el.dataset.suffix || '';
-      const val = (el.type==='range' || el.type==='number') ? (el.value + sx) : el.value;
-      if (scope === 'global') {
-        ROOT.style.setProperty(v, val);
-        const prefs = loadPrefs(); prefs.global = prefs.global || {}; prefs.global[v] = val; savePrefs(prefs);
-      } else {
-        const pg = getActivePageEl(); if (pg) pg.style.setProperty(v, val);
-        const prefs = loadPrefs(); prefs.pages = prefs.pages || {}; const id = getActivePageId();
-        prefs.pages[id] = prefs.pages[id] || {}; prefs.pages[id][v] = val; savePrefs(prefs);
-      }
+  (function () {
+    const ROOT = document.documentElement;
+    const STORAGE_KEY = 'ui_prefs_v2'; // 升版以避免舊格式衝突
+    const $ = (s, r = document) => r.querySelector(s);
+    const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+    // 預設色票（請依你的 share.html 實際值校對）
+    const DEFAULT_PALETTE = {
+      '--tone-pos-fg': '#0f766e',
+      '--tone-pos-bg': 'rgba(16,185,129,0.12)',
+      '--tone-pos-bd': 'rgba(16,185,129,0.35)',
+      '--tone-neg-fg': '#b91c1c',
+      '--tone-neg-bg': 'rgba(239,68,68,0.12)',
+      '--tone-neg-bd': 'rgba(239,68,68,0.35)',
+      '--tone-zero-fg': '#6b7280',
+      '--tone-zero-bg': 'rgba(47,110,252,0.10)', /* 依你實值調整 */
+      '--tone-zero-bd': 'rgba(47,110,252,0.25)',
+      '--tone-warn-fg': '#b45309',
+      '--tone-warn-bg': 'rgba(251,191,36,0.16)',
+      '--tone-warn-bd': 'rgba(251,191,36,0.38)',
+      '--tone-info-fg': '#0b4a6f',
+      '--tone-info-bg': 'rgba(59,130,246,0.12)',
+      '--tone-info-bd': 'rgba(59,130,246,0.35)',
+      '--tone-primary-fg': '#0b1939',
+      '--tone-primary-bg': 'color-mix(in oklab, var(--tint) 26%, transparent)',
+      '--tone-primary-bd': 'color-mix(in oklab, var(--tint) 60%, transparent)',
+      '--tone-secondary-fg': '#073f35',
+      '--tone-secondary-bg': 'color-mix(in oklab, var(--accent) 22%, transparent)',
+      '--tone-secondary-bd': 'color-mix(in oklab, var(--accent) 55%, transparent)'
     };
-    inputs.forEach(el => {
-      el.addEventListener('input', () => applyVar(el));
-      if(el.value) applyVar(el); // 初始化一次（如果有預設值）
+
+    // 取得目前顯示中的 page 容器（.page.show）
+    function getActivePageEl() { return document.querySelector('.page.show') || null; }
+    function getActivePageId() { const el = getActivePageEl(); return el ? (el.id || el.dataset.page || 'unknown') : 'unknown'; }
+
+    // 偏好存取：{ global:{var:val...}, themes:{ [theme]:{var:val...} }, pages:{[pageId]:{var:val...}} }
+    function loadPrefs() {
+      try {
+        const d = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        return { global: d.global || {}, themes: d.themes || {}, pages: d.pages || {} };
+      } catch (e) {
+        return { global: {}, themes: {}, pages: {} };
+      }
+    }
+    function savePrefs(obj) { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); }
+
+    function getCurTheme() { return ROOT.dataset.theme || 'dark'; }
+
+    // 哪些變數是隨主題變動的？
+    const THEME_AWARE_VARS = ['--bg', '--neu-upper', '--neu-lower', '--crumb-current-bg', '--crumb-current-fg', '--tint', '--accent'];
+
+    // 將偏好套用到 DOM：global → :root；page → 目前 .page.show
+    function applyGlobal(vars) { Object.entries(vars || {}).forEach(([k, v]) => ROOT.style.setProperty(k, v)); }
+    function applyPage(pageId, vars) { const el = getActivePageEl(); if (!el) return; Object.entries(vars || {}).forEach(([k, v]) => el.style.setProperty(k, v)); }
+
+    // 讀取目前值（優先偏好 → 否則取 computed style）
+    function readVar(scope, name, pageVars, prefs) {
+      if (scope === 'page' && pageVars && pageVars[name] != null) return pageVars[name];
+      if (scope === 'global') {
+        const theme = getCurTheme();
+        if (THEME_AWARE_VARS.includes(name)) {
+          if (prefs.themes?.[theme]?.[name] != null) return prefs.themes[theme][name];
+        } else {
+          if (prefs.global && prefs.global[name] != null) return prefs.global[name];
+        }
+      }
+      const target = (scope === 'page' ? getActivePageEl() : ROOT) || ROOT;
+      const val = getComputedStyle(target).getPropertyValue(name).trim();
+      return val || '';
+    }
+
+    // 將控制項顯示同步到目前數值（接受容器）
+    function syncControls(container) {
+      const root = container || document;
+      const prefs = loadPrefs();
+      const pageId = getActivePageId();
+      const pageVars = prefs.pages?.[pageId] || {};
+      $$('[data-var]', root).forEach(el => {
+        const { scope, var: v, suffix = '' } = el.dataset;
+        const val = readVar(scope, v, pageVars, prefs);
+        if (el.type === 'color') {
+          el.value = (val.startsWith('#') && val.length === 7) ? val : '#000000';
+        } else {
+          const num = suffix ? parseFloat(String(val).replace(suffix, '')) : parseFloat(val);
+          if (!Number.isNaN(num)) el.value = num;
+        }
+        // Update readouts
+        const readout = root.querySelector(`[data-read="${v}"]`);
+        if (readout) readout.textContent = val + (suffix ? '' : '');
+        // Update hex text
+        const hexText = root.querySelector(`[data-sync="${v}"]`);
+        if (hexText) hexText.value = (val.startsWith('#')) ? val : '';
+      });
+    }
+
+    // 綁定設定控制（容器化）
+    function bindSettings(root) {
+      if (!root) return;
+      const inputs = $$('[data-var]', root);
+      const applyVar = (el) => {
+        const v = el.dataset.var; if (!v) return;
+        const scope = el.dataset.scope || 'global';
+        const sx = el.dataset.suffix || '';
+        const val = (el.type === 'range' || el.type === 'number') ? (el.value + sx) : el.value;
+        const prefs = loadPrefs();
+
+        if (scope === 'global') {
+          ROOT.style.setProperty(v, val);
+          if (THEME_AWARE_VARS.includes(v)) {
+            const theme = getCurTheme();
+            prefs.themes = prefs.themes || {};
+            prefs.themes[theme] = prefs.themes[theme] || {};
+            prefs.themes[theme][v] = val;
+          } else {
+            prefs.global = prefs.global || {};
+            prefs.global[v] = val;
+          }
+        } else {
+          const pg = getActivePageEl(); if (pg) pg.style.setProperty(v, val);
+          prefs.pages = prefs.pages || {};
+          const id = getActivePageId();
+          prefs.pages[id] = prefs.pages[id] || {};
+          prefs.pages[id][v] = val;
+        }
+        savePrefs(prefs);
+      };
+      inputs.forEach(el => {
+        el.addEventListener('input', () => {
+          applyVar(el);
+          // Sync HEX text if any
+          const v = el.dataset.var;
+          const hexText = root.querySelector(`[data-sync="${v}"]`);
+          if (hexText && el.type === 'color') hexText.value = el.value.toUpperCase();
+          // Sync Range readout
+          const readout = root.querySelector(`[data-read="${v}"]`);
+          if (readout) readout.textContent = el.value + (el.dataset.suffix || '');
+        });
+        if (el.value) applyVar(el);
+      });
+
+      // HEX text sync back
+      $$('.hex-text', root).forEach(tx => {
+        tx.addEventListener('change', () => {
+          let val = tx.value.trim();
+          if (!val.startsWith('#')) val = '#' + val;
+          if (/^#[0-9A-F]{6}$/i.test(val)) {
+            const v = tx.dataset.sync;
+            const colorInp = root.querySelector(`input[data-var="${v}"]`);
+            if (colorInp) {
+              colorInp.value = val;
+              applyVar(colorInp);
+            }
+          }
+        });
+      });
+
+      // 容器區域內的按鈕（避免與 overlay/整頁互撞）
+      const wrap = root.closest('section, .settings-sheet, body') || document;
+      const btnSave = $('.btnSave', wrap);
+      const btnResetPage = $('.btnResetPage', wrap);
+      const btnResetAll = $('.btnResetAll', wrap);
+
+      btnSave && btnSave.addEventListener('click', (e) => { e.preventDefault(); /* 如需後端儲存可在此串接 */ alert('已儲存（變更會即時生效）'); });
+      btnResetPage && btnResetPage.addEventListener('click', (e) => { e.preventDefault(); const el = getActivePageEl(); if (el) el.removeAttribute('style'); const prefs = loadPrefs(); const id = getActivePageId(); if (prefs.pages) delete prefs.pages[id]; savePrefs(prefs); syncControls(root); });
+      btnResetAll && btnResetAll.addEventListener('click', (e) => { e.preventDefault(); const prefs = loadPrefs(); prefs.global = {}; savePrefs(prefs); ROOT.removeAttribute('style'); syncControls(root); });
+    }
+
+    function resetPaletteToDefaults() {
+      const prefs = loadPrefs(); prefs.global = prefs.global || {};
+      Object.entries(DEFAULT_PALETTE).forEach(([k, v]) => {
+        document.documentElement.style.setProperty(k, v);
+        prefs.global[k] = v;
+      });
+      savePrefs(prefs);
+      // 同步 UI（浮層 + 整頁）
+      syncControls($('#settingsPanel'));
+      syncControls($('#settingsForm'));
+      // 也把膠囊重新上色
+      bindSwatches($('#settingsPanel'));
+      bindSwatches($('#settingsForm'));
+    }
+
+    // 讓浮層內保存/關閉確實關閉視窗
+    (function () {
+      const wrap = document.getElementById('settingsOverlay');
+      if (!wrap) return;
+      const btnSave = wrap.querySelector('#btnSave, .btnSave');
+      const btnClose = wrap.querySelector('#closeSettings, .settings-close');
+      const btnResetPage = wrap.querySelector('#btnResetPage, .btnResetPage');
+      const btnResetAll = wrap.querySelector('#btnResetAll, .btnResetAll');
+      btnSave && btnSave.addEventListener('click', () => closeOverlay());
+      btnClose && btnClose.addEventListener('click', () => closeOverlay());
+      btnResetPage && btnResetPage.addEventListener('click', () => { });
+      btnResetAll && btnResetAll.addEventListener('click', () => { });
+    })();
+
+    // 支援 data-rgba-var 容器：color + alpha → rgba()
+    function bindRgbaPickers() {
+      document.querySelectorAll('[data-rgba-var]').forEach(box => {
+        const vname = box.getAttribute('data-rgba-var');
+        const color = box.querySelector('input[type="color"][data-role="color"]');
+        const alpha = box.querySelector('input[type="range"][data-role="alpha"]');
+        const apply = () => {
+          if (!color || !alpha) return;
+          const hex = color.value.trim();
+          const a = parseFloat(alpha.value || '1');
+          const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+          if (!m) return;
+          const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+          const rgba = `rgba(${r},${g},${b},${a})`;
+          document.documentElement.style.setProperty(vname, rgba);
+          const prefs = loadPrefs(); prefs.global = prefs.global || {}; prefs.global[vname] = rgba; savePrefs(prefs);
+        };
+        color && color.addEventListener('input', apply);
+        alpha && alpha.addEventListener('input', apply);
+        apply();
+      });
+    }
+
+    // swatch 膠囊：data-color-var（HEX） 與 data-rgba-var（HEX + α）
+    function bindSwatches(container) {
+      const roots = container ? [container] : [document];
+      roots.forEach(root => {
+        // 1) 純 HEX：data-color-var
+        root.querySelectorAll('.swatch[data-color-var]').forEach(box => {
+          const varName = box.getAttribute('data-color-var');
+          const btn = box.querySelector('.swatch-btn');
+          const input = box.querySelector('.swatch-input');
+          if (!btn || !input || !varName) return;
+          const setBtnStyle = (hex) => {
+            btn.style.background = hex;
+            const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+            if (m) {
+              const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+              const l = 0.2126 * r + 0.7152 * g + 0.0722 * b; btn.style.color = (l < 140) ? '#fff' : '#111';
+            }
+          };
+          const apply = () => {
+            const hex = input.value || '#000000';
+            ROOT.style.setProperty(varName, hex);
+            const prefs = loadPrefs();
+            if (THEME_AWARE_VARS.includes(varName)) {
+              const theme = getCurTheme();
+              prefs.themes = prefs.themes || {};
+              prefs.themes[theme] = prefs.themes[theme] || {};
+              prefs.themes[theme][varName] = hex;
+            } else {
+              prefs.global = prefs.global || {};
+              prefs.global[varName] = hex;
+            }
+            savePrefs(prefs);
+            setBtnStyle(hex);
+          };
+          btn.addEventListener('click', () => input.click());
+          input.addEventListener('input', apply);
+          apply();
+        });
+
+        // 2) RGBA：data-rgba-var（有 .swatch-alpha range）
+        root.querySelectorAll('.swatch.swatch--alpha[data-rgba-var]').forEach(box => {
+          const varName = box.getAttribute('data-rgba-var');
+          const btn = box.querySelector('.swatch-btn');
+          const color = box.querySelector('.swatch-input[type="color"]');
+          const alpha = box.querySelector('.swatch-alpha[type="range"]');
+          if (!btn || !color || !alpha || !varName) return;
+
+          const setBtnStyle = (hex, a) => {
+            btn.style.background = hex;
+            const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+            if (m) {
+              const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+              const l = 0.2126 * r + 0.7152 * g + 0.0722 * b; btn.style.color = (l < 140) ? '#fff' : '#111';
+            }
+            btn.dataset.alpha = a; // 小提示：可視需要在 title 上顯示 α
+          };
+
+          const apply = () => {
+            const hex = color.value || '#000000';
+            const a = parseFloat(alpha.value || '1');
+            const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
+            if (!m) return;
+            const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+            const rgba = `rgba(${r},${g},${b},${a})`;
+            ROOT.style.setProperty(varName, rgba);
+            const prefs = loadPrefs();
+            if (THEME_AWARE_VARS.includes(varName)) {
+              const theme = getCurTheme();
+              prefs.themes = prefs.themes || {};
+              prefs.themes[theme] = prefs.themes[theme] || {};
+              prefs.themes[theme][varName] = rgba;
+            } else {
+              prefs.global = prefs.global || {};
+              prefs.global[varName] = rgba;
+            }
+            savePrefs(prefs);
+            setBtnStyle(hex, a);
+          };
+
+          btn.addEventListener('click', () => color.click());
+          color.addEventListener('input', apply);
+          alpha.addEventListener('input', apply);
+          apply();
+        });
+      });
+    }
+
+    // 監看 .page.show 切換
+    function applyForCurrentPage() {
+      const prefs = loadPrefs();
+      const theme = getCurTheme();
+
+      // 先清除先前手動設定的 style (如 --bg)，讓 CSS 主題選擇器能生效
+      ROOT.removeAttribute('style');
+
+      // 1) 套用 Global (非 theme-aware 部分仍由 global 覆蓋)
+      Object.entries(prefs.global || {}).forEach(([k, v]) => ROOT.style.setProperty(k, v));
+
+      // 2) 套用目前 Theme 的變數 (背景等自定義)
+      const tVars = prefs.themes?.[theme] || {};
+      Object.entries(tVars).forEach(([k, v]) => ROOT.style.setProperty(k, v));
+
+      // 3) 套用 Page 變數
+      const id = getActivePageId();
+      applyPage(id, (prefs.pages && prefs.pages[id]) || {});
+
+      syncControls($('#settingsPanel'));
+      syncControls($('#settingsForm'));
+    }
+
+    const mo = new MutationObserver((muts) => {
+      const changed = muts.some(m => m.attributeName === 'class' || m.attributeName === 'data-theme');
+      if (changed) applyForCurrentPage();
+    });
+    // 確保只在 documentElement 上監測，並處理 DOMReady
+    function initObserver() {
+      if (!document.documentElement) return;
+      mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+      applyForCurrentPage();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initObserver);
+    else initObserver();
+
+    // === Overlay 開關 ===
+    const overlay = $('#settingsOverlay');
+    const openOverlay = () => { if (!overlay) return; overlay.classList.add('show'); document.documentElement.classList.add('lock-scroll'); syncControls($('#settingsPanel')); };
+    const closeOverlay = () => { if (!overlay) return; overlay.classList.remove('show'); document.documentElement.classList.remove('lock-scroll'); };
+
+    // Header 按鈕 → 一律只開浮層 (排除已進入整頁設定的情況)
+    document.addEventListener('click', (e) => {
+      const t = e.target.closest('#openSettings, [data-open="settings-overlay"]');
+      if (t) {
+        e.preventDefault();
+        openOverlay();
+      }
+    }, true);
+
+    // 浮層內關閉鈕 / 點背景 / ESC 關閉
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#closeSettings, .settings-close, [data-close="settings-overlay"], .modal .btn-close, [data-action="close-settings"]')) {
+        e.preventDefault();
+        closeOverlay();
+      } else if (e.target.classList && e.target.classList.contains('settings-backdrop')) {
+        closeOverlay();
+      }
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeOverlay(); });
+
+    // === 右側抽屜 → 進入整頁 Settings ===
+    const showPage = (id) => { $$('.page').forEach(p => p.classList.toggle('show', p.id === id)); closeOverlay(); };
+    document.addEventListener('click', (e) => {
+      const goPageBtn = e.target.closest('#openSettingsPage, [data-route="settings-page"], .drawer [data-target="settings-page"]');
+      if (goPageBtn) { e.preventDefault(); showPage('page-settings'); }
     });
 
-    // 容器區域內的按鈕（避免與 overlay/整頁互撞）
-    const wrap = root.closest('section, .settings-sheet, body') || document;
-    const btnSave = $('.btnSave', wrap);
-    const btnResetPage = $('.btnResetPage', wrap);
-    const btnResetAll = $('.btnResetAll', wrap);
-
-    btnSave && btnSave.addEventListener('click', (e)=>{ e.preventDefault(); /* 如需後端儲存可在此串接 */ alert('已儲存（變更會即時生效）'); });
-    btnResetPage && btnResetPage.addEventListener('click', (e)=>{ e.preventDefault(); const el = getActivePageEl(); if (el) el.removeAttribute('style'); const prefs = loadPrefs(); const id = getActivePageId(); if (prefs.pages) delete prefs.pages[id]; savePrefs(prefs); syncControls(root); });
-    btnResetAll && btnResetAll.addEventListener('click', (e)=>{ e.preventDefault(); const prefs = loadPrefs(); prefs.global = {}; savePrefs(prefs); ROOT.removeAttribute('style'); syncControls(root); });
-  }
-
-  function resetPaletteToDefaults(){
-    const prefs = loadPrefs(); prefs.global = prefs.global || {};
-    Object.entries(DEFAULT_PALETTE).forEach(([k,v])=>{
-      document.documentElement.style.setProperty(k, v);
-      prefs.global[k] = v;
+    document.addEventListener('click', (e) => {
+      const t = e.target.closest('.btnResetPalette');
+      if (t) { e.preventDefault(); resetPaletteToDefaults(); }
     });
-    savePrefs(prefs);
-    // 同步 UI（浮層 + 整頁）
-    syncControls($('#settingsPanel'));
-    syncControls($('#settingsForm'));
-    // 也把膠囊重新上色
+
+    // 啟用兩組容器
+    bindSettings($('#settingsPanel')); // 浮層 controls（若存在）
+    bindSettings($('#settingsForm'));  // 整頁 controls（若存在）
     bindSwatches($('#settingsPanel'));
     bindSwatches($('#settingsForm'));
-  }
 
-  // 讓浮層內保存/關閉確實關閉視窗
-  (function(){
-    const wrap = document.getElementById('settingsOverlay');
-    if(!wrap) return;
-    const btnSave = wrap.querySelector('#btnSave, .btnSave');
-    const btnClose = wrap.querySelector('#closeSettings, .settings-close');
-    const btnResetPage = wrap.querySelector('#btnResetPage, .btnResetPage');
-    const btnResetAll = wrap.querySelector('#btnResetAll, .btnResetAll');
-    btnSave && btnSave.addEventListener('click', ()=> closeOverlay());
-    btnClose && btnClose.addEventListener('click', ()=> closeOverlay());
-    btnResetPage && btnResetPage.addEventListener('click', ()=> {});
-    btnResetAll && btnResetAll.addEventListener('click', ()=> {});
+    // 首次載入
+    applyForCurrentPage();
   })();
-
-  // 支援 data-rgba-var 容器：color + alpha → rgba()
-  function bindRgbaPickers(){
-    document.querySelectorAll('[data-rgba-var]').forEach(box=>{
-      const vname = box.getAttribute('data-rgba-var');
-      const color = box.querySelector('input[type="color"][data-role="color"]');
-      const alpha = box.querySelector('input[type="range"][data-role="alpha"]');
-      const apply = ()=>{
-        if(!color || !alpha) return;
-        const hex = color.value.trim();
-        const a = parseFloat(alpha.value || '1');
-        const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
-        if(!m) return;
-        const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16);
-        const rgba = `rgba(${r},${g},${b},${a})`;
-        document.documentElement.style.setProperty(vname, rgba);
-        const prefs = loadPrefs(); prefs.global = prefs.global || {}; prefs.global[vname]=rgba; savePrefs(prefs);
-      };
-      color && color.addEventListener('input', apply);
-      alpha && alpha.addEventListener('input', apply);
-      apply();
-    });
-  }
-  
-  // swatch 膠囊：data-color-var（HEX） 與 data-rgba-var（HEX + α）
-function bindSwatches(container){
-  const roots = container ? [container] : [document];
-  roots.forEach(root=>{
-    // 1) 純 HEX：data-color-var
-    root.querySelectorAll('.swatch[data-color-var]').forEach(box=>{
-      const varName = box.getAttribute('data-color-var');
-      const btn  = box.querySelector('.swatch-btn');
-      const input= box.querySelector('.swatch-input');
-      if(!btn || !input || !varName) return;
-      const setBtnStyle = (hex)=>{
-        btn.style.background = hex;
-        const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
-        if(m){ const r=parseInt(m[1],16),g=parseInt(m[2],16),b=parseInt(m[3],16);
-          const l = 0.2126*r+0.7152*g+0.0722*b; btn.style.color = (l < 140)?'#fff':'#111';
-        }
-      };
-      const apply = ()=>{
-        const hex = input.value || '#000000';
-        document.documentElement.style.setProperty(varName, hex);
-        const prefs = loadPrefs(); prefs.global = prefs.global||{}; prefs.global[varName]=hex; savePrefs(prefs);
-        setBtnStyle(hex);
-      };
-      btn.addEventListener('click', ()=> input.click());
-      input.addEventListener('input', apply);
-      apply();
-    });
-
-    // 2) RGBA：data-rgba-var（有 .swatch-alpha range）
-    root.querySelectorAll('.swatch.swatch--alpha[data-rgba-var]').forEach(box=>{
-      const varName = box.getAttribute('data-rgba-var');
-      const btn   = box.querySelector('.swatch-btn');
-      const color = box.querySelector('.swatch-input[type="color"]');
-      const alpha = box.querySelector('.swatch-alpha[type="range"]');
-      if(!btn || !color || !alpha || !varName) return;
-
-      const setBtnStyle = (hex, a)=>{
-        btn.style.background = hex;
-        const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
-        if(m){ const r=parseInt(m[1],16),g=parseInt(m[2],16),b=parseInt(m[3],16);
-          const l = 0.2126*r+0.7152*g+0.0722*b; btn.style.color = (l < 140)?'#fff':'#111';
-        }
-        btn.dataset.alpha = a; // 小提示：可視需要在 title 上顯示 α
-      };
-
-      const apply = ()=>{
-        const hex = color.value || '#000000';
-        const a   = parseFloat(alpha.value || '1');
-        const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex);
-        if(!m) return;
-        const r=parseInt(m[1],16), g=parseInt(m[2],16), b=parseInt(m[3],16);
-        const rgba = `rgba(${r},${g},${b},${a})`;
-        document.documentElement.style.setProperty(varName, rgba);
-        const prefs = loadPrefs(); prefs.global = prefs.global||{}; prefs.global[varName]=rgba; savePrefs(prefs);
-        setBtnStyle(hex, a);
-      };
-
-      btn.addEventListener('click', ()=> color.click());
-      color.addEventListener('input', apply);
-      alpha.addEventListener('input', apply);
-      apply();
-    });
-  });
-}
-
-  // 監看 .page.show 切換（若你有自己的路由事件，也可自行呼叫 applyForCurrentPage）
-  function applyForCurrentPage(){ const prefs = loadPrefs(); applyGlobal(prefs.global||{}); const id = getActivePageId(); applyPage(id, (prefs.pages&&prefs.pages[id]) || {}); syncControls($('#settingsPanel')); syncControls($('#settingsForm')); }
-  const mo = new MutationObserver(()=> applyForCurrentPage());
-  mo.observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
-
-  // === Overlay 開關 ===
-  const overlay = $('#settingsOverlay');
-  const openOverlay = () => { if (!overlay) return; overlay.hidden = false; document.documentElement.classList.add('lock-scroll'); syncControls($('#settingsPanel')); };
-  const closeOverlay = () => { if (!overlay) return; overlay.hidden = true; document.documentElement.classList.remove('lock-scroll'); };
-
-  // Header 按鈕 → 一律只開浮層（捕獲階段擋住任何路由）
-  document.addEventListener('click', (e) => {
-    const t = e.target.closest('#openSettings, [data-open="settings-overlay"], a[href*="settings" i]');
-    if (t){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      openOverlay();
-    }
-  }, true);
-
-  // 浮層內關閉鈕 / 點背景 / ESC 關閉
-  document.addEventListener('click', (e) => {
-    if (e.target.closest('#closeSettings, .settings-close, [data-close="settings-overlay"], .modal .btn-close, [data-action="close-settings"]')){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      closeOverlay();
-    }
-    if (e.target.classList && e.target.classList.contains('settings-backdrop')){ closeOverlay(); }
-  });
-  document.addEventListener('keydown', e=>{ if (e.key==='Escape') closeOverlay(); });
-
-  // === 右側抽屜 → 進入整頁 Settings ===
-  const showPage = (id) => { $$('.page').forEach(p => p.classList.toggle('show', p.id === id)); closeOverlay(); };
-  document.addEventListener('click', (e) => {
-    const goPageBtn = e.target.closest('#openSettingsPage, [data-route="settings-page"], .drawer [data-target="settings-page"]');
-    if (goPageBtn){ e.preventDefault(); showPage('page-settings'); }
-  });
-
-  document.addEventListener('click', (e)=>{
-  const t = e.target.closest('.btnResetPalette');
-  if (t){ e.preventDefault(); resetPaletteToDefaults(); }
-  });
-
-  // 啟用兩組容器
-  bindSettings($('#settingsPanel')); // 浮層 controls（若存在）
-  bindSettings($('#settingsForm'));  // 整頁 controls（若存在）
-  bindSwatches($('#settingsPanel'));
-  bindSwatches($('#settingsForm'));
-
-  // 首次載入
-  applyForCurrentPage();
-})();
 </script>

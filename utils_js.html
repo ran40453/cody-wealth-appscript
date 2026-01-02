@@ -1,38 +1,38 @@
 <script>
-// utils_js.html
-/* ===== Utils (shared) ===== */
+  // utils_js.html
+  /* ===== Utils (shared) ===== */
 
-function esc(s){ return String(s==null?'':s).replace(/[&<>\"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;' }[m])); }
-function setText(id, txt){ const el = document.getElementById(id); if (el) el.textContent = txt; }
-function normalizeNumber(v){ if (v==null) return ''; return String(v).replace(/[,\\s]/g,''); }
-function toggleSign(){
-  const el = document.getElementById('amount');
-  let v = (el.value||'').replace(/[,\\s]/g,'');
-  if (!v){ el.value='-'; el.focus(); return; }
-  el.value = v.startsWith('-') ? v.slice(1) : ('-'+v);
-}
-function fmt0(n){ n = Number(n); return isFinite(n) ? n.toLocaleString('zh-Hant-TW',{maximumFractionDigits:0}) : '-'; }
-function fmt1(n){ n = Number(n); return isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:1, maximumFractionDigits:1}) : '0.0'; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": "&#39;" }[m])); }
+  function setText(id, txt) { const el = document.getElementById(id); if (el) el.textContent = txt; }
+  function normalizeNumber(v) { if (v == null) return ''; return String(v).replace(/[, \s]/g, ''); }
+  function toggleSign() {
+    const el = document.getElementById('amount');
+    let v = (el.value || '').replace(/[, \s]/g, '');
+    if (!v) { el.value = '-'; el.focus(); return; }
+    el.value = v.startsWith('-') ? v.slice(1) : ('-' + v);
+  }
+  function fmt0(n) { n = Number(n); return isFinite(n) ? n.toLocaleString('zh-Hant-TW', { maximumFractionDigits: 0 }) : '-'; }
+  function fmt1(n) { n = Number(n); return isFinite(n) ? n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '0.0'; }
 
-/* 將 kpiBox, kv, kv_with_badge 從 dashmain_js.html 移至此處 */
-function kpiBox(label, v, frac=0){
-  const n = Number(v||0);
-  const txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac}) : '-';
-  return `<div class=\"db-kpi\"><div class=\"kpi-label\">${label}</div><div class=\"kpi-value\">${txt}</div></div>`;
-}
+  /* 將 kpiBox, kv, kv_with_badge 從 dashmain_js.html 移至此處 */
+  function kpiBox(label, v, frac = 0) {
+    const n = Number(v || 0);
+    const txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: frac, maximumFractionDigits: frac }) : '-';
+    return `<div class=\"db-kpi\"><div class=\"kpi-label\">${label}</div><div class=\"kpi-value\">${txt}</div></div>`;
+  }
 
-function kv(label, v, frac=0, suffix=''){
-  const n = Number(v||0);
-  const txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW',{minimumFractionDigits:frac, maximumFractionDigits:frac}) : '-';
-  return `<div class=\"sumGroup\"><div class=\"sumRow\"><span class=\"sumLabel\">${label}</span><span class=\"sumNum\">${txt}${suffix}</span></div></div>`;
-}
+  function kv(label, v, frac = 0, suffix = '') {
+    const n = Number(v || 0);
+    const txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: frac, maximumFractionDigits: frac }) : '-';
+    return `<div class=\"sumGroup\"><div class=\"sumRow\"><span class=\"sumLabel\">${label}</span><span class=\"sumNum\">${txt}${suffix}</span></div></div>`;
+  }
 
-/* 新增一個帶膠囊樣式的函式，專門用於報酬率 */
-function kv_with_badge(label, v, frac=1, suffix='%') {
-  const n = Number(v || 0);
-  const txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: frac, maximumFractionDigits: frac }) : '-';
-  const badgeClass = n >= 0 ? 'badge pos' : 'badge neg';
-  return `<div class=\"sumGroup\"><div class=\"sumRow\"><span class=\"sumLabel\">${label}</span><span class=\"sumNum\"><span class=\"${badgeClass}\">${txt}${suffix}</span></span></div></div>`;
-}
+  /* 新增一個帶膠囊樣式的函式，專門用於報酬率 */
+  function kv_with_badge(label, v, frac = 1, suffix = '%') {
+    const n = Number(v || 0);
+    const txt = isFinite(n) ? n.toLocaleString('zh-Hant-TW', { minimumFractionDigits: frac, maximumFractionDigits: frac }) : '-';
+    const badgeClass = n >= 0 ? 'badge pos' : 'badge neg';
+    return `<div class=\"sumGroup\"><div class=\"sumRow\"><span class=\"sumLabel\">${label}</span><span class=\"sumNum\"><span class=\"${badgeClass}\">${txt}${suffix}</span></span></div></div>`;
+  }
 
 </script>

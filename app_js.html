@@ -7,11 +7,19 @@
     titles: {
       input: '記帳',
       dashmain: 'Dashboard', debt: '債務', record: 'Database',
-      ctbc: 'CTBC', policy: '定存保單', gcv: 'GCV',
+      invest: '投資', policy: '定存保單', gcv: 'GCV',
       mrpt: '投資月報表', fortune: '年報表', stk: '股票總表',
       grw: 'Growin', anlys: '投資分析', charts: 'Charts', links: '其他連結'
     }
   };
+
+  /** 全域 Busy 狀態控制 */
+  function toggleBusy(on) {
+    const loader = byId('btnRefresh'); // 或其它全域 loader 容器
+    if (loader) loader.classList.toggle('busy', on);
+    // 可視需求加入全域遮罩
+    document.body.style.cursor = on ? 'wait' : 'default';
+  }
 
   // =================== Utils ===================
   function esc(s) {
@@ -27,7 +35,7 @@
 
   // =================== 主題 ===================
   function getSavedTheme() {
-    try { return localStorage.getItem('cw_theme') || 'dark'; } catch (e) { return 'dark'; }
+    try { return localStorage.getItem('cw_theme') || 'neu-dark'; } catch (e) { return 'neu-dark'; }
   }
   function saveTheme(mode) {
     try { localStorage.setItem('cw_theme', mode); } catch (e) { }
@@ -43,9 +51,54 @@
   function initTheme() {
     applyTheme(getSavedTheme());
   }
-  function toggleTheme() {
-    const next = (document.documentElement.dataset.theme === 'dark') ? 'light' : 'dark';
-    applyTheme(next);
+  function toggleTheme(e) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    showThemePicker();
+  }
+
+  function showThemePicker() {
+    let picker = document.getElementById('themePicker');
+    if (!picker) {
+      picker = document.createElement('div');
+      picker.id = 'themePicker';
+      picker.className = 'theme-picker card';
+      const themes = [
+        { id: 'neu', color: '#e0e5ec', label: 'Neu-L' },
+        { id: 'neu-dark', color: '#1e2125', label: 'Neu-D' }
+      ];
+      picker.innerHTML = themes.map(t => `
+        <div class="theme-option ${t.id}" data-theme="${t.id}" title="${t.label}" style="--theme-col: ${t.color}">
+          <div class="theme-circle"></div>
+        </div>
+      `).join('');
+      document.body.appendChild(picker);
+
+      picker.querySelectorAll('.theme-option').forEach(opt => {
+        opt.onclick = () => {
+          applyTheme(opt.dataset.theme);
+          picker.classList.remove('active');
+        };
+      });
+
+      // Click outside to close
+      document.addEventListener('click', (e) => {
+        if (!picker.contains(e.target) && !e.target.closest('.themeBtn')) {
+          picker.classList.remove('active');
+        }
+      });
+    }
+
+    picker.classList.toggle('active');
+
+    if (picker.classList.contains('active')) {
+      const btn = document.getElementById('btnTheme') || document.querySelector('.themeBtn');
+      if (btn) {
+        const rect = btn.getBoundingClientRect();
+        picker.style.bottom = 'auto';
+        picker.style.top = (isMobile() ? (rect.bottom + 4) : (rect.bottom + 8)) + 'px';
+        picker.style.right = Math.max(10, (window.innerWidth - rect.right)) + 'px';
+      }
+    }
   }
 
   // =================== 數字遮罩 ===================
@@ -280,6 +333,7 @@
     });
   }
   function go(page) {
+    if (page === 'ctbc') page = 'invest'; // 舊網址與點擊重新導向
     // 顯示/隱藏 section
     document.querySelectorAll('section[id^="page_"], .page').forEach(sec => {
       const id = sec.id || ''; // 兼容 .page.show
@@ -555,6 +609,14 @@
     document.addEventListener('touchstart', onTouchStart, { passive: true });
     document.addEventListener('touchend', clearTouch, { passive: true });
     document.addEventListener('touchcancel', clearTouch, { passive: true });
+  })();
+
+  // Robust Theme Initialization
+  (function () {
+    const init = () => { if (typeof initTheme === 'function') initTheme(); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+    setTimeout(init, 500);
   })();
 
 </script>

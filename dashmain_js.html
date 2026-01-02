@@ -262,12 +262,12 @@
 
     // 最小版 ROI 膠囊（沿用全域 .roi-badge 樣式）
     function roiChipHTML(v) {
-      if (v == null || !isFinite(+v)) return '<span class="roi-badge zero mask-num" data-mask-str="＊＊＊">—</span>';
+      if (v == null || !isFinite(+v)) return '<span class="monolith-label mask-num" data-mask-str="＊＊＊">---</span>';
       const n = Number(v);
-      const cls = n > 0 ? 'pos' : (n < 0 ? 'neg' : 'zero');
-      const sign = n > 0 ? '+' : (n < 0 ? '−' : '');
+      const cls = n > 0 ? 'monolith-gain' : (n < 0 ? 'monolith-loss' : '');
+      const sign = n > 0 ? '▲' : (n < 0 ? '▼' : '');
       const s = Math.abs(n).toLocaleString('zh-Hant-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      return `<span class="roi-badge ${cls} mask-num" data-mask-str="＊＊＊">${sign}${s}%</span>`;
+      return `<span class="monolith-label ${cls} mask-num" style="font-weight:700;" data-mask-str="＊＊＊">${sign} ${s}%</span>`;
     }
     function setPnlPill(elOrId, v) {
       const el = (typeof elOrId === 'string') ? document.getElementById(elOrId) : elOrId;
@@ -293,7 +293,7 @@
     (function () {
       const run = google?.script?.run; if (!run) return;
       run.withSuccessHandler(res => {
-        // 伺服端鍵名：ctbcUSD_N/T/AF、ctbcTWD_N/T/AF（皆為「基金」集合）
+        // 伺服端鍵名：investUSD_N/T/AF、investTWD_N/T/AF（皆為「基金」集合）
         const usdN = Number(res?.ctbcUSD_N || 0), usdT = Number(res?.ctbcUSD_T || 0), usdAF = Number(res?.ctbcUSD_AF || 0);
         const twdN = Number(res?.ctbcTWD_N || 0), twdT = Number(res?.ctbcTWD_T || 0), twdAF = Number(res?.ctbcTWD_AF || 0);
 
@@ -366,6 +366,10 @@
               console.error('[dashmain] getDashBalanceSummary ERR', (err && err.message) || err);
             })
             .getDashBalanceSummary();
+          // 確保股票市場區塊在儀表板載入時也更新
+          if (window.App?.modules?.stk?.init) {
+            App.modules.stk.init();
+          }
         })
         .withFailureHandler(err => {
           console.error('[dashmain] getDashboardData ERR', err && err.message || err);

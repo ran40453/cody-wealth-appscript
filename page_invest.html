@@ -1,0 +1,129 @@
+<section id="page-invest" class="page">
+    <div class="invest-shell cards-zoom-scope">
+        <div class="invest-layout">
+
+            <!-- 左側 1/3：類別按鈕 -->
+            <aside class="invest-sidebar card">
+                <div class="sidebar-header">
+                    <div class="header-main">
+                        <span class="material-symbols-outlined">account_balance_wallet</span>
+                        <h3>投資分類</h3>
+                        <!-- KPI 收合按鈕 -->
+                        <button id="kpiSideToggle" class="btn-ghost" title="收合/展開側邊資訊" style="margin-left: auto;">
+                            <span class="material-symbols-outlined" style="font-size: 20px;">side_navigation</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="invest-chips-vertical" id="investChips">
+                    <!-- 由 JS 注入分類按鈕 -->
+                </div>
+            </aside>
+
+            <!-- 右側 2/3：動態內容 -->
+            <div class="invest-main-content">
+
+                <div id="investStatus" class="invest-status-chip"></div>
+
+                <!-- 動態切換區域 -->
+                <div class="invest-views-container">
+
+                    <!-- 1. 分析 + 列表 視圖 (Split View) -->
+                    <div class="invest-view-section active" id="investAnalysisView">
+                        <div class="analysis-split">
+                            <!-- 左側：KPI 卡片 -->
+                            <div class="analysis-left">
+                                <div class="invest-kpiBar card" id="investKPI">
+                                    <!-- 總覽 -->
+                                    <div class="kpi-row" id="investKpiAll">
+                                        <div class="kpi-title">總覽 (USD)</div>
+                                        <div class="kpi-list">
+                                            <div class="kpi"><span class="k">現值</span><span class="v bold"
+                                                    id="investAllNoInt">—</span></div>
+                                            <div class="kpi"><span class="k">損益</span><span class="v bold"
+                                                    id="investAllT">—</span></div>
+                                            <div class="kpi"><span class="k">ROI</span><span class="v bold"
+                                                    id="investAllROI">—</span></div>
+                                            <div class="kpi"><span class="k">利息</span><span class="v bold"
+                                                    id="investAllAF">—</span></div>
+                                        </div>
+                                    </div>
+                                    <!-- 幣別 -->
+                                    <div class="kpi-sub-grid">
+                                        <div class="kpi-card-mini" id="investTWD">
+                                            <div class="t">TWD</div>
+                                            <div class="v" id="investTWD_N">—</div>
+                                            <div class="roi" id="investTWD_ROI">—</div>
+                                        </div>
+                                        <div class="kpi-card-mini" id="investUSD">
+                                            <div class="t">USD</div>
+                                            <div class="v" id="investUSD_N">—</div>
+                                            <div class="roi" id="investUSD_ROI">—</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="investAddAction" style="padding: 10px;"></div>
+                            </div>
+                            <!-- 右側：資料列表 -->
+                            <div class="analysis-right">
+                                <!-- A. 一般明細表 -->
+                                <div class="invest-tableWrap card" id="investMiniTable">
+                                    <div class="invest-scroll" id="investViewport">
+                                        <table class="invest-table">
+                                            <thead id="investHead">
+                                                <tr>
+                                                    <th class="txt">項目</th>
+                                                    <th class="num col-fix-1">現值 (USD)</th>
+                                                    <th class="num col-fix-2">報價 (USD)</th>
+                                                    <th class="txt col-fix-3">損益/ROI</th>
+                                                    <th class="num col-fix-4">利息 (USD)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="investBody">
+                                                <tr>
+                                                    <td class="empty" colspan="5">載入中…</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div id="investSpacer" aria-hidden="true"></div>
+                                    </div>
+                                </div>
+
+                                <!-- B. 股票詳細表 -->
+                                <div class="invest-stock-wrap" id="investStockView" style="display: none;">
+                                    <div class="invest-tableWrap card">
+                                        <!-- 股票專用市場切換 (橫向) -->
+                                        <div class="stk-market-bar" id="stkMarketHorizontal">
+                                            <div id="stkMarketsList" class="stk-markets-horizontal"></div>
+                                        </div>
+
+                                        <header class="stk-header-row">
+                                            <div class="stk-status-info" id="stkStatusText">持有中標的</div>
+                                            <div class="stk-ops">
+                                                <button id="stkStatusToggle" class="btn-ghost" title="切換顯示"><span
+                                                        class="material-symbols-outlined">visibility</span></button>
+                                                <button id="stkAddBtn" class="btn-ghost" title="新增"><span
+                                                        class="material-symbols-outlined">add</span></button>
+                                            </div>
+                                        </header>
+                                        <div class="invest-scroll stk-viewport" id="stkViewport">
+                                            <table class="invest-table stk-table">
+                                                <thead id="stkHead"></thead>
+                                                <tbody id="stkBody"></tbody>
+                                            </table>
+                                            <div id="stkSpacer" aria-hidden="true"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- C. 詳細卡片 (取代彈窗) -->
+                            <div id="investDetailCardContainer"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+    </div>
+</section>

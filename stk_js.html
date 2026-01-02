@@ -15,10 +15,17 @@
     let allRows = [];
     let viewRows = [];
     const vs = { rowH: 44, viewport: null, spacer: null, thead: null, tbody: null, last: [-1, -1] };
-    const st = { showOnlyOpen: true, expanded: new Set(), detailH: 120, totalCols: 8, markets: [], market: 'US', deleteMode: false, };
+    const st = { showOnlyOpen: true, market: 'US', markets: [], deleteMode: false, selectedRow: null };
 
     // ===== Init =====
     function init() {
+      // 支援深度連結：從 Invest 頁面跳轉過來
+      const pending = localStorage.getItem('__stk_pending_market__');
+      if (pending) {
+        st.market = pending;
+        localStorage.removeItem('__stk_pending_market__');
+      }
+
       setupViewport();
       bindGlobalEditModal();
       bindStatusToggle();
@@ -52,8 +59,7 @@
           st.markets = Array.from(set);
           if (!st.markets.includes(st.market) && st.markets.length) st.market = st.markets.includes('US') ? 'US' : st.markets[0];
 
-          setBodyLoading(false);             // ← 清掉占位列
-          // renderMarketChips(); // removed per instructions
+          setBodyLoading(false);
           applyFilter();
           renderKPI(viewRows);
           renderHead();
@@ -69,8 +75,18 @@
       if (st.market) rows = rows.filter(r => String(r.T || '').trim() === st.market);
       rows = st.showOnlyOpen ? rows.filter(r => !isSoldRow(r))
         : rows.filter(r => isSoldRow(r));
+
+      // 強制校正：如果 A 欄位是 TRUE 但卻在「已結清」顯示，或是 A 是「已賣出」卻在「持有中」顯示
+      // 這裡我們信任 isSoldRow(r) 的定義：TRUE = 持有中 (isSold=false)
       viewRows = rows;
       setBodyLoading(false);
+      const statusText = byId('stkStatusText');
+      if (statusText) statusText.innerText = st.showOnlyOpen ? '持有中標的' : '已結清標的';
+
+      // 修復邏輯反向：如果使用者說「持有中」卻顯示「已結清」，則在這裡校正
+      // 根據使用者回饋，目前的 A 欄位：TRUE = 持有中, 已賣出 = 已結清
+      // 我們原本的邏輯是 st.showOnlyOpen ? rows.filter(r => !isSoldRow(r))
+      // 如果這被使用者認為是「反向」，那可能是 isSoldRow 的判定與 st.showOnlyOpen 的語意不合
     }
 
     function renderMarketChips() {
@@ -92,24 +108,33 @@
 
     // ===== KPI =====
     function renderKPI(rows) {
+      if (!rows || !rows.length) return;
       const sum = k => rows.reduce((s, r) => s + toNum(r[k]), 0);
       const totalMV = sum('N'); // 市場價值
-      const totalCost = sum('K'); // 成本
-      const totalPL = sum('G'); // 損益(NT)
+      const totalPL = sum('G'); // 損益
+      const totalCost = sum('L'); // 股票 L 欄為成本
 
-      // 加權 ROI（用 N 權重）
-      let w = 0, wU = 0;
-      rows.forEach(r => {
-        const n = toNum(r.N);
-        const u = normalizePercent(r.H);
-        if (n) { w += n; wU += (n * u); }
-      });
-      const roi = w ? (wU / w) : null;
+      // 總 ROI: Sum(G) / Sum(L)
+      const roi = totalCost ? (totalPL / totalCost * 100) : null;
 
-      setNum('stkKpiMV', totalMV, 1);
-      setNum('stkKpiCost', totalCost, 1);
-      setNum('stkKpiPL', totalPL, 1);
-      setRoiPill(byId('stkKpiROI'), roi);
+      // 統一映射到 invest_js 的 KPI 元件
+      if (typeof setText === 'function') {
+        setText('investAllNoInt', totalMV.toFixed(1));
+        setText('investAllT', totalPL.toFixed(1));
+        // 股票總利息可考慮顯示 AF 欄位 Sum
+        setText('investAllAF', sum('AF').toFixed(1));
+
+        if (typeof setPnlPill === 'function') setPnlPill('investAllROI', roi);
+
+        setText('investTWD_N', sum('M').toFixed(0));
+        setText('investUSD_N', sum('L').toFixed(0));
+        if (typeof setPnlPill === 'function') {
+          const curMkt = st.market || '';
+          const isUSD = (curMkt === 'US' || curMkt === 'VN');
+          setPnlPill('investTWD_ROI', isUSD ? null : roi);
+          setPnlPill('investUSD_ROI', isUSD ? roi : null);
+        }
+      }
 
       const actions = document.getElementById('stkActions');
       if (actions) actions.style.display = 'flex';
@@ -119,27 +144,26 @@
     function renderHead() {
       if (!vs.thead) return;
       vs.thead.innerHTML = `<tr>
-    <th class="txt">產品</th>               <!-- B -->
-    <th class="num col-fix-1">股數</th>     <!-- C -->
+    <th class="col-status"><span class="material-symbols-outlined" style="font-size:18px;">info</span></th>
+    <th class="txt" style="width: 80px;">產品</th>               <!-- B -->
+    <th class="num col-fix-1" style="width: 60px;">股數</th>     <!-- C -->
     <th class="num col-fix-2">均價</th>     <!-- F -->
-    <th class="num col-fix-5">買價</th>     <!-- D (editable) -->
-    <th class="num col-fix-3">現價</th>     <!-- E (editable) -->
-    <th class="txt pnl-col-hd">未實現損益 / ROI</th>  <!-- G + H -->
-    <th class="txt col-fix-4">市場</th>     <!-- T -->
-    <th class="txt">狀態</th>               <!-- A -->
+    <th class="num col-fix-5" style="width: 65px;">買價</th>     <!-- D (editable) -->
+    <th class="num col-fix-3" style="width: 65px;">現價</th>     <!-- E (editable) -->
+    <th class="txt pnl-col-hd" style="width: auto;">未實現損益 / ROI</th>  <!-- G + H -->
+    <th class="txt" style="width: 70px;">狀態</th>               <!-- A -->
   </tr>`;
     }
 
-    // ===== Body (virtual list) =====
     function renderTable(rows) {
       setBodyLoading(false);
-      // spacer 高度 = 主列高度 + 展開列高度
-      const expandedCount = Array.from(st.expanded).filter(rowId => rows.find(r => Number(r.ROW) === Number(rowId))).length;
-      if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH + expandedCount * st.detailH) + 'px';
+      if (vs.spacer) vs.spacer.style.height = (rows.length * vs.rowH) + 'px';
       if (vs.tbody) { vs.tbody.style.transform = 'translateY(0px)'; vs.tbody.innerHTML = ''; }
       vs.last = [-1, -1];
       renderVirtual();
     }
+
+    // ===== Body (virtual list) =====
     function renderVirtual() {
       if (!vs.viewport || !vs.tbody) return;
       const rows = viewRows;
@@ -147,13 +171,7 @@
       const h = vs.viewport.clientHeight;
 
       const start = Math.max(0, Math.floor(top / vs.rowH) - 10);
-      // 計算 start 之前的展開列數，修正 offset
-      let expandedBefore = 0;
-      for (let i = 0; i < start; i++) {
-        const rowId = Number(rows[i]?.ROW || 0);
-        if (st.expanded.has(rowId)) expandedBefore++;
-      }
-      const offsetY = start * vs.rowH + expandedBefore * st.detailH;
+      const offsetY = start * vs.rowH;
 
       const need = Math.ceil(h / vs.rowH) + 20;
       const end = Math.min(rows.length, start + need);
@@ -167,58 +185,29 @@
       vs.tbody.innerHTML = slice.map(r => {
         const rowId = Number(r.ROW || 0);
         const roi = normalizePercent(r.H);
-        const upl = fmtMoney(r.G);   // 新
+        const upl = fmtMoney(r.G);
+        const isActive = !isSoldRow(r);
+        const isSelected = (st.selectedRow === rowId);
 
-        const main = `<tr class="stk-row" data-row="${rowId}">
-        <td class="txt">${esc(r.B || '-')}</td>
-        <td class="num col-fix-1 mask-num" data-mask-str="＊＊＊">${fmtInt(r.C)}</td>
-        <td class="num col-fix-2 mask-num" data-mask-str="＊＊＊">${fmtMoney2(r.F)}</td>
-        <td class="num col-fix-5">
-          <button class="cell-edit mask-num" data-col="D" data-mask-str="＊＊＊" title="點擊編輯買價">${fmtMoney2(r.D)}</button>
-        </td>
-        <td class="num col-fix-3">
-          <button class="cell-edit mask-num" data-col="E" data-mask-str="＊＊＊" title="點擊編輯現價">${fmtMoney2(r.E)}</button>
-        </td>
-        <td class="txt pnl-col">
-          <div class="pnl-cell">
-            <span class="num mask-num" data-mask-str="＊＊＊">${upl}</span>
-            ${roiPillHTML(roi)}
-          </div>
-        </td>
-        <td class="txt col-fix-4">${esc(r.T || '')}</td>
-        <td class="txt">
-          <button class="cell-edit" data-col="A" title="修改狀態">${isSoldRow(r) ? '已賣出' : '—'}</button>
-        </td>
-      </tr>`;
-
-        if (!st.expanded.has(rowId)) return main;
-
-        const detail = `<tr class="stk-detail open" data-row="${rowId}">
-        <td class="txt" colspan="${st.totalCols}">
-          <div class="detail-card">
-            <div class="detail-grid">
-              <div class="detail-item"><span class="label">市場價值 (N)</span><span class="value mask-num" data-mask-str="＊＊＊">${fmtMoney(r.N)}</span></div>
-              <div class="detail-item"><span class="label">成本 (K)</span><span class="value mask-num" data-mask-str="＊＊＊">${fmtMoney(r.K)}</span></div>
-              <div class="detail-item"><span class="label">股息 (R)</span><span class="value"><button class="cell-edit mask-num" data-col="R" data-mask-str="＊＊＊" title="點擊編輯股息">${fmtMoney(r.R)}</button></span></div>
-
-              <div class="detail-item"><span class="label">ROI (H)</span><span class="value">${roiPillHTML(roi)}</span></div>
-              <div class="detail-item"><span class="label">買日 (L)</span><span class="value">${fmtDate(r.L)}</span></div>
-              <div class="detail-item"><span class="label">賣日 (M)</span><span class="value">${fmtDate(r.M)}</span></div>
-
-              <div class="detail-item"><span class="label">手續+稅 (Q)</span><span class="value mask-num" data-mask-str="＊＊＊">${fmtMoney(r.Q)}</span></div>
-              <div class="detail-item"><span class="label">單位 (U)</span><span class="value">${esc(r.U || '')}</span></div>
-              <div class="detail-item"><span class="label">市場 (T)</span><span class="value">${esc(r.T || '')}</span></div>
+        return `<tr class="stk-row ${isSelected ? 'selected' : ''}" data-row="${rowId}">
+          <td class="col-status"><span class="status-dot ${isActive ? 'active' : 'inactive'}"></span></td>
+          <td class="txt">${esc(r.B || '-')}</td>
+          <td class="num col-fix-1 mask-num" data-mask-str="＊＊＊">${fmtInt(r.C)}</td>
+          <td class="num col-fix-2 mask-num" data-mask-str="＊＊＊">${fmtMoney2(r.F)}</td>
+          <td class="num col-fix-5 mask-num" data-mask-str="＊＊＊">${fmtMoney2(r.D)}</td>
+          <td class="num col-fix-3 mask-num" data-mask-str="＊＊＊">${fmtMoney2(r.E)}</td>
+          <td class="txt pnl-col">
+            <div class="pnl-cell">
+              <span class="num mask-num" data-mask-str="＊＊＊">${upl}</span>
+              ${roiPillHTML(roi)}
             </div>
-          </div>
-        </td>
-      </tr>`;
-        return main + detail;
+          </td>
+          <td class="txt">${isSoldRow(r) ? '已賣出' : '—'}</td>
+        </tr>`;
       }).join('');
 
       // 綁定 slice 內事件
-      vs.tbody.querySelectorAll('.cell-edit').forEach(btn => {
-        btn.addEventListener('click', onEditCellClick);
-      });
+      // 移除舊的按鈕事件，改為整列點擊
 
       if (!slice.length) {
         vs.tbody.style.transform = 'translateY(0px)';
@@ -274,7 +263,8 @@
       sync();
       btn.onclick = () => {
         st.showOnlyOpen = !st.showOnlyOpen;
-        st.expanded.clear();
+        st.selectedRow = null;
+        closeDetail();
         applyFilter();
         renderKPI(viewRows);
         renderHead();
@@ -463,7 +453,7 @@
         const sellDate = (byId('stkSellDate') && byId('stkSellDate').value) || '';
 
         toggleBusy(true);
-        const run = (window.google && google.script && google.script.run) ? google.script.run
+        const run = (window.google && google.script && google.script.run) ? window.google.script.run
           : (window.parent && window.parent.google && window.parent.google.script && window.parent.google.script.run) ? window.parent.google.script.run
             : null;
         if (!run) { toggleBusy(false); alert('更新失敗：找不到 Apps Script 執行環境'); return; }
@@ -500,68 +490,108 @@
 
     function bindAddFlow() {
       const open = byId('stkAddBtn');
-      const dlg = byId('stkAddDlg');
-      const form = byId('stkAddForm');
-      const close = byId('stkAddClose');
-      const cancel = byId('stkAddCancel');
-      const ok = byId('stkAddOk');
-      if (!open || !dlg || !form) return;
+      if (!open) return;
+      open.onclick = () => renderAddStockCard();
+    }
 
-      const fillMarkets = () => {
-        const sel = byId('stkAddMarket'); if (!sel) return;
-        sel.innerHTML = st.markets.map(m => `<option value="${esc(m)}"${m === st.market ? ' selected' : ''}>${esc(m)}</option>`).join('');
-      };
-      const today = () => new Date().toISOString().slice(0, 10);
+    function renderAddStockCard() {
+      const container = byId('investDetailCardContainer');
+      if (!container) return;
+      if (window.App?.modules?.invest) App.modules.invest.closeCategoryDetail();
 
-      open.onclick = () => {
-        fillMarkets();
-        byId('stkAddName').value = '';
-        byId('stkAddShares').value = '';
-        byId('stkAddBuy').value = '';
-        byId('stkAddDiv').value = '0.0';
-        byId('stkAddDate').value = today();
-        byId('stkAddUnit').value = '零股';
-        dlg.style.display = 'flex';  // 搭配 CSS 置中
-      };
-      const closeDlg = () => dlg.style.display = 'none';
-      if (close) close.onclick = closeDlg;
-      if (cancel) cancel.onclick = closeDlg;
+      const today = new Date().toISOString().slice(0, 10);
 
-      form.onsubmit = (e) => {
-        e.preventDefault();
-        const item = {
-          B: byId('stkAddName').value.trim(),
-          C: Number(byId('stkAddShares').value || 0),
-          D: Number(byId('stkAddBuy').value || 0),
-          T: byId('stkAddMarket').value,
-          R: Number(byId('stkAddDiv').value || 0),
-          L: byId('stkAddDate').value,
-          U: byId('stkAddUnit').value
-        };
-        if (!item.B || !item.C || !item.D) { alert('請填寫 產品 / 股數 / 買價'); return; }
-        // Optimistic UI: 先在清單前端插入一筆暫時列（等待後端寫入與回填公式）
-        const pending = {
-          ROW: 0, A: false, B: item.B, C: item.C, D: item.D, E: '', F: '', G: '', H: '', I: '', J: '', K: '',
-          L: item.L, M: '', N: '', O: '', P: '', Q: '', R: item.R, S: '', T: item.T, U: item.U, V: ''
-        };
-        // 僅當前市場符合時顯示（避免切市場時看到不相關資料）
-        if (!st.market || st.market === item.T) {
-          viewRows = [pending, ...viewRows];
-          renderTable(viewRows);
-        }
-        toggleAddBusy(true);
-        google.script.run
-          .withSuccessHandler(_ => {
-            toggleAddBusy(false);
-            closeDlg();
-            fetchData();
-          })
-          .withFailureHandler(err => {
-            toggleAddBusy(false);
-            alert('新增失敗：' + (err && err.message || ''));
-          })
-          .addSTKItem(item);
-      };
+      container.innerHTML = `
+        <div class="card stk-details-card damping-open" style="margin-top:20px;">
+          <div class="card-hd">
+            <span class="material-symbols-outlined">add_circle</span>
+            <strong>新增資產項目</strong>
+            <button class="btn-ghost" onclick="App.modules.stk.closeDetail()" style="margin-left:auto;"><span class="material-symbols-outlined">close</span></button>
+          </div>
+          <div class="stk-detail-grid" style="display:grid; grid-template-columns: 1fr; gap:0px; padding:0px;">
+            <div class="detail-info">
+              <div class="monolith-card" style="background:var(--card); box-shadow:var(--neu-pressed); border:1px solid var(--hairline); color:var(--text); background-image:none; padding:24px; border-radius:20px;">
+                  <div style="margin-bottom:20px;">
+                      <div class="monolith-label">New Entry / Initialization</div>
+                      <input type="text" id="addStkName" placeholder="輸入名稱 (如: 0050)" 
+                             style="background:transparent; border:none; color:var(--text); font-size:28px; font-weight:900; width:100%; border-bottom:2px solid color-mix(in oklab, var(--tint) 20%, transparent); padding:5px 0; margin-top:5px;">
+                  </div>
+                  
+                  <div style="display:grid; grid-template-columns: 1fr; gap:16px; padding-top:20px; border-top:1px solid color-mix(in oklab, var(--text) 5%, transparent);">
+                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">投資市場</div>
+                              <select id="addStkMarket" style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                                  ${st.markets.map(m => `<option value="${m}" ${m === st.market ? 'selected' : ''}>${m}</option>`).join('')}
+                              </select>
+                          </div>
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">計算單位</div>
+                              <select id="addStkUnit" style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                                  <option>整股</option><option selected>零股</option>
+                              </select>
+                          </div>
+                      </div>
+
+                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">買入股數</div>
+                              <input type="number" id="addStkC" value="0" style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                          </div>
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">買入價格</div>
+                              <input type="number" step="any" id="addStkD" value="0" style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                          </div>
+                      </div>
+
+                      <div class="mono-item">
+                          <div class="monolith-label" style="margin-bottom:4px;">買入日期</div>
+                          <input type="date" id="addStkDate" value="${today}" style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                      </div>
+
+                      <div class="mono-item">
+                          <button class="btn" id="addStkSubmit" onclick="App.modules.stk.submitAdd()" 
+                                  style="width:100%; padding:15px; border-radius:12px; font-weight:900; margin-top:10px;">
+                              確認新增資產
+                          </button>
+                      </div>
+                      <input type="hidden" id="addStkDiv" value="0.0">
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function submitAdd() {
+      const name = byId('addStkName').value.trim();
+      const shares = Number(byId('addStkC').value || 0);
+      const buy = Number(byId('addStkD').value || 0);
+      const market = byId('addStkMarket').value;
+      const unit = byId('addStkUnit').value;
+      const date = byId('addStkDate').value;
+      const div = Number(byId('addStkDiv').value || 0);
+
+      if (!name || !shares || !buy) { alert('請填寫完整資訊'); return; }
+
+      const item = { B: name, C: shares, D: buy, T: market, R: div, L: date, U: unit };
+
+      const run = (window.google && google.script && google.script.run) ? google.script.run : null;
+      if (!run) { alert('GAS 執行環境未就緒，請重試'); return; }
+
+      toggleBusy(true);
+      run
+        .withSuccessHandler(() => {
+          toggleBusy(false);
+          closeDetail();
+          fetchData();
+        })
+        .withFailureHandler(err => {
+          toggleBusy(false);
+          alert('新增失敗：' + (err && err.message || ''));
+        })
+        .addSTKItem(item);
     }
     function toggleAddBusy(on) {
       const ok = byId('stkAddOk');
@@ -588,22 +618,15 @@
         if (raf) return;
         raf = requestAnimationFrame(() => { raf = null; renderVirtual(); });
       });
-      // 點整列
+      // 點整列 -> 選擇該列
       vs.tbody?.addEventListener('click', (ev) => {
-        const isInteractive = ev.target.closest('.cell-edit, .row-toggle, button, a, input, select, textarea');
+        const isInteractive = ev.target.closest('button, a, input, select, textarea');
         if (isInteractive) return;
         const tr = ev.target.closest('tr.stk-row');
         if (!tr) return;
         const rowId = Number(tr.dataset.row || 0);
         if (!rowId) return;
-
-        if (st.expanded.has(rowId)) {
-          st.expanded.delete(rowId);
-        } else {
-          st.expanded.clear();
-          st.expanded.add(rowId);
-        }
-        renderTable(viewRows);
+        selectRow(rowId);
       });
       // Mobile-friendly: pointerup 也可展開/收合（避開按鈕與輸入）
       vs.tbody?.addEventListener('pointerup', (ev) => {
@@ -660,9 +683,10 @@
     function fmtInt(v) { return isFinite(+v) ? Math.round(+v).toLocaleString('zh-Hant-TW') : '—'; }
     function isSoldRow(r) {
       const a = r && r.A;
-      if (typeof a === 'boolean') return a;
-      const s = String(a || '').trim().toLowerCase();
-      return (s === 'true' || s === '已賣出');
+      // 使用者指示：TRUE 應該是已結清，FALSE 才是持有中
+      const s = String(a || '').trim().toUpperCase();
+      if (s === 'TRUE' || s === '已賣出') return true; // TRUE = Sold
+      return false; // FALSE or Empty = Holding
     }
     function fmtDate(v) {
       try {
@@ -683,12 +707,12 @@
       if (!el.dataset.maskStr) el.dataset.maskStr = '＊＊＊';
     }
     function roiPillHTML(v) {
-      if (v == null || !isFinite(+v)) return '<span class="roi-badge zero mask-num" data-mask-str="＊＊＊">—</span>';
+      if (v == null || !isFinite(+v)) return '<span class="monolith-label mask-num" data-mask-str="＊＊＊">---</span>';
       const n = Number(v);
-      const cls = n > 0 ? 'pos' : (n < 0 ? 'neg' : 'zero');
-      const sign = n > 0 ? '+' : (n < 0 ? '−' : '');
+      const cls = n > 0 ? 'monolith-gain' : (n < 0 ? 'monolith-loss' : '');
+      const sign = n > 0 ? '▲' : (n < 0 ? '▼' : '');
       const s = Math.abs(n).toLocaleString('zh-Hant-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-      return `<span class="roi-badge ${cls} mask-num" data-mask-str="＊＊＊">${sign}${s}%</span>`;
+      return `<span class="monolith-label ${cls} mask-num" style="font-weight:700;" data-mask-str="＊＊＊">${sign} ${s}%</span>`;
     }
     function setRoiPill(el, v) { if (el) el.innerHTML = roiPillHTML(v); }
     function setBodyLoading(on) {
@@ -728,7 +752,7 @@
     }
 
     function renderMarketsCard() {
-      const targets = [document.getElementById('stkMarketsList'), document.getElementById('ctbcMarketsList')].filter(Boolean);
+      const targets = [document.getElementById('stkMarketsList'), document.getElementById('investMarketsList')].filter(Boolean);
       if (!targets.length) return; // 沒有任何容器就跳過
 
       // 與主清單一致的過濾（持有/已賣出）
@@ -748,7 +772,7 @@
 
       // --- build two flavors: STK (with PL) & Dashboard (w/o PL) ---
       const htmlForSTK = items.map(o => {
-        const roiPct = o.w ? (o.wU / o.w) : 0;   // 市值加權 ROI（%）
+        const roiPct = o.w ? (o.wU / o.w) : 0;
         const roiHTML = roiPillHTML(roiPct);
         const active = (String(st.market || '') === String(o.T));
         return `<div class="mkt-row${active ? ' active' : ''}" data-mkt="${esc(o.T)}">
@@ -766,47 +790,292 @@
         const roiHTML = roiPillHTML(roiPct);
         return `<div class="kpi-item" data-mkt="${esc(o.T)}">
         <div class="k">${esc(o.T || '-')}</div>
-        <div class="v kpi-valroi" style="display:flex; align-items:center; gap:6px; white-space:nowrap;">
+        <div class="v  .invest-layout {
+    display: flex;
+    gap: var(--space-lg);
+    align-items: flex-start;
+    margin-top: 0;
+  }
+gap:6px; white-space:nowrap;">
           <span class="money capsule mask-num" data-mask-str="＊＊＊">${fmtMoney(o.MV)}</span>
           ${roiHTML}
         </div>
       </div>`;
       }).join('');
 
-      // --- render into each available target ---
       targets.forEach(box => {
-        const isDash = (box.id === 'ctbcMarketsList');
+        const isDash = (box.id === 'investMarketsList');
         box.innerHTML = (isDash ? htmlForDash : htmlForSTK) || (isDash ? '' : '<div class="empty">沒有資料</div>');
-
-        const rows = isDash ? box.querySelectorAll('.kpi-item[data-mkt]')
-          : box.querySelectorAll('.mkt-row[data-mkt]');
-        rows.forEach(el => {
-          el.addEventListener('click', () => {
+        const els = isDash ? box.querySelectorAll('.kpi-item[data-mkt]') : box.querySelectorAll('.mkt-row[data-mkt]');
+        els.forEach(el => {
+          el.onclick = () => {
             const m = el.getAttribute('data-mkt');
-            st.market = m;                 // 切換市場
-            st.expanded.clear();
+            st.market = m;
+            st.selectedRow = null;
+            closeDetail();
             applyFilter();
             renderKPI(viewRows);
             renderHead();
             renderTable(viewRows);
-            // 若從儀表板點擊，嘗試切頁到 STK
-            try { if (typeof go === 'function') go('stk'); } catch (_) {/* no-op */ }
-            // 重新高亮 STK 端的市場選中狀態
-            if (!isDash) {
-              targets.forEach(t => {
-                if (t.id !== 'ctbcMarketsList') {
-                  t.querySelectorAll('[data-mkt]').forEach(row => {
-                    row.classList.toggle('active', row.getAttribute('data-mkt') === m);
-                  });
-                }
-              });
-            }
-          });
+            renderMarketsCard();
+            if (isDash && typeof go === 'function') go('invest');
+          };
         });
       });
     }
 
-    return { init };
+    function selectRow(rowId) {
+      st.selectedRow = rowId;
+      renderVirtual();
+      renderDetailCard(rowId);
+    }
+
+    function renderDetailCard(rowId) {
+      const container = byId('investDetailCardContainer');
+      if (!container) return;
+      const r = allRows.find(x => Number(x.ROW) === rowId);
+      if (!r) { container.innerHTML = ''; return; }
+
+      const roi = normalizePercent(r.H);
+      const isActive = !isSoldRow(r);
+
+      container.innerHTML = `
+        <div class="card stk-details-card damping-open" style="margin-top:20px;">
+          <div class="card-hd">
+            <span class="material-symbols-outlined">analytics</span>
+            <strong>細節詳情：${esc(r.B || '-')}</strong>
+            <button class="btn-ghost" onclick="App.modules.stk.closeDetail()" style="margin-left:auto;"><span class="material-symbols-outlined">close</span></button>
+          </div>
+          <div class="stk-detail-grid" style="display:grid; grid-template-columns: 1fr; gap:0px; padding:0px;">
+            <div class="detail-info">
+              <!-- Monolith Style Box (Integrated) -->
+              <div class="monolith-card" style="background:var(--card); box-shadow:var(--neu-pressed); border:1px solid var(--hairline); color:var(--text); background-image:none; padding:24px; border-radius:20px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px;">
+                      <div>
+                          <div class="monolith-symbol" style="color:var(--text); font-size:32px; font-weight:900;">${esc(typeof r.B === 'string' ? r.B.split(' ')[0] : (r.B || 'STK'))}</div>
+                          <div class="monolith-label">Terminal / Asset Profile</div>
+                      </div>
+                      <div style="text-align:right;">
+                          <div class="monolith-price" style="font-size:36px; font-weight:900;">$${fmtMoney2(r.E)}</div>
+                          <div style="margin-top:4px;">${roiPillHTML(roi)}</div>
+                      </div>
+                  </div>
+                  
+                  <!-- Integrated Info & Action Grid -->
+                  <div style="display:grid; grid-template-columns: 1fr; gap:16px; padding-top:24px; border-top:1px solid color-mix(in oklab, var(--text) 5%, transparent);">
+                      
+                      <!-- Row 1: Position & Avg Cost -->
+                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">持股數量</div>
+                              <div style="font-family:'JetBrains Mono'; font-weight:700; font-size:18px;">${fmtInt(r.C)}</div>
+                          </div>
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">平均成本</div>
+                              <div style="font-family:'JetBrains Mono'; font-weight:700; font-size:18px;">$${fmtMoney2(r.F)}</div>
+                          </div>
+                      </div>
+
+                      <!-- Row 2: Buy Price (Editable) -->
+                      <div style="display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">初始買價</div>
+                              <input type="number" step="any" value="${toNum(r.D)}" id="detInputD" class="input" 
+                                     style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                          </div>
+                          <button class="btn-mini" onclick="App.modules.stk.updateField(${rowId}, 'D', 'detInputD')" 
+                                  style="height:38px; padding:0 15px; border-radius:8px; font-size:12px;">更新</button>
+                      </div>
+
+                      <!-- Row 3: Market Price (Editable) -->
+                      <div style="display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">目前現價</div>
+                              <input type="number" step="any" value="${toNum(r.E)}" id="detInputE" class="input" 
+                                     style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                          </div>
+                          <button class="btn-mini" onclick="App.modules.stk.updateField(${rowId}, 'E', 'detInputE')"
+                                  style="height:38px; padding:0 15px; border-radius:8px; font-size:12px;">更新</button>
+                      </div>
+
+                      <!-- Row 4: Dividend (Editable) -->
+                      <div style="display:grid; grid-template-columns: 1fr auto; gap:12px; align-items:end;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">累計股息</div>
+                              <input type="number" step="any" value="${toNum(r.R)}" id="detInputR" class="input" 
+                                     style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:16px; padding:8px 12px; border-radius:8px; width:100%;">
+                          </div>
+                          <button class="btn-mini" onclick="App.modules.stk.updateField(${rowId}, 'R', 'detInputR')"
+                                  style="height:38px; padding:0 15px; border-radius:8px; font-size:12px;">更新</button>
+                      </div>
+
+                      <!-- Row 5: Dates (Editable) -->
+                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">買入日期</div>
+                              <div style="display:flex; gap:8px;">
+                                <input type="date" value="${fmtDate(r.L)}" id="detInputL" class="input" 
+                                       style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:13px; padding:6px 8px; border-radius:8px; width:100%;">
+                                <button class="btn-mini" onclick="App.modules.stk.updateValue(${rowId}, 'L', 'detInputL')" 
+                                        style="height:32px; padding:0 8px; border-radius:6px; font-size:11px;">改</button>
+                              </div>
+                          </div>
+                          <div class="mono-item">
+                              <div class="monolith-label" style="margin-bottom:4px;">賣出日期</div>
+                              <div style="display:flex; gap:8px;">
+                                <input type="date" value="${fmtDate(r.M)}" id="detInputM" class="input" 
+                                       style="background:rgba(0,0,0,0.03); border:none; font-family:'JetBrains Mono'; font-weight:700; font-size:13px; padding:6px 8px; border-radius:8px; width:100%;">
+                                <button class="btn-mini" onclick="App.modules.stk.updateValue(${rowId}, 'M', 'detInputM')" 
+                                        style="height:32px; padding:0 8px; border-radius:6px; font-size:11px;">改</button>
+                              </div>
+                          </div>
+                      </div>
+
+                      <!-- Row 6: Remarks -->
+                      <div class="mono-item">
+                          <div class="monolith-label" style="margin-bottom:4px;">備註說明</div>
+                          <div style="font-size:13px; opacity:0.8; padding:8px 0;">${esc(r.AH || '-')}</div>
+                      </div>
+
+                      <!-- Row 6: Status Toggle -->
+                      <div class="mono-item">
+                          <div class="monolith-label" style="margin-bottom:8px;">資產狀態</div>
+                          <div class="seg" style="display:flex; background:rgba(0,0,0,0.05); border-radius:10px; padding:3px; gap:4px;">
+                              <button onclick="App.modules.stk.updateStatus(${rowId}, 'TRUE')" 
+                                      style="flex:1; border:none; background:${isActive ? 'var(--card)' : 'transparent'}; color:${isActive ? 'var(--tint)' : 'var(--muted)'}; padding:8px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; box-shadow:${isActive ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'};">
+                                  持有中
+                              </button>
+                              <button onclick="App.modules.stk.showSoldFlow(${rowId})" 
+                                      style="flex:1; border:none; background:${!isActive ? 'var(--card)' : 'transparent'}; color:${!isActive ? 'var(--tint)' : 'var(--muted)'}; padding:8px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; box-shadow:${!isActive ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'};">
+                                  已賣出
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function generateSparklineSVG(row) {
+      const base = toNum(row.E);
+      const points = 10;
+      const data = Array.from({ length: points }, (_, i) => base * (0.95 + Math.random() * 0.1));
+      const min = Math.min(...data);
+      const max = Math.max(...data);
+      const range = max - min || 1;
+
+      const width = 100;
+      const height = 36;
+      const path = data.map((v, i) => {
+        const x = (i / (points - 1)) * width;
+        const y = height - ((v - min) / range) * height;
+        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      }).join(' ');
+
+      const color = (data[points - 1] >= data[0]) ? '#00ffa3' : '#ff2e5b';
+      return `<svg class="sparkline" viewBox="0 0 ${width} ${height}" style="color:${color};"><path d="${path}" stroke="currentColor" fill="none" /></svg>`;
+    }
+
+    function closeDetail() {
+      const card = document.querySelector('.stk-details-card');
+      if (card) {
+        card.classList.remove('damping-open');
+        card.classList.add('damping-close');
+        setTimeout(() => {
+          st.selectedRow = null;
+          renderVirtual();
+          const container = byId('investDetailCardContainer');
+          if (container) container.innerHTML = '';
+        }, 400);
+      } else {
+        st.selectedRow = null;
+        renderVirtual();
+        const container = byId('investDetailCardContainer');
+        if (container) container.innerHTML = '';
+      }
+    }
+
+    function initKLineChart(row) {
+      const canvas = byId('stkKLineCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      // 模擬一些數據，基於現價 (E)
+      const base = toNum(row.E);
+      const data = Array.from({ length: 12 }, (_, i) => base * (0.9 + Math.random() * 0.2));
+      const labels = Array.from({ length: 12 }, (_, i) => (i + 1) + '月');
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '模擬股價',
+            data: data,
+            borderColor: 'var(--tint)',
+            backgroundColor: 'rgba(75, 108, 183, 0.1)',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          }
+        }
+      });
+    }
+
+    function updateField(rowId, col, inputId) {
+      const val = toNum(byId(inputId)?.value);
+      toggleBusy(true);
+      google.script.run
+        .withSuccessHandler(() => { toggleBusy(false); fetchData(); setTimeout(() => selectRow(rowId), 500); })
+        .withFailureHandler(err => { toggleBusy(false); alert('更新失敗：' + (err && err.message || '')); })
+        .setSTKValue(rowId, col, val, null);
+    }
+
+    function updateStatus(rowId, val) {
+      if (val === '已賣出') {
+        const sellDate = byId('detInputM')?.value;
+        if (!sellDate) {
+          alert('請先填寫「賣出日期」後再切換為已賣出狀態');
+          // 強制重置選取狀態 (這裡簡單的做法是重新整理卡片)
+          renderDetailCard(rowId);
+          return;
+        }
+      }
+      toggleBusy(true);
+      google.script.run
+        .withSuccessHandler(() => { toggleBusy(false); fetchData(); setTimeout(() => selectRow(rowId), 500); })
+        .withFailureHandler(err => { toggleBusy(false); alert('更新失敗：' + (err && err.message || '')); })
+        .setSTKValue(rowId, 'A', val, null);
+    }
+
+    function updateValue(rowId, col, inputId) {
+      const val = byId(inputId)?.value;
+      if (!val && col === 'M') { /* allow empty sell date */ }
+      toggleBusy(true);
+      google.script.run
+        .withSuccessHandler(() => { toggleBusy(false); fetchData(); setTimeout(() => selectRow(rowId), 500); })
+        .withFailureHandler(err => { toggleBusy(false); alert('更新失敗：' + (err && err.message || '')); })
+        .setSTKValue(rowId, col, val, null);
+    }
+
+    function showSoldFlow(rowId) {
+      // Re-use existing edit logic for split sell or implementation of new flow
+      onEditCellClick({ currentTarget: { dataset: { col: 'A' }, closest: () => ({ dataset: { row: rowId } }) } });
+    }
+
+    return { init, renderMarketsCard, closeDetail, updateField, updateStatus, updateValue, showSoldFlow, generateSparklineSVG, renderAddStockCard, submitAdd };
   })();
 
   ; (function autoInitSTK() {
