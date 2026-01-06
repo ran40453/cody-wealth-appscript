@@ -1,0 +1,116 @@
+<section id="page-db" class="page">
+    <div class="db-v2-grid cards-zoom-scope">
+
+        <!-- Card 1: Cockpit -->
+        <div class="neu-v2-card neu-flat-v2 db-v2-full" data-go="dashmain" style="padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <h2 style="font-size:14px; font-weight:700; opacity:0.6; margin-bottom:8px;">TOTAL ASSETS (TWD)</h2>
+                    <div style="font-size:36px; font-weight:900; letter-spacing:-1px;" id="db2TotalAssets"
+                        class="mask-num" data-mask-str="＊＊＊">Loading...</div>
+                </div>
+                <!-- Scaled PnL Pill -->
+                <div id="db2PnLPill" class="db-v2-pill db-v2-pill-lg pos">
+                    <span class="material-symbols-outlined">trending_up</span>
+                    <span id="db2PnLPerc">Loading...</span>
+                </div>
+            </div>
+
+            <div class="db-v2-kpi-grid" style="margin-top: 20px;">
+                <div class="neu-inset-v2" style="padding:16px; border-radius:20px;">
+                    <div style="font-size:10px; font-weight:700; opacity:0.5; margin-bottom:4px;">NET ASSETS</div>
+                    <div style="font-size:18px; font-weight:800;" id="db2NetAssets" class="mask-num"
+                        data-mask-str="＊＊＊">Loading...</div>
+                </div>
+                <div class="neu-inset-v2" style="padding:16px; border-radius:20px;">
+                    <div style="font-size:10px; font-weight:700; opacity:0.5; margin-bottom:4px;">LIQUID CASH</div>
+                    <div style="font-size:18px; font-weight:800;" id="db2Cash" class="mask-num" data-mask-str="＊＊＊">
+                        Loading...</div>
+                </div>
+                <div class="neu-inset-v2" style="padding:16px; border-radius:20px;">
+                    <div style="font-size:10px; font-weight:700; opacity:0.5; margin-bottom:4px;">DISPOSABLE</div>
+                    <div style="font-size:18px; font-weight:800;" id="db2Avail" class="mask-num" data-mask-str="＊＊＊">
+                        Loading...</div>
+                </div>
+                <div class="neu-inset-v2" style="padding:16px; border-radius:20px;">
+                    <div style="font-size:10px; font-weight:700; opacity:0.5; margin-bottom:4px;">USD RESERVES</div>
+                    <div style="font-size:18px; font-weight:800;" id="db2USD" class="mask-num" data-mask-str="＊＊＊">
+                        Loading...</div>
+                </div>
+            </div>
+
+            <div
+                style="margin-top:16px; display:flex; align-items:center; gap:8px; opacity:0.3; font-size:10px; font-weight:700;">
+                <span class="material-symbols-outlined" style="font-size:14px;">history</span>
+                LAST UPDATE: <span id="db2LastUpdate">LOADING...</span>
+            </div>
+        </div>
+
+        <!-- Card 2: Investment Pulse -->
+        <div class="neu-v2-card neu-flat-v2" data-go="invest">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                <h3 style="font-size:16px; font-weight:800;">Investment Pulse</h3>
+                <span class="material-symbols-outlined" style="opacity:0.4;">monitoring</span>
+            </div>
+
+            <div style="display:flex; gap:16px; margin-bottom:24px;">
+                <div style="flex:1;">
+                    <div style="font-size:10px; font-weight:700; opacity:0.5; margin-bottom:6px;">MANAGED FUNDS</div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:24px; font-weight:900;" id="db2FundVal" class="mask-num"
+                            data-mask-str="＊＊＊">Loading...</span>
+                        <span id="db2FundROI"></span>
+                    </div>
+                </div>
+                <div style="flex:1;">
+                    <div style="font-size:10px; font-weight:700; opacity:0.5; margin-bottom:6px;">INTEREST</div>
+                    <div style="font-size:24px; font-weight:900;" id="db2FundInt" class="mask-num" data-mask-str="＊＊＊">
+                        Loading...</div>
+                </div>
+            </div>
+
+            <div style="font-size:11px; font-weight:800; opacity:0.4; margin-bottom:12px; text-transform:uppercase;">
+                Live Equity Holdings</div>
+            <div id="db2StockList" style="display:grid; gap:12px;">
+                <!-- JS items -->
+            </div>
+        </div>
+
+        <!-- Card 3: Cashflow -->
+        <div class="neu-v2-card neu-flat-v2" data-go="input">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+                <h3 style="font-size:16px; font-weight:800;">Cashflow</h3>
+                <div style="text-align:right;">
+                    <div style="font-size:20px; font-weight:900;" id="db2ProjectedSum" class="mask-num"
+                        data-mask-str="＊＊＊">$Loading...</div>
+                    <div style="font-size:9px; font-weight:700; opacity:0.4;">PROJECTED (NORMAL)</div>
+                </div>
+            </div>
+
+            <div id="db2ActivityList" style="display:grid; gap:12px;">
+                <!-- JS items: each show posted & projected boxes -->
+            </div>
+        </div>
+
+        <!-- Card 4: Wallet Distribution -->
+        <div class="neu-v2-card neu-flat-v2 db-v2-full" data-go="acc">
+            <div style="display:flex; justify-content:space-between; align-items:end; margin-bottom:24px;">
+                <div>
+                    <h3 style="font-size:16px; font-weight:800;">Wallet Distribution</h3>
+                    <div style="font-size:11px; opacity:0.4; font-weight:700; margin-top:4px;">NET POSITIONS ACROSS
+                        INSTITUTIONS</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:28px; font-weight:950; color:var(--tint);" id="db2WalletTotal"
+                        class="mask-num" data-mask-str="＊＊＊">Loading...</div>
+                    <div style="font-size:9px; font-weight:800; opacity:0.3;">TOTAL LIQUID SUM</div>
+                </div>
+            </div>
+
+            <div class="db-v2-wallet-grid" id="db2WalletGrid">
+                <!-- JS items: 5 per row on desktop -->
+            </div>
+        </div>
+
+    </div>
+</section>

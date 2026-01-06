@@ -7770,4 +7770,173 @@
       background: var(--card);
     }
   }
+
+  /* Phase 48: Neumorphic V2 Utility Classes (AI Design) */
+  .neu-flat-v2 {
+    background: var(--bg);
+    box-shadow: 9px 9px 16px color-mix(in oklab, var(--bg) 10%, black 15%),
+      -9px -9px 16px color-mix(in oklab, var(--bg) 10%, white 15%);
+  }
+
+  [data-theme="neu"] .neu-flat-v2 {
+    box-shadow: 9px 9px 16px #bec8d2, -9px -9px 16px #ffffff;
+  }
+
+  [data-theme="neu-dark"] .neu-flat-v2 {
+    box-shadow: 9px 9px 16px #131517, -9px -9px 16px #292d31;
+  }
+
+  .neu-inset-v2 {
+    background: var(--bg);
+    box-shadow: inset 6px 6px 12px color-mix(in oklab, var(--bg) 10%, black 15%),
+      inset -6px -6px 12px color-mix(in oklab, var(--bg) 10%, white 15%);
+  }
+
+  [data-theme="neu"] .neu-inset-v2 {
+    box-shadow: inset 6px 6px 12px #bec8d2, inset -6px -6px 12px #ffffff;
+  }
+
+  [data-theme="neu-dark"] .neu-inset-v2 {
+    box-shadow: inset 6px 6px 12px #131517, inset -6px -6px 12px #292d31;
+  }
+
+  .neu-v2-card {
+    border-radius: 24px;
+    padding: 24px;
+    transition: all 0.3s var(--ease-emphasized);
+  }
+
+  .neu-v2-card:hover {
+    transform: translateY(-4px);
+  }
+
+  /* Grid Layout for DB V2 */
+  .db-v2-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    padding: 24px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  @media (min-width: 1024px) {
+    .db-v2-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .db-v2-full {
+      grid-column: span 2;
+    }
+  }
+
+  .db-v2-pill {
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .db-v2-pill-lg {
+    padding: 8px 20px;
+    font-size: 18px;
+    gap: 8px;
+    border-radius: 999px;
+  }
+
+  .db-v2-pill-lg .material-symbols-outlined {
+    font-size: 20px !important;
+  }
+
+  .db-v2-pill.pos {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+  }
+
+  .db-v2-pill.neg {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+  }
+
+  .db-v2-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  @media (min-width: 768px) {
+    .db-v2-kpi-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+  }
+
+  .db-v2-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    border-radius: 20px;
+    margin-bottom: 12px;
+  }
+
+  .db-v2-icon-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Wallet Grid 5-column */
+  .db-v2-wallet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .db-v2-wallet-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .db-v2-wallet-grid {
+      grid-template-columns: repeat(5, 1fr);
+    }
+  }
+
+  .db-v2-cash-box {
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 800;
+    min-width: 60px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .db-v2-cash-box span:first-child {
+    font-size: 8px;
+    opacity: 0.5;
+    font-weight: 400;
+    text-transform: uppercase;
+  }
+
+  .db-v2-cash-box.posted {
+    background: rgba(var(--tint-rgb), 0.1);
+    color: var(--tint);
+  }
+
+  .db-v2-cash-box.projected {
+    background: rgba(0, 0, 0, 0.05);
+  }
 </style>

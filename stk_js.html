@@ -54,6 +54,7 @@
       run
         .withSuccessHandler(rows => {
           allRows = Array.isArray(rows) ? rows : [];
+          window.__stkHoldings__ = allRows; // Expose for Dashboard V2
           const set = new Set();
           allRows.forEach(r => { const t = String(r.T || '').trim(); if (t) set.add(t); });
           st.markets = Array.from(set);

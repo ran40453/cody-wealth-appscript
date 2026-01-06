@@ -6,6 +6,7 @@
     pages: {},                       // pageKey -> { init?, refresh? }
     titles: {
       input: '記帳',
+      db: 'Dashboard V2',
       dashmain: 'Dashboard', debt: '債務', record: 'Database',
       invest: '投資', policy: '定存保單', gcv: 'GCV',
       mrpt: '投資月報表', fortune: '年報表', stk: '股票總表',
@@ -505,7 +506,7 @@
     console.log('[App] Start Hash:', first);
 
     // Whitelist valid pages to prevent weird states
-    const validPages = ['dashmain', 'input', 'invest', 'record', 'policy', 'links', 'gcv', 'mrpt', 'fortune', 'grw', 'anlys', 'charts', 'stk'];
+    const validPages = ['db', 'dashmain', 'input', 'invest', 'record', 'policy', 'links', 'gcv', 'mrpt', 'fortune', 'grw', 'anlys', 'charts', 'stk'];
     if (!first || !validPages.includes(first)) {
       console.log('[App] Invalid or empty hash, defaulting to dashmain');
       first = 'dashmain';
