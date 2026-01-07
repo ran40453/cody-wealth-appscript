@@ -1,0 +1,112 @@
+<? var DEPLOY_TAG = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss z"); ?>
+<!doctype html>
+<html lang="zh-Hant">
+
+<head>
+  <script>
+    // 由最上層模板計算後塞到前端（注意：這段要在其它檔案 include 之前）
+    window.__CW_DEPLOY_TAG = "<?= DEPLOY_TAG ?>";
+    // 若你要暫時手動標註測試環境，也可以覆蓋：
+    // window.__CW_DEPLOY_TAG = "TEST / staging-2025-09-03";
+  </script>
+  <?!= include('_head'); ?>
+  <?!= include('shared'); ?>
+  <?!= include('style'); ?>
+</head>
+
+<body>
+  <header id="app-header">
+    <?!= include('_header'); ?>
+  </header>
+
+  <aside id="drawer" class="drawer">
+    <?!= include('_drawer'); ?>
+  </aside>
+
+  <main class="app" id="app-pages">
+    <?!= include('page_db'); ?>
+    <?!= include('page_dashmain'); ?>
+    <?!= include('page_input'); ?>
+    <?!= include('page_acc'); ?>
+    <?!= include('page_invest'); ?>
+    <?!= include('page_record'); ?>
+    <?!= include('page_debt'); ?>
+    <?!= include('page_routines'); ?>
+    <?!= include('page_policy'); ?>
+    <?!= include('page_gcv'); ?>
+    <?!= include('page_mrpt'); ?>
+    <?!= include('page_fortune'); ?>
+    <?!= include('page_grw'); ?>
+    <?!= include('page_anlys'); ?>
+    <?!= include('page_charts'); ?>
+    <?!= include('page_links'); ?>
+  </main>
+
+  <!-- popmenus root -->
+  <div id="popmenus-root" aria-live="polite"></div>
+
+  <!-- 版本提示 UI -->
+  <button id="ver-chip" class="ver-chip" type="button" aria-label="顯示部署版本"></button>
+  <div id="ver-toast" class="ver-toast" role="status" hidden></div>
+
+  <!-- 初始化版本提示（不影響既有腳本） -->
+  <script>
+    (function () {
+      const tag = window.__CW_DEPLOY_TAG || 'unknown';
+      const chip = document.getElementById('ver-chip');
+      const toast = document.getElementById('ver-toast');
+      if (!chip || !toast) return;
+
+      chip.textContent = 'v';
+      chip.addEventListener('click', showToast);
+
+      function showToast() {
+        toast.textContent = '部署版本：' + tag;
+        toast.hidden = false;
+        requestAnimationFrame(() => toast.classList.add('show'));
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => {
+          toast.classList.remove('show');
+          setTimeout(() => toast.hidden = true, 200);
+        }, 2600);
+      }
+    })();
+  </script>
+
+  <?!= include('nowbar'); ?>
+  <?!= include('tabbar'); ?>
+
+  <!-- 全域腳本 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <?!= include('api_js'); ?>
+  <?!= include('utils_js'); ?>
+  <?!= include('app_js'); ?>
+  <?!= include('record_js'); ?>
+  <?!= include('db_js'); ?>
+  <?!= include('dashmain_js'); ?>
+  <?!= include('cashflow_js'); ?>
+  <?!= include('invest_js'); ?>
+  <?!= include('input_js'); ?>
+  <?!= include('links_js'); ?>
+  <?!= include('stk_js'); ?>
+  <?!= include('acc_js'); ?>
+  <?!= include('routines_js'); ?>
+  <?!= include('route_js'); ?>
+  <script>
+
+    (function () {
+      const looksMobile =
+        /iPhone|Android|iPad|iPod/i.test(navigator.userAgent) ||
+        matchMedia('(pointer: coarse)').matches;
+      document.documentElement.classList.toggle('mobile', looksMobile);
+      document.documentElement.classList.toggle('is-mobile', looksMobile);
+      const v = getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim();
+
+    })();
+
+  </script>
+
+</body>
+
+</html>

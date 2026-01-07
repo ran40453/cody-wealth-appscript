@@ -27,7 +27,7 @@ const COLS = {                 // 後備：找不到表頭時的預設欄位（A
 
 /** Web App 入口 */
 function doGet() {
-  const tpl = HtmlService.createTemplateFromFile('index'); // ← 指向 index
+  const tpl = HtmlService.createTemplateFromFile('app_index'); // ← 指向 app_index
   return tpl.evaluate()
     .setTitle('Cody Wealth')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
